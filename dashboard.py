@@ -33,18 +33,19 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=600)
 def load_and_sync_data():
-    # Pulling from the 5 keys in your secrets
-    roster = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet_roster"])
-    ash    = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet_ash"])
-    cmj    = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet_cmj"])
-    throws = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet_throws"])
-    swings = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet_swings"])
+    # This version looks for the keys directly in st.secrets
+    # Use this if your secrets are NOT nested under [connections.gsheets]
+    roster = conn.read(spreadsheet=st.secrets["spreadsheet_roster"])
+    ash    = conn.read(spreadsheet=st.secrets["spreadsheet_ash"])
+    cmj    = conn.read(spreadsheet=st.secrets["spreadsheet_cmj"])
+    throws = conn.read(spreadsheet=st.secrets["spreadsheet_throws"])
+    swings = conn.read(spreadsheet=st.secrets["spreadsheet_swings"])
 
     # Clean column names (remove whitespace)
-    for df in [roster, ash, cmj, throws, swings]:
-        df.columns = df.columns.str.strip()
+    for data_frame in [roster, ash, cmj, throws, swings]:
+        data_frame.columns = data_frame.columns.str.strip()
 
-    # Merging logic
+    # Merging logic (ensure 'Player Name' is the exact column name in all 5 sheets)
     master = roster.merge(ash, on="Player Name", how="left") \
                    .merge(cmj, on="Player Name", how="left") \
                    .merge(throws, on="Player Name", how="left") \
