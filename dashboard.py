@@ -18,89 +18,114 @@ st.markdown("""
 
 # --- PASSWORD PROTECTION ---
 def check_password():
-    def password_entered():
-        if st.session_state["password"] == st.secrets["PASSWORD"]:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
-    
     if "password_correct" not in st.session_state:
-        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
-        st.error("Incorrect Password")
+        st.session_state["password_correct"] = False
+
+    if not st.session_state["password_correct"]:
+        _, col2, _ = st.columns([1,1,1])
+        with col2:
+            st.title("🥎 Access Key")
+            pwd = st.text_input("Enter Password", type="password")
+            if st.button("Login"):
+                if pwd == st.secrets["PASSWORD"]:
+                    st.session_state["password_correct"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect Password")
         return False
     return True
 
 if check_password():
 
-    # --- DATA LOADING (The 'Nuclear Sanitizer' Logic) ---
     @st.cache_data(ttl=300)
     def load_all_data():
-        def heavy_sanitize(frame):
+        def heavy_sanitize(frame, sheet_name):
+            # Strip whitespace from headers
             frame.columns = frame.columns.str.strip()
-            # Force numeric conversion for performance stats
+            
+            # Find the Name column
+            name_col = None
+            possible_names = ['Player Name', 'Name', 'Athlete', 'Player']
+            for col in frame.columns:
+                if col in possible_names or col.lower() in [p.lower() for p in possible_names]:
+                    name_col = col
+                    break
+            
+            if name_col:
+                frame.rename(columns={name_col: "Player Name"}, inplace=True)
+                # Clean up the names themselves
+                frame["Player Name"] = frame["Player Name"].astype(str).str.strip()
+            else:
+                st.error(f"Missing Name column in {sheet_name} sheet.")
+                st.stop()
+
+            # Clean numeric data
             for col in frame.columns:
                 if any(word in col.lower() for word in ['force', 'rfd', 'height', 'load', 'count', 'power']):
                     frame[col] = pd.to_numeric(frame[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
             return frame
 
-        # Load from secrets
-        roster = heavy_sanitize(pd.read_csv(st.secrets["ROSTER_URL"]))
-        ash = heavy_sanitize(pd.read_csv(st.secrets["ASH_URL"]))
-        cmj = heavy_sanitize(pd.read_csv(st.secrets["CMJ_URL"]))
-        throws = heavy_sanitize(pd.read_csv(st.secrets["THROWS_URL"]))
-        swings = heavy_sanitize(pd.read_csv(st.secrets["SWINGS_URL"]))
+        try:
+            # 1. Fetch
+            roster = heavy_sanitize(pd.read_csv(st.secrets["ROSTER_URL"]), "Roster")
+            ash    = heavy_sanitize(pd.read_csv(st.secrets["ASH_URL"]), "ASH")
+            cmj    = heavy_sanitize(pd.read_csv(st.secrets["CMJ_URL"]), "CMJ")
+            throws = heavy_sanitize(pd.read_csv(st.secrets["THROWS_URL"]), "Throws")
+            swings = heavy_sanitize(pd.read_csv(st.secrets["SWINGS_URL"]), "Swings")
 
-        # Merge sequence (Assumes 'Name' is the key in all sheets)
-        master = roster.merge(ash, on="Name", how="left") \
-                       .merge(cmj, on="Name", how="left") \
-                       .merge(throws, on="Name", how="left") \
-                       .merge(swings, on="Name", how="left")
-        return master
+            # 2. Merge - Inner merge on roster first to establish our list
+            master = roster.merge(ash, on="Player Name", how="left")
+            master = master.merge(cmj, on="Player Name", how="left")
+            master = master.merge(throws, on="Player Name", how="left")
+            master = master.merge(swings, on="Player Name", how="left")
+            
+            return master
+        except Exception as e:
+            st.error(f"Data Load Error: {e}")
+            st.stop()
 
     df = load_all_data()
 
     # --- DASHBOARD UI ---
     st.title("🥎 Softball Performance Analytics")
 
-    # Sidebar Filters
-    pos_filter = st.sidebar.multiselect("Position", options=df['Position'].unique(), default=df['Position'].unique())
-    filtered_df = df[df['Position'].isin(pos_filter)]
-
-    # Player Profile Section
-    st.subheader("Player Profile")
-    sel_player = st.selectbox("Select Athlete", filtered_df['Name'])
-    player_data = filtered_df[filtered_df['Name'] == sel_player].iloc[0]
-
-    p_col1, p_col2, p_col3 = st.columns([1, 2, 2])
-    with p_col1:
-        # Assumes your roster sheet has a PhotoURL column
-        photo = player_data.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
-        st.markdown(f'<img src="{photo}" class="player-photo-large">', unsafe_allow_html=True)
+    # Sidebar
+    st.sidebar.header("Filters")
+    pos_list = df['Position'].unique().tolist() if 'Position' in df.columns else ["N/A"]
+    pos_filter = st.sidebar.multiselect("Position", options=pos_list, default=pos_list)
     
-    with p_col2:
-        st.metric("ASH Peak Force", f"{player_data['Peak Vertical Force [N]']} N")
-        st.metric("CMJ Jump Height", f"{player_data['Jump Height (Imp-Mom) [cm]']} cm")
+    filtered_df = df[df['Position'].isin(pos_filter)] if 'Position' in df.columns else df
+
+    # Profiles
+    sel_player = st.selectbox("Select Athlete", filtered_df['Player Name'].unique())
+    p_data = filtered_df[filtered_df['Player Name'] == sel_player].iloc[0]
+
+    c1, c2, c3 = st.columns([1, 2, 2])
+    with c1:
+        img = p_data.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
+        st.markdown(f'<img src="{img}" class="player-photo-large">', unsafe_allow_html=True)
     
-    with p_col3:
-        st.metric("Max Swing Load", player_data['Sum Swing Max Player Load'])
-        st.metric("Total Throws", player_data['Total Throw Count'])
+    with c2:
+        # Using .get() prevents crash if column name is slightly different
+        st.metric("ASH Peak Force", f"{p_data.get('Peak Vertical Force [N]', 0)} N")
+        st.metric("CMJ Jump Height", f"{p_data.get('Jump Height (Imp-Mom) [cm]', 0)} cm")
+    
+    with c3:
+        st.metric("Max Swing Load", p_data.get('Sum Swing Max Player Load', 0))
+        st.metric("Total Throws", p_data.get('Total Throw Count', 0))
 
     st.divider()
 
-    # Correlation Plot
+    # Scatter Plot
     st.subheader("Performance Correlations")
-    col_x = st.selectbox("Gym Metric (X-Axis)", ['Peak Vertical Force [N]', 'Peak Power [W]', 'Jump Height (Imp-Mom) [cm]'])
-    col_y = st.selectbox("Field Metric (Y-Axis)", ['Sum Swing Max Player Load', 'Total Throw Count'])
+    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+    col_x = st.selectbox("X-Axis", options=numeric_cols, index=0)
+    col_y = st.selectbox("Y-Axis", options=numeric_cols, index=min(len(numeric_cols)-1, 5))
 
     fig = px.scatter(filtered_df, x=col_x, y=col_y, color="Position", 
-                     hover_name="Name", trendline="ols",
+                     hover_name="Player Name", trendline="ols",
                      template="plotly_white", color_discrete_sequence=["#FF8200", "#4895DB"])
     st.plotly_chart(fig, use_container_width=True)
 
-    # Admin View
-    with st.expander("View Full Master Data"):
-        st.dataframe(filtered_df)
+    with st.expander("Admin: Raw Master Data"):
+        st.write(df)
