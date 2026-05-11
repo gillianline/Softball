@@ -1,40 +1,29 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Softball Performance Profile", layout="centered")
+st.set_page_config(page_title="Softball ASH Performance", layout="wide")
 
-# --- CUSTOM SCOUT CARD CSS ---
+# --- CUSTOM SCOUT CSS ---
 st.markdown("""
     <style>
-    /* Main Background & Font */
-    .stApp { background-color: #F5F5F7; color: #1D1D1F; font-family: 'Helvetica Neue', sans-serif; }
-    
-    /* Center the metric text */
-    [data-testid="stMetricValue"] { font-size: 32px; font-weight: 800; color: #FF8200; }
-    [data-testid="stMetricLabel"] { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #4895DB; }
-
-    /* The Athlete Card Container */
-    .athlete-card {
-        background-color: white;
-        padding: 30px;
-        border-radius: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        text-align: center;
-        margin-top: 20px;
+    .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
+    .athlete-header {
+        background-color: #F8F9FA;
+        padding: 20px;
+        border-radius: 15px;
+        border-left: 10px solid #FF8200;
+        margin-bottom: 25px;
     }
-    
-    /* Circular Photo Styling */
     .player-photo {
         border-radius: 50%;
-        width: 180px;
-        height: 180px;
+        width: 150px;
+        height: 150px;
         object-fit: cover;
-        border: 4px solid #FF8200;
-        margin-bottom: 20px;
+        border: 4px solid #4895DB;
     }
-
-    /* Hide Streamlit Clutter */
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
@@ -44,9 +33,9 @@ if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    _, col2, _ = st.columns([1,2,1])
+    _, col2, _ = st.columns([1,1,1])
     with col2:
-        st.title("🔐 Access")
+        st.title("🔐 Performance Access")
         pwd = st.text_input("Enter Key", type="password")
         if st.button("Login"):
             if pwd == st.secrets["PASSWORD"]:
@@ -54,45 +43,98 @@ if not st.session_state.auth:
                 st.rerun()
     st.stop()
 
-# --- DATA LOADING (ASH ONLY) ---
+# --- DATA LOADING (ASH + ROSTER) ---
 @st.cache_data(ttl=300)
-def load_data():
-    df = pd.read_csv(st.secrets["ASH_URL"])
-    df.columns = df.columns.str.strip()
-    # Simple clean: only the essentials
-    for col in df.columns:
-        if any(w in col.lower() for w in ['force', 'rfd', 'asym']):
-            df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
-    return df
+def load_performance_data():
+    try:
+        # Load ASH and Roster
+        ash_df = pd.read_csv(st.secrets["ASH_URL"])
+        roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
+        
+        # Clean headers
+        ash_df.columns = ash_df.columns.str.strip()
+        roster_df.columns = roster_df.columns.str.strip()
+        
+        # Nuclear Sanitizer for ASH
+        num_cols = ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']
+        for col in ash_df.columns:
+            if any(m in col for m in num_cols) or 'Asym' in col:
+                ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+        
+        # Merge Picture URLs from Roster
+        df = ash_df.merge(roster_df[['Player Name', 'Picture']], on='Player Name', how='left')
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df
+    except Exception as e:
+        st.error(f"Data Sync Error: {e}")
+        return pd.DataFrame()
 
-df = load_data()
+df = load_performance_data()
 
-# --- UI: THE SCOUT CARD ---
-athlete_list = sorted(df['Player Name'].unique())
-selected = st.selectbox("Search Athlete", athlete_list)
-p_data = df[df['Player Name'] == selected].iloc[-1]
+# --- DASHBOARD UI ---
+if not df.empty:
+    # Athlete Selection
+    athlete_list = sorted(df['Player Name'].unique())
+    selected = st.selectbox("Search Athlete", athlete_list)
+    
+    # Filter data for selected athlete
+    p_all_tests = df[df['Player Name'] == selected].sort_values('Date')
+    p_latest = p_all_tests.iloc[-1]
 
-# Display the "Card"
-st.markdown(f"""
-    <div class="athlete-card">
-        <img src="{p_data.get('PhotoURL', 'https://www.w3schools.com/howto/img_avatar.png')}" class="player-photo">
-        <h1 style="margin:0; color:#1D1D1F;">{selected}</h1>
-        <p style="color:#8E8E93; font-weight:600; text-transform:uppercase;">{p_data.get('Position', 'Athlete')}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Athlete Header Card
+    st.markdown(f"""
+        <div class="athlete-header">
+            <div style="display: flex; align-items: center;">
+                <img src="{p_latest.get('Picture', 'https://www.w3schools.com/howto/img_avatar.png')}" class="player-photo">
+                <div style="margin-left: 30px;">
+                    <h1 style="margin:0;">{selected}</h1>
+                    <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
+                    <p style="color:#8E8E93; margin:0;">Latest Test: {p_latest['Date'].strftime('%m/%d/%Y') if pd.notnull(p_latest['Date']) else 'N/A'}</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-st.write("###") # Spacing
+    # Metric Row
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Peak Force", f"{int(p_latest['Peak Vertical Force [N]'])} N")
+    m2.metric("RFD (200ms)", f"{int(p_latest['RFD - 200ms [N/s]'])} N/s")
+    
+    # Logic for Asymmetry Alert
+    asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
+    m3.metric("Force Asymmetry", f"{asym}%", delta="- Injury Risk" if asym > 10 else None, delta_color="inverse")
+    
+    m4.metric("Time to Peak", f"{p_latest.get('Start Time to Peak Force [s]', 0)}s")
 
-# Metric Grid
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("Peak Force", f"{int(p_data['Peak Vertical Force [N]'])} N")
-    st.metric("Force Asym", f"{p_data.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
+    st.divider()
 
-with col2:
-    st.metric("RFD (200ms)", f"{int(p_data['RFD - 200ms [N/s]'])} N/s")
-    st.metric("Explosive Efforts", p_data.get('Explosive Efforts', 'N/A'))
+    # Visualizations
+    col_left, col_right = st.columns(2)
 
-# Simple Rank Message (No tables/charts)
-peak_force_rank = df['Peak Vertical Force [N]'].rank(ascending=False).loc[p_data.name]
-st.info(f"💡 **Team Insight:** {selected} is currently ranked **#{int(peak_force_rank)}** in Peak Force production.")
+    with col_left:
+        st.subheader("Force Trend (History)")
+        if len(p_all_tests) > 1:
+            fig_trend = px.line(p_all_tests, x='Date', y='Peak Vertical Force [N]', 
+                                markers=True, template="plotly_white", color_discrete_sequence=["#FF8200"])
+            st.plotly_chart(fig_trend, use_container_width=True)
+        else:
+            st.info("Additional test dates required to generate trend lines.")
+
+    with col_right:
+        st.subheader("Side-by-Side Comparison")
+        # Visualizing Left vs Right Force
+        l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
+        r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
+        
+        side_df = pd.DataFrame({
+            'Side': ['Left', 'Right'],
+            'Force [N]': [l_force, r_force]
+        })
+        
+        fig_side = px.bar(side_df, x='Side', y='Force [N]', 
+                          color='Side', color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
+                          template="plotly_white")
+        st.plotly_chart(fig_side, use_container_width=True)
+
+else:
+    st.warning("Ensure 'Player Name' and 'Picture' columns exist in your sheets.")
