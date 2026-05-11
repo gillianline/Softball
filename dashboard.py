@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go  # <--- ADD THIS LINE
+import plotly.graph_objects as go
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
@@ -27,207 +27,132 @@ st.markdown("""
     }
     .stTabs [role="tab"] { font-weight: 800; color: #4895DB; font-size: 18px; }
     .stTabs [aria-selected="true"] { color: #FF8200; border-bottom-color: #FF8200; }
+    .scout-table { width: 100%; border-collapse: collapse; text-align: center; }
+    .scout-table th { background-color: #4895DB; color: white; padding: 8px; border-bottom: 2px solid #FF8200; text-transform: uppercase; font-size: 12px; }
+    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- PASSWORD GATE ---
-if "auth" not in st.session_state:
-    st.session_state.auth = False
+def check_password():
+    if "auth" not in st.session_state:
+        st.session_state.auth = False
+    if not st.session_state.auth:
+        _, col2, _ = st.columns([1,1,1])
+        with col2:
+            st.title("🔐 Access Key")
+            pwd = st.text_input("Password", type="password")
+            if st.button("Unlock Dashboard"):
+                if pwd == st.secrets["PASSWORD"]:
+                    st.session_state.auth = True
+                    st.rerun()
+                else:
+                    st.error("Invalid Password")
+        return False
+    return True
 
-if not st.session_state.auth:
-    _, col2, _ = st.columns([1,1,1])
-    with col2:
-        st.title("🔐 Access Key")
-        pwd = st.text_input("Password", type="password")
-        if st.button("Unlock Dashboard"):
-            if pwd == st.secrets["PASSWORD"]:
-                st.session_state.auth = True
-                st.rerun()
-    st.stop()
+if check_password():
 
-# --- DATA LOADING ---
-@st.cache_data(ttl=300)
-def load_all_data():
-    try:
-        # Load sheets
-        ash_df = pd.read_csv(st.secrets["ASH_URL"])
-        cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
-        roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
+    # --- DATA LOADING & SANITIZATION ---
+    @st.cache_data(ttl=300)
+    def load_all_data():
+        try:
+            ash_df = pd.read_csv(st.secrets["ASH_URL"])
+            cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
+            roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
+            
+            def heavy_sanitize(df):
+                df.columns = df.columns.str.strip()
+                for col in df.columns:
+                    if any(w in col.lower() for w in ['force', 'rfd', 'height', 'power', 'velocity', 'rsi', 'stiffness']):
+                        df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+                if 'Date' in df.columns:
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                return df
+
+            return heavy_sanitize(ash_df), heavy_sanitize(cmj_df), roster_df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+        except Exception as e:
+            st.error(f"Sync Error: {e}")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    ash_df, cmj_df, roster_df = load_all_data()
+
+    if not ash_df.empty and not cmj_df.empty:
+        # Athlete Selection
+        athlete_list = sorted(list(set(ash_df['Player Name'].unique()) | set(cmj_df['Player Name'].unique())))
+        selected = st.selectbox("Search Athlete", athlete_list)
         
-        # Clean headers
-        for df in [ash_df, cmj_df, roster_df]:
-            df.columns = df.columns.str.strip()
-        
-        # Nuclear Sanitizer for numeric columns
-        def sanitize(df):
-            for col in df.columns:
-                if any(word in col.lower() for word in ['force', 'rfd', 'height', 'power', 'velocity', 'impulse', 'rsi', 'stiffness']):
-                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
-            if 'Date' in df.columns:
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-            return df
+        # Get Picture
+        pic_row = roster_df[roster_df['Player Name'] == selected]
+        photo = pic_row['Picture'].values[0] if not pic_row.empty and 'Picture' in roster_df.columns else "https://www.w3schools.com/howto/img_avatar.png"
 
-        ash_df = sanitize(ash_df)
-        cmj_df = sanitize(cmj_df)
-        
-        return ash_df, cmj_df, roster_df
-    except Exception as e:
-        st.error(f"Sync Error: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-
-ash_df, cmj_df, roster_df = load_all_data()
-
-# --- UI LOGIC ---
-if not ash_df.empty and not cmj_df.empty:
-    # Athlete Search
-    athlete_list = sorted(list(set(ash_df['Player Name'].unique()) | set(cmj_df['Player Name'].unique())))
-    selected = st.selectbox("Search Athlete", athlete_list)
-    
-    # Get Picture from Roster
-    photo_url = roster_df[roster_df['Player Name'] == selected]['Picture'].values
-    photo = photo_url[0] if len(photo_url) > 0 else "https://www.w3schools.com/howto/img_avatar.png"
-
-    # Header
-    st.markdown(f"""
-        <div class="athlete-header">
-            <div style="display: flex; align-items: center;">
-                <img src="{photo}" class="player-photo">
-                <div style="margin-left: 30px;">
-                    <h1 style="margin:0;">{selected}</h1>
-                    <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">PERFORMANCE MASTER DASHBOARD</p>
+        # Header
+        st.markdown(f"""
+            <div class="athlete-header">
+                <div style="display: flex; align-items: center;">
+                    <img src="{photo}" class="player-photo">
+                    <div style="margin-left: 30px;">
+                        <h1 style="margin:0;">{selected}</h1>
+                        <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">SOFTBALL PERFORMANCE Hub</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-    # --- TABS ---
-    tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST (Force/RFD)", "🚀 CMJ TEST (Jump/Power)"])
+        tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
 
-    with tab_ash:
-        p_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
-        if not p_ash.empty:
-            latest_ash = p_ash.iloc[-1]
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Peak Force", f"{int(latest_ash['Peak Vertical Force [N]'])} N")
-            m2.metric("RFD (200ms)", f"{int(latest_ash['RFD - 200ms [N/s]'])} N/s")
-            m3.metric("Force Asym", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
-            m4.metric("Time to Peak", f"{latest_ash.get('Start Time to Peak Force [s]', 0)}s")
-            
-            st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', title="Force History", markers=True, color_discrete_sequence=["#FF8200"]), use_container_width=True)
-        else:
-            st.warning("No ASH data found for this athlete.")
-
-    with tab_cmj:
-        p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
-    
-        if not p_cmj.empty:
-            # (Baseline calculations here)
-
-            st.subheader("Height vs. RSI Trend")
-        
-            # This will now work because 'go' is imported
-            fig_trend = go.Figure() 
-        
-            # Add Height Trace
-            fig_trend.add_trace(go.Scatter(
-                x=p_cmj['Date'], y=p_cmj['Jump Height (Imp-Mom) [cm]'],
-                name="Jump Height (cm)", yaxis="y1"
-            ))
-        
-            # Add RSI Trace
-            fig_trend.add_trace(go.Scatter(
-                x=p_cmj['Date'], y=p_cmj['RSI-modified (Imp-Mom) [m/s]'],
-                name="RSI-m", yaxis="y2"
-            ))
-            # --- 2. HEADER: CMJ BASELINE VS. RECOVERY ---
-            st.subheader("CMJ Baseline vs. Post-Match Recovery")
-            st.markdown(f"**Performance vs. Initial Baseline**")
-        
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Baseline Height", f"{b_height:.1f} cm")
-            m2.metric("Latest Jump", f"{l_height:.1f} cm", delta=f"{height_perc:+.1f}%")
-            m3.metric("Current RSI", f"{l_rsi:.2f}", delta=f"{rsi_perc:+.1f}%")
-        
-            # Status logic: flagging fatigue if drop is > 5%
-            status = "Recovered" if height_perc > -5 else "Fatigued"
-            m4.metric("Status", status, delta_color="normal" if status == "Recovered" else "inverse")
-
-            st.divider()
-
-            # --- 3. DUAL AXIS CHART: HEIGHT VS RSI TREND ---
-            st.subheader("Height vs. RSI Trend")
-        
-            fig_trend = go.Figure()
-
-            # Primary Axis: Jump Height
-            fig_trend.add_trace(go.Scatter(
-                x=p_cmj['Date'], y=p_cmj['Jump Height (Imp-Mom) [cm]'],
-                name="Jump Height (cm)", mode='lines+markers',
-                line=dict(color='#FF8200', width=3),
-                marker=dict(size=8, borderwidth=1, bordercolor="white")
-            ))
-
-            # Secondary Axis: RSI
-            fig_trend.add_trace(go.Scatter(
-                x=p_cmj['Date'], y=p_cmj['RSI-modified (Imp-Mom) [m/s]'],
-                name="RSI-m", mode='lines+markers',
-                line=dict(color='#4895DB', width=3, dash='dot'),
-                marker=dict(size=8, borderwidth=1, bordercolor="white"),
-                yaxis="y2"
-            ))
-
-            fig_trend.update_layout(
-                template="plotly_white",
-                hovermode="x unified",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                xaxis=dict(showgrid=False),
-                yaxis=dict(
-                    title="Jump Height (cm)",
-                    titlefont=dict(color="#FF8200"),
-                    tickfont=dict(color="#FF8200")
-                ),
-                yaxis2=dict(
-                    title="RSI-m (m/s)",
-                    titlefont=dict(color="#4895DB"),
-                    tickfont=dict(color="#4895DB"),
-                    anchor="x", overlaying="y", side="right",
-                    showgrid=False
-                ),
-                margin=dict(l=0, r=0, t=40, b=0)
-            )
-            st.plotly_chart(fig_trend, use_container_width=True)
-
-            st.divider()
-
-            # --- 4. MATCH CONTEXT TABLE ---
-            st.subheader("Jump History & Match Context")
-        
-            # Prepare table data
-            history = p_cmj.copy()
-            history['Vs. Baseline'] = (history['Jump Height (Imp-Mom) [cm]'] - b_height).map('{:+.1f} cm'.format)
-        
-            # Rename for clean headers
-            history = history.rename(columns={
-                'Date': 'Jump Date',
-                'Jump Height (Imp-Mom) [cm]': 'Jump Height',
-                'RSI-modified (Imp-Mom) [m/s]': 'RSI'
-            })
-        
-            # Ensure your CMJ Google Sheet has a 'Match Context' column to pull this in
-            display_cols = ['Jump Date', 'Jump Height', 'Vs. Baseline', 'RSI']
-            if 'Match Context' in history.columns:
-                display_cols.insert(1, 'Match Context')
+        # --- ASH TAB ---
+        with tab_ash:
+            p_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+            if not p_ash.empty:
+                latest = p_ash.iloc[-1]
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Peak Force", f"{int(latest['Peak Vertical Force [N]'])} N")
+                m2.metric("RFD (200ms)", f"{int(latest['RFD - 200ms [N/s]'])} N/s")
+                asym = latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
+                m3.metric("Force Asym", f"{asym}%", delta="- Risk" if asym > 10 else None, delta_color="inverse")
+                m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
+                
+                st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', markers=True, title="Force History", color_discrete_sequence=["#FF8200"]), use_container_width=True)
             else:
-                # Fallback if the column doesn't exist yet
-                history['Match Context'] = "N/A"
-                display_cols.insert(1, 'Match Context')
+                st.warning("No ASH data found.")
 
-            # Convert date for cleaner display
-            history['Jump Date'] = history['Jump Date'].dt.strftime('%m/%d/%Y')
+        # --- CMJ TAB ---
+        with tab_cmj:
+            p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
+            if not p_cmj.empty:
+                b_cmj = p_cmj.iloc[0]
+                l_cmj = p_cmj.iloc[-1]
+                
+                h_perc = ((l_cmj['Jump Height (Imp-Mom) [cm]'] - b_cmj['Jump Height (Imp-Mom) [cm]']) / b_cmj['Jump Height (Imp-Mom) [cm]']) * 100
+                
+                st.subheader("CMJ Baseline vs. Post-Match Recovery")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Baseline Height", f"{b_cmj['Jump Height (Imp-Mom) [cm]']:.1f} cm")
+                c2.metric("Latest Jump", f"{l_cmj['Jump Height (Imp-Mom) [cm]']:.1f} cm", delta=f"{h_perc:+.1f}%")
+                c3.metric("Current RSI", f"{l_cmj['RSI-modified (Imp-Mom) [m/s]']:.2f}")
+                status = "Recovered" if h_perc > -5 else "Fatigued"
+                c4.metric("Status", status, delta_color="normal" if status == "Recovered" else "inverse")
 
-            # Rendering with the volleyball CSS class 'scout-table'
-            st.write(history[display_cols].to_html(index=False, classes='scout-table', justify='center', escape=False), unsafe_allow_html=True)
+                # Dual Axis Chart
+                st.subheader("Height vs. RSI Trend")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['Jump Height (Imp-Mom) [cm]'], name="Height (cm)", line=dict(color='#FF8200', width=3), marker=dict(size=8)))
+                fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['RSI-modified (Imp-Mom) [m/s]'], name="RSI-m", line=dict(color='#4895DB', width=3, dash='dot'), yaxis="y2"))
+                
+                fig.update_layout(template="plotly_white", legend=dict(orientation="h", y=1.1),
+                    yaxis=dict(title="Jump Height (cm)", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200")),
+                    yaxis2=dict(title="RSI-m", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB"), overlaying="y", side="right", showgrid=False)
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
-        else:
-            st.warning("No CMJ data available for the selected athlete.")
+                # History Table
+                st.subheader("Jump History & Match Context")
+                hist = p_cmj.copy()
+                hist['Vs. Baseline'] = (hist['Jump Height (Imp-Mom) [cm]'] - b_cmj['Jump Height (Imp-Mom) [cm]']).map('{:+.1f} cm'.format)
+                hist['Jump Date'] = hist['Date'].dt.strftime('%m/%d/%Y')
+                cols = ['Jump Date', 'Jump Height (Imp-Mom) [cm]', 'Vs. Baseline', 'RSI-modified (Imp-Mom) [m/s]']
+                st.write(hist[cols].to_html(index=False, classes='scout-table', escape=False), unsafe_allow_html=True)
+            else:
+                st.warning("No CMJ data found.")
