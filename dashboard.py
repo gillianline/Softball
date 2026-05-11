@@ -50,7 +50,7 @@ def load_all_data():
         
         def sanitize(df):
             df.columns = df.columns.str.strip()
-            # Simplification for Plotly Stability
+            # Clean names for stability
             if 'Jump Height (Imp-Mom) [cm]' in df.columns:
                 df.rename(columns={'Jump Height (Imp-Mom) [cm]': 'JumpHeight'}, inplace=True)
             if 'RSI-modified (Imp-Mom) [m/s]' in df.columns:
@@ -100,7 +100,7 @@ if not ash_df.empty and not cmj_df.empty:
             m2.metric("RFD (200ms)", f"{int(latest['RFD - 200ms [N/s]'])} N/s")
             m3.metric("Force Asym", f"{latest.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
             m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
-            st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', markers=True, color_discrete_sequence=["#FF8200"]), use_container_width=True)
+            st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', markers=True, color_discrete_sequence=["#FF8200"], template="plotly_white"), use_container_width=True)
 
     with tab_cmj:
         p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
@@ -116,43 +116,26 @@ if not ash_df.empty and not cmj_df.empty:
             c3.metric("Current RSI", f"{l_cmj['RSI']:.2f}")
             c4.metric("Status", "Recovered" if h_perc > -5 else "Fatigued", delta_color="normal" if h_perc > -5 else "inverse")
 
-            # --- DUAL AXIS TREND (BYPASSING CONSTRUCTORS) ---
-            st.subheader("Height vs. RSI Trend")
-            
-            # Creating the figure as a raw dictionary to bypass Python 3.14 validation bugs
-            fig_dict = {
-                "data": [
-                    {
-                        "x": p_cmj['Date'].dt.strftime('%Y-%m-%d').tolist(),
-                        "y": p_cmj['JumpHeight'].tolist(),
-                        "type": "scatter",
-                        "mode": "lines+markers",
-                        "name": "Height",
-                        "line": {"color": "#FF8200", "width": 3}
-                    },
-                    {
-                        "x": p_cmj['Date'].dt.strftime('%Y-%m-%d').tolist(),
-                        "y": p_cmj['RSI'].tolist(),
-                        "type": "scatter",
-                        "mode": "lines+markers",
-                        "name": "RSI",
-                        "yaxis": "y2",
-                        "line": {"color": "#4895DB", "width": 3, "dash": "dot"}
-                    }
-                ],
-                "layout": {
-                    "template": "plotly_white",
-                    "xaxis": {"showgrid": False},
-                    "yaxis": {"title": "Jump Height (cm)", "titlefont": {"color": "#FF8200"}, "tickfont": {"color": "#FF8200"}},
-                    "yaxis2": {"title": "RSI", "titlefont": {"color": "#4895DB"}, "tickfont": {"color": "#4895DB"}, "overlaying": "y", "side": "right", "showgrid": False},
-                    "legend": {"orientation": "h", "y": 1.1},
-                    "margin": {"l": 50, "r": 50, "t": 50, "b": 50}
-                }
-            }
-            
-            st.plotly_chart(fig_dict, use_container_width=True)
+            st.divider()
 
-            # --- TABLE ---
+            # --- STACKED CHARTS (BROKEN DUAL-AXIS BYPASSED) ---
+            st.subheader("Performance Trends")
+            
+            # Chart 1: Jump Height
+            fig_h = px.line(p_cmj, x='Date', y='JumpHeight', markers=True, 
+                            title="Jump Height (cm)", color_discrete_sequence=["#FF8200"], template="plotly_white")
+            fig_h.update_layout(xaxis_title=None, margin=dict(l=20, r=20, t=40, b=0))
+            st.plotly_chart(fig_h, use_container_width=True)
+
+            # Chart 2: RSI
+            fig_r = px.line(p_cmj, x='Date', y='RSI', markers=True, 
+                            title="Explosiveness (RSI)", color_discrete_sequence=["#4895DB"], template="plotly_white")
+            fig_r.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+            st.plotly_chart(fig_r, use_container_width=True)
+
+            st.divider()
+
+            # --- HISTORY TABLE ---
             st.subheader("Jump History")
             hist = p_cmj.copy()
             hist['Vs. Baseline'] = (hist['JumpHeight'] - b_cmj['JumpHeight']).map('{:+.1f} cm'.format)
