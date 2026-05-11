@@ -119,49 +119,70 @@ if not ash_df.empty and not cmj_df.empty:
 
     with tab_cmj:
         p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
+        
         if not p_cmj.empty:
+            # --- BASELINE LOGIC ---
+            # We assume the first test or a specific 'Week 1' test is the baseline
+            baseline_val = p_cmj.iloc[0]['Jump Height (Imp-Mom) [cm]']
             latest_cmj = p_cmj.iloc[-1]
+            latest_val = latest_cmj['Jump Height (Imp-Mom) [cm]']
             
-            # --- TOP ROW: THE BIG 4 ---
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Jump Height", f"{latest_cmj['Jump Height (Imp-Mom) [cm]']} cm")
-            c2.metric("RSI-Modified", f"{latest_cmj['RSI-modified (Imp-Mom) [m/s]']}")
-            c3.metric("Peak Power", f"{int(latest_cmj['Peak Power [W]'])} W")
-            c4.metric("Stiffness", f"{int(latest_cmj['CMJ Stiffness [N/m]'])} N/m")
+            # Calculate % Change
+            perc_change = ((latest_val - baseline_val) / baseline_val) * 100
+            
+            # --- TOP ROW: RECOVERY VS BASELINE ---
+            st.subheader("CMJ Baseline vs. Latest Recovery")
+            b1, b2, b3, b4 = st.columns(4)
+            
+            b1.metric("Baseline Height", f"{baseline_val:.1f} cm")
+            b2.metric("Latest Jump", f"{latest_val:.1f} cm", delta=f"{perc_change:+.1f}%")
+            
+            # RSI Comparison
+            baseline_rsi = p_cmj.iloc[0]['RSI-modified (Imp-Mom) [m/s]']
+            latest_rsi = latest_cmj['RSI-modified (Imp-Mom) [m/s]']
+            rsi_delta = ((latest_rsi - baseline_rsi) / baseline_rsi) * 100
+            
+            b3.metric("Current RSI", f"{latest_rsi:.2f}", delta=f"{rsi_delta:+.1f}%")
+            b4.metric("Jump Status", "Recovered" if perc_change > -5 else "Fatigued", 
+                      delta_color="normal" if perc_change > -5 else "inverse")
 
             st.divider()
 
-            # --- MIDDLE ROW: STRATEGY & TRENDS ---
-            col_left, col_right = st.columns(2)
-            
-            with col_left:
-                st.subheader("Braking vs. Deceleration RFD")
-                # This shows if the athlete is 'sharp' or 'mushy' in the bottom of the jump
-                rfd_data = pd.DataFrame({
-                    'Metric': ['Eccentric Braking', 'Eccentric Deceleration'],
-                    'Value': [latest_cmj['Eccentric Braking RFD [N/s]'], latest_cmj['Eccentric Deceleration RFD [N/s]']]
-                })
-                fig_rfd = px.bar(rfd_data, x='Metric', y='Value', 
-                                 color='Metric', 
-                                 color_discrete_map={'Eccentric Braking': '#4895DB', 'Eccentric Deceleration': '#FF8200'},
-                                 template="plotly_white")
-                fig_rfd.update_layout(showlegend=False)
-                st.plotly_chart(fig_rfd, use_container_width=True)
-            
-            with col_right:
-                st.subheader("Jump Height Trend")
-                fig_trend = px.line(p_cmj, x='Date', y='Jump Height (Imp-Mom) [cm]', 
-                                    markers=True, 
-                                    color_discrete_sequence=["#FF8200"],
-                                    template="plotly_white")
-                st.plotly_chart(fig_trend, use_container_width=True)
+            # --- MIDDLE ROW: THE VOLLEYBALL-STYLE TREND ---
+            st.subheader("Height vs. RSI Trend")
+            # Create a dual-axis style chart
+            fig_trend = px.line(p_cmj, x='Date', y=['Jump Height (Imp-Mom) [cm]', 'RSI-modified (Imp-Mom) [m/s]'],
+                                markers=True, 
+                                labels={"value": "Performance Value", "variable": "Metric"},
+                                color_discrete_map={
+                                    "Jump Height (Imp-Mom) [cm]": "#FF8200", 
+                                    "RSI-modified (Imp-Mom) [m/s]": "#4895DB"
+                                },
+                                template="plotly_white")
+            st.plotly_chart(fig_trend, use_container_width=True)
 
-            # --- BOTTOM ROW: ASYMMETRY CHECK ---
-            st.subheader("CMJ Symmetry Analysis")
-            asym_cols = st.columns(3)
-            # Highlighting specific asymmetries in the jump strategy
-            asym_cols[0].metric("Concentric Mean Force Asym", f"{latest_cmj.get('Concentric Mean Force % (Asym) (%)', 0)}%")
-            asym_cols[1].metric("Eccentric Braking Asym", f"{latest_cmj.get('Eccentric Braking RFD % (Asym) (%)', 0)}%")
-            asym_cols[2].metric("Takeoff Peak Force Asym", f"{latest_cmj.get('Takeoff Peak Force % (Asym) (%)', 0)}%")
+            # --- BOTTOM ROW: MATCH CONTEXT TABLE ---
+            st.subheader("Jump History & Match Context")
+            
+            # Create the summary table
+            history_table = p_cmj.copy()
+            history_table['Vs. Baseline'] = history_table['Jump Height (Imp-Mom) [cm]'] - baseline_val
+            history_table['Vs. Baseline'] = history_table['Vs. Baseline'].map('{:+.1f} cm'.format)
+            
+            # Rename columns to match your preferred look
+            display_cols = {
+                'Date': 'Jump Date',
+                'Jump Height (Imp-Mom) [cm]': 'Jump Height',
+                'RSI-modified (Imp-Mom) [m/s]': 'RSI'
+            }
+            
+            # Formatting for display
+            final_table = history_table[list(display_cols.keys()) + ['Vs. Baseline']]
+            final_table = final_table.rename(columns=display_cols)
+            final_table['Jump Date'] = final_table['Jump Date'].dt.strftime('%m/%d/%Y')
+            
+            # Apply the style
+            st.write(final_table.to_html(index=False, classes='scout-table', escape=False), unsafe_allow_html=True)
+            
         else:
             st.warning("No CMJ data found for this athlete.")
