@@ -119,70 +119,112 @@ if not ash_df.empty and not cmj_df.empty:
 
     with tab_cmj:
         p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
-        
+    
         if not p_cmj.empty:
-            # --- BASELINE LOGIC ---
-            # We assume the first test or a specific 'Week 1' test is the baseline
-            baseline_val = p_cmj.iloc[0]['Jump Height (Imp-Mom) [cm]']
+            # --- 1. BASELINE & RECOVERY LOGIC ---
+            # Establish baseline from the first recorded test
+            baseline_cmj = p_cmj.iloc[0]
             latest_cmj = p_cmj.iloc[-1]
-            latest_val = latest_cmj['Jump Height (Imp-Mom) [cm]']
-            
-            # Calculate % Change
-            perc_change = ((latest_val - baseline_val) / baseline_val) * 100
-            
-            # --- TOP ROW: RECOVERY VS BASELINE ---
-            st.subheader("CMJ Baseline vs. Latest Recovery")
-            b1, b2, b3, b4 = st.columns(4)
-            
-            b1.metric("Baseline Height", f"{baseline_val:.1f} cm")
-            b2.metric("Latest Jump", f"{latest_val:.1f} cm", delta=f"{perc_change:+.1f}%")
-            
-            # RSI Comparison
-            baseline_rsi = p_cmj.iloc[0]['RSI-modified (Imp-Mom) [m/s]']
-            latest_rsi = latest_cmj['RSI-modified (Imp-Mom) [m/s]']
-            rsi_delta = ((latest_rsi - baseline_rsi) / baseline_rsi) * 100
-            
-            b3.metric("Current RSI", f"{latest_rsi:.2f}", delta=f"{rsi_delta:+.1f}%")
-            b4.metric("Jump Status", "Recovered" if perc_change > -5 else "Fatigued", 
-                      delta_color="normal" if perc_change > -5 else "inverse")
+        
+            b_height = baseline_cmj['Jump Height (Imp-Mom) [cm]']
+            l_height = latest_cmj['Jump Height (Imp-Mom) [cm]']
+        
+            b_rsi = baseline_cmj['RSI-modified (Imp-Mom) [m/s]']
+            l_rsi = latest_cmj['RSI-modified (Imp-Mom) [m/s]']
+        
+            # Calculate Deltas
+            height_diff = l_height - b_height
+            height_perc = (height_diff / b_height) * 100
+            rsi_perc = ((l_rsi - b_rsi) / b_rsi) * 100
+
+            # --- 2. HEADER: CMJ BASELINE VS. RECOVERY ---
+            st.subheader("CMJ Baseline vs. Post-Match Recovery")
+            st.markdown(f"**Performance vs. Initial Baseline**")
+        
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Baseline Height", f"{b_height:.1f} cm")
+            m2.metric("Latest Jump", f"{l_height:.1f} cm", delta=f"{height_perc:+.1f}%")
+            m3.metric("Current RSI", f"{l_rsi:.2f}", delta=f"{rsi_perc:+.1f}%")
+        
+            # Status logic: flagging fatigue if drop is > 5%
+            status = "Recovered" if height_perc > -5 else "Fatigued"
+            m4.metric("Status", status, delta_color="normal" if status == "Recovered" else "inverse")
 
             st.divider()
 
-            # --- MIDDLE ROW: THE VOLLEYBALL-STYLE TREND ---
+            # --- 3. DUAL AXIS CHART: HEIGHT VS RSI TREND ---
             st.subheader("Height vs. RSI Trend")
-            # Create a dual-axis style chart
-            fig_trend = px.line(p_cmj, x='Date', y=['Jump Height (Imp-Mom) [cm]', 'RSI-modified (Imp-Mom) [m/s]'],
-                                markers=True, 
-                                labels={"value": "Performance Value", "variable": "Metric"},
-                                color_discrete_map={
-                                    "Jump Height (Imp-Mom) [cm]": "#FF8200", 
-                                    "RSI-modified (Imp-Mom) [m/s]": "#4895DB"
-                                },
-                                template="plotly_white")
+        
+            fig_trend = go.Figure()
+
+            # Primary Axis: Jump Height
+            fig_trend.add_trace(go.Scatter(
+                x=p_cmj['Date'], y=p_cmj['Jump Height (Imp-Mom) [cm]'],
+                name="Jump Height (cm)", mode='lines+markers',
+                line=dict(color='#FF8200', width=3),
+                marker=dict(size=8, borderwidth=1, bordercolor="white")
+            ))
+
+            # Secondary Axis: RSI
+            fig_trend.add_trace(go.Scatter(
+                x=p_cmj['Date'], y=p_cmj['RSI-modified (Imp-Mom) [m/s]'],
+                name="RSI-m", mode='lines+markers',
+                line=dict(color='#4895DB', width=3, dash='dot'),
+                marker=dict(size=8, borderwidth=1, bordercolor="white"),
+                yaxis="y2"
+            ))
+
+            fig_trend.update_layout(
+                template="plotly_white",
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                xaxis=dict(showgrid=False),
+                yaxis=dict(
+                    title="Jump Height (cm)",
+                    titlefont=dict(color="#FF8200"),
+                    tickfont=dict(color="#FF8200")
+                ),
+                yaxis2=dict(
+                    title="RSI-m (m/s)",
+                    titlefont=dict(color="#4895DB"),
+                    tickfont=dict(color="#4895DB"),
+                    anchor="x", overlaying="y", side="right",
+                    showgrid=False
+                ),
+                margin=dict(l=0, r=0, t=40, b=0)
+            )
             st.plotly_chart(fig_trend, use_container_width=True)
 
-            # --- BOTTOM ROW: MATCH CONTEXT TABLE ---
+            st.divider()
+
+            # --- 4. MATCH CONTEXT TABLE ---
             st.subheader("Jump History & Match Context")
-            
-            # Create the summary table
-            history_table = p_cmj.copy()
-            history_table['Vs. Baseline'] = history_table['Jump Height (Imp-Mom) [cm]'] - baseline_val
-            history_table['Vs. Baseline'] = history_table['Vs. Baseline'].map('{:+.1f} cm'.format)
-            
-            # Rename columns to match your preferred look
-            display_cols = {
+        
+            # Prepare table data
+            history = p_cmj.copy()
+            history['Vs. Baseline'] = (history['Jump Height (Imp-Mom) [cm]'] - b_height).map('{:+.1f} cm'.format)
+        
+            # Rename for clean headers
+            history = history.rename(columns={
                 'Date': 'Jump Date',
                 'Jump Height (Imp-Mom) [cm]': 'Jump Height',
                 'RSI-modified (Imp-Mom) [m/s]': 'RSI'
-            }
-            
-            # Formatting for display
-            final_table = history_table[list(display_cols.keys()) + ['Vs. Baseline']]
-            final_table = final_table.rename(columns=display_cols)
-            final_table['Jump Date'] = final_table['Jump Date'].dt.strftime('%m/%d/%Y')
-            
-            # Apply the style
-            st.write(final_table.to_html(index=False, classes='scout-table', escape=False), unsafe_allow_html=True)
-            
+            })
+        
+            # Ensure your CMJ Google Sheet has a 'Match Context' column to pull this in
+            display_cols = ['Jump Date', 'Jump Height', 'Vs. Baseline', 'RSI']
+            if 'Match Context' in history.columns:
+                display_cols.insert(1, 'Match Context')
+            else:
+                # Fallback if the column doesn't exist yet
+                history['Match Context'] = "N/A"
+                display_cols.insert(1, 'Match Context')
+
+            # Convert date for cleaner display
+            history['Jump Date'] = history['Jump Date'].dt.strftime('%m/%d/%Y')
+
+            # Rendering with the volleyball CSS class 'scout-table'
+            st.write(history[display_cols].to_html(index=False, classes='scout-table', justify='center', escape=False), unsafe_allow_html=True)
+
         else:
-            st.warning("No CMJ data found for this athlete.")
+            st.warning("No CMJ data available for the selected athlete.")
