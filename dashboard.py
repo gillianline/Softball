@@ -122,22 +122,24 @@ if not ash_df.empty and not cmj_df.empty:
         p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
     
         if not p_cmj.empty:
-            # --- 1. BASELINE & RECOVERY LOGIC ---
-            # Establish baseline from the first recorded test
-            baseline_cmj = p_cmj.iloc[0]
-            latest_cmj = p_cmj.iloc[-1]
-        
-            b_height = baseline_cmj['Jump Height (Imp-Mom) [cm]']
-            l_height = latest_cmj['Jump Height (Imp-Mom) [cm]']
-        
-            b_rsi = baseline_cmj['RSI-modified (Imp-Mom) [m/s]']
-            l_rsi = latest_cmj['RSI-modified (Imp-Mom) [m/s]']
-        
-            # Calculate Deltas
-            height_diff = l_height - b_height
-            height_perc = (height_diff / b_height) * 100
-            rsi_perc = ((l_rsi - b_rsi) / b_rsi) * 100
+            # (Baseline calculations here)
 
+            st.subheader("Height vs. RSI Trend")
+        
+            # This will now work because 'go' is imported
+            fig_trend = go.Figure() 
+        
+            # Add Height Trace
+            fig_trend.add_trace(go.Scatter(
+                x=p_cmj['Date'], y=p_cmj['Jump Height (Imp-Mom) [cm]'],
+                name="Jump Height (cm)", yaxis="y1"
+            ))
+        
+            # Add RSI Trace
+            fig_trend.add_trace(go.Scatter(
+                x=p_cmj['Date'], y=p_cmj['RSI-modified (Imp-Mom) [m/s]'],
+                name="RSI-m", yaxis="y2"
+            ))
             # --- 2. HEADER: CMJ BASELINE VS. RECOVERY ---
             st.subheader("CMJ Baseline vs. Post-Match Recovery")
             st.markdown(f"**Performance vs. Initial Baseline**")
