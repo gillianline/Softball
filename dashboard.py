@@ -3,9 +3,9 @@ import pandas as pd
 import plotly.express as px
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Softball ASH Performance", layout="wide")
+st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
-# --- CUSTOM SCOUT CSS ---
+# --- VOLLEYBALL STYLE CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
@@ -24,6 +24,8 @@ st.markdown("""
         object-fit: cover;
         border: 4px solid #4895DB;
     }
+    .stTabs [role="tab"] { font-weight: 800; color: #4895DB; font-size: 18px; }
+    .stTabs [aria-selected="true"] { color: #FF8200; border-bottom-color: #FF8200; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
@@ -35,106 +37,109 @@ if "auth" not in st.session_state:
 if not st.session_state.auth:
     _, col2, _ = st.columns([1,1,1])
     with col2:
-        st.title("🔐 Performance Access")
-        pwd = st.text_input("Enter Key", type="password")
-        if st.button("Login"):
+        st.title("🔐 Access Key")
+        pwd = st.text_input("Password", type="password")
+        if st.button("Unlock Dashboard"):
             if pwd == st.secrets["PASSWORD"]:
                 st.session_state.auth = True
                 st.rerun()
     st.stop()
 
-# --- DATA LOADING (ASH + ROSTER) ---
+# --- DATA LOADING ---
 @st.cache_data(ttl=300)
-def load_performance_data():
+def load_all_data():
     try:
-        # Load ASH and Roster
+        # Load sheets
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
+        cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
         
         # Clean headers
-        ash_df.columns = ash_df.columns.str.strip()
-        roster_df.columns = roster_df.columns.str.strip()
+        for df in [ash_df, cmj_df, roster_df]:
+            df.columns = df.columns.str.strip()
         
-        # Nuclear Sanitizer for ASH
-        num_cols = ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']
-        for col in ash_df.columns:
-            if any(m in col for m in num_cols) or 'Asym' in col:
-                ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+        # Nuclear Sanitizer for numeric columns
+        def sanitize(df):
+            for col in df.columns:
+                if any(word in col.lower() for word in ['force', 'rfd', 'height', 'power', 'velocity', 'impulse', 'rsi', 'stiffness']):
+                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            return df
+
+        ash_df = sanitize(ash_df)
+        cmj_df = sanitize(cmj_df)
         
-        # Merge Picture URLs from Roster
-        df = ash_df.merge(roster_df[['Player Name', 'Picture']], on='Player Name', how='left')
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df
+        return ash_df, cmj_df, roster_df
     except Exception as e:
-        st.error(f"Data Sync Error: {e}")
-        return pd.DataFrame()
+        st.error(f"Sync Error: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-df = load_performance_data()
+ash_df, cmj_df, roster_df = load_all_data()
 
-# --- DASHBOARD UI ---
-if not df.empty:
-    # Athlete Selection
-    athlete_list = sorted(df['Player Name'].unique())
+# --- UI LOGIC ---
+if not ash_df.empty and not cmj_df.empty:
+    # Athlete Search
+    athlete_list = sorted(list(set(ash_df['Player Name'].unique()) | set(cmj_df['Player Name'].unique())))
     selected = st.selectbox("Search Athlete", athlete_list)
     
-    # Filter data for selected athlete
-    p_all_tests = df[df['Player Name'] == selected].sort_values('Date')
-    p_latest = p_all_tests.iloc[-1]
+    # Get Picture from Roster
+    photo_url = roster_df[roster_df['Player Name'] == selected]['Picture'].values
+    photo = photo_url[0] if len(photo_url) > 0 else "https://www.w3schools.com/howto/img_avatar.png"
 
-    # Athlete Header Card
+    # Header
     st.markdown(f"""
         <div class="athlete-header">
             <div style="display: flex; align-items: center;">
-                <img src="{p_latest.get('Picture', 'https://www.w3schools.com/howto/img_avatar.png')}" class="player-photo">
+                <img src="{photo}" class="player-photo">
                 <div style="margin-left: 30px;">
                     <h1 style="margin:0;">{selected}</h1>
-                    <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
-                    <p style="color:#8E8E93; margin:0;">Latest Test: {p_latest['Date'].strftime('%m/%d/%Y') if pd.notnull(p_latest['Date']) else 'N/A'}</p>
+                    <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">PERFORMANCE MASTER DASHBOARD</p>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    # Metric Row
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Peak Force", f"{int(p_latest['Peak Vertical Force [N]'])} N")
-    m2.metric("RFD (200ms)", f"{int(p_latest['RFD - 200ms [N/s]'])} N/s")
-    
-    # Logic for Asymmetry Alert
-    asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
-    m3.metric("Force Asymmetry", f"{asym}%", delta="- Injury Risk" if asym > 10 else None, delta_color="inverse")
-    
-    m4.metric("Time to Peak", f"{p_latest.get('Start Time to Peak Force [s]', 0)}s")
+    # --- TABS ---
+    tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST (Force/RFD)", "🚀 CMJ TEST (Jump/Power)"])
 
-    st.divider()
-
-    # Visualizations
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        st.subheader("Force Trend (History)")
-        if len(p_all_tests) > 1:
-            fig_trend = px.line(p_all_tests, x='Date', y='Peak Vertical Force [N]', 
-                                markers=True, template="plotly_white", color_discrete_sequence=["#FF8200"])
-            st.plotly_chart(fig_trend, use_container_width=True)
+    with tab_ash:
+        p_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+        if not p_ash.empty:
+            latest_ash = p_ash.iloc[-1]
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Peak Force", f"{int(latest_ash['Peak Vertical Force [N]'])} N")
+            m2.metric("RFD (200ms)", f"{int(latest_ash['RFD - 200ms [N/s]'])} N/s")
+            m3.metric("Force Asym", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
+            m4.metric("Time to Peak", f"{latest_ash.get('Start Time to Peak Force [s]', 0)}s")
+            
+            st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', title="Force History", markers=True, color_discrete_sequence=["#FF8200"]), use_container_width=True)
         else:
-            st.info("Additional test dates required to generate trend lines.")
+            st.warning("No ASH data found for this athlete.")
 
-    with col_right:
-        st.subheader("Side-by-Side Comparison")
-        # Visualizing Left vs Right Force
-        l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
-        r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
-        
-        side_df = pd.DataFrame({
-            'Side': ['Left', 'Right'],
-            'Force [N]': [l_force, r_force]
-        })
-        
-        fig_side = px.bar(side_df, x='Side', y='Force [N]', 
-                          color='Side', color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
-                          template="plotly_white")
-        st.plotly_chart(fig_side, use_container_width=True)
+    with tab_cmj:
+        p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
+        if not p_cmj.empty:
+            latest_cmj = p_cmj.iloc[-1]
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Jump Height", f"{latest_cmj['Jump Height (Imp-Mom) [cm]']} cm")
+            c2.metric("RSI-Modified", f"{latest_cmj['RSI-modified (Imp-Mom) [m/s]']}")
+            c3.metric("Peak Power", f"{int(latest_cmj['Peak Power [W]'])} W")
+            c4.metric("Stiffness", f"{int(latest_cmj['CMJ Stiffness [N/m]'])} N/m")
 
-else:
-    st.warning("Ensure 'Player Name' and 'Picture' columns exist in your sheets.")
+            # Chart: Braking vs Deceleration RFD
+            st.subheader("Braking Strategy")
+            side_col1, side_col2 = st.columns(2)
+            with side_col1:
+                # Impulse Comparison
+                impulse_data = pd.DataFrame({
+                    'Metric': ['P1 Concentric', 'P2 Concentric'],
+                    'Value': [latest_cmj['P1 Concentric Impulse [N s]'], latest_cmj['P2 Concentric Impulse [N s]']]
+                })
+                st.plotly_chart(px.bar(impulse_data, x='Metric', y='Value', color='Metric', title="Concentric Impulse Phases", color_discrete_sequence=["#4895DB", "#FF8200"]), use_container_width=True)
+            
+            with side_col2:
+                # RSI Trend
+                st.plotly_chart(px.line(p_cmj, x='Date', y='RSI-modified (Imp-Mom) [m/s]', title="Explosiveness (RSI-m) Trend", markers=True, color_discrete_sequence=["#FF8200"]), use_container_width=True)
+        else:
+            st.warning("No CMJ data found for this athlete.")
