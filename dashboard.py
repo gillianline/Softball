@@ -49,7 +49,7 @@ def load_all_softball_data():
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
         cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
-        swing_df = pd.read_csv(st.secrets["SWING_URL"])
+        swing_df = pd.read_csv(st.secrets["SWINGS_URL"])
         throw_df = pd.read_csv(st.secrets["THROW_URL"])
         
         def sanitize(df):
