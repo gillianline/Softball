@@ -1,2 +1,5 @@
 pandas
+plotly
+matplotlib
+seaborn
 st-gsheets-connection
