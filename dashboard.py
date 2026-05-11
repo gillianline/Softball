@@ -1,93 +1,106 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 
-# 1. UI Setup & Branding
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance", layout="wide")
-st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 
-# 2. Secret-Based Password Protection
+# --- CSS: FORMATTING (Matches your VB style) ---
+st.markdown("""
+    <style>
+    th, td {text-align: center !important;}
+    [data-testid="stMetricValue"] {font-size: 24px;}
+    .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    .scout-table th { background-color: #4895DB; color: white; padding: 4px; border-bottom: 2px solid #FF8200; font-weight: 700; font-size: 11px; }
+    .player-photo-large { border-radius: 50%; width: 200px; height: 200px; object-fit: contain; border: 6px solid #FF8200; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- PASSWORD PROTECTION ---
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
+    def password_entered():
+        if st.session_state["password"] == st.secrets["PASSWORD"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
     
-    if not st.session_state["authenticated"]:
-        # Centering the login box
-        _, col2, _ = st.columns([1,1,1])
-        with col2:
-            st.title("🔐 Login")
-            pwd = st.text_input("Enter Access Key", type="password")
-            if st.button("Access Dashboard"):
-                if pwd == st.secrets["password"]:
-                    st.session_state["authenticated"] = True
-                    st.rerun()
-                else:
-                    st.error("Invalid Key")
-        st.stop()
+    if "password_correct" not in st.session_state:
+        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
+        st.error("Incorrect Password")
+        return False
+    return True
 
-check_password()
+if check_password():
 
-# 3. Data Connection (Links hidden in Secrets)
-conn = st.connection("gsheets", type=GSheetsConnection)
+    # --- DATA LOADING (The 'Nuclear Sanitizer' Logic) ---
+    @st.cache_data(ttl=300)
+    def load_all_data():
+        def heavy_sanitize(frame):
+            frame.columns = frame.columns.str.strip()
+            # Force numeric conversion for performance stats
+            for col in frame.columns:
+                if any(word in col.lower() for word in ['force', 'rfd', 'height', 'load', 'count', 'power']):
+                    frame[col] = pd.to_numeric(frame[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+            return frame
 
-@st.cache_data(ttl=600)
-def load_and_sync_data():
-    # This version looks for the keys directly in st.secrets
-    # Use this if your secrets are NOT nested under [connections.gsheets]
-    roster = conn.read(spreadsheet=st.secrets["spreadsheet_roster"])
-    ash    = conn.read(spreadsheet=st.secrets["spreadsheet_ash"])
-    cmj    = conn.read(spreadsheet=st.secrets["spreadsheet_cmj"])
-    throws = conn.read(spreadsheet=st.secrets["spreadsheet_throws"])
-    swings = conn.read(spreadsheet=st.secrets["spreadsheet_swings"])
+        # Load from secrets
+        roster = heavy_sanitize(pd.read_csv(st.secrets["ROSTER_URL"]))
+        ash = heavy_sanitize(pd.read_csv(st.secrets["ASH_URL"]))
+        cmj = heavy_sanitize(pd.read_csv(st.secrets["CMJ_URL"]))
+        throws = heavy_sanitize(pd.read_csv(st.secrets["THROWS_URL"]))
+        swings = heavy_sanitize(pd.read_csv(st.secrets["SWINGS_URL"]))
 
-    # Clean column names (remove whitespace)
-    for data_frame in [roster, ash, cmj, throws, swings]:
-        data_frame.columns = data_frame.columns.str.strip()
+        # Merge sequence (Assumes 'Player Name' is the key in all sheets)
+        master = roster.merge(ash, on="Player Name", how="left") \
+                       .merge(cmj, on="Player Name", how="left") \
+                       .merge(throws, on="Player Name", how="left") \
+                       .merge(swings, on="Player Name", how="left")
+        return master
 
-    # Merging logic (ensure 'Player Name' is the exact column name in all 5 sheets)
-    master = roster.merge(ash, on="Player Name", how="left") \
-                   .merge(cmj, on="Player Name", how="left") \
-                   .merge(throws, on="Player Name", how="left") \
-                   .merge(swings, on="Player Name", how="left")
-    return master
+    df = load_all_data()
 
-df = load_and_sync_data()
+    # --- DASHBOARD UI ---
+    st.title("🥎 Softball Performance Analytics")
 
-# 4. Dashboard Logic
-st.title("🥎 Softball Analytics Dashboard")
+    # Sidebar Filters
+    pos_filter = st.sidebar.multiselect("Position", options=df['Position'].unique(), default=df['Position'].unique())
+    filtered_df = df[df['Position'].isin(pos_filter)]
 
-# Top Metrics Row
-cols = st.columns(4)
-cols[0].metric("Roster Size", len(df))
-cols[1].metric("Avg Peak Power", f"{int(df['Peak Power [W]'].mean())}W")
-cols[2].metric("High Load Swings", df['Swing Max Rotation Band 3 Count'].sum())
-cols[3].metric("Throw Volume", df['Total Throw Count'].sum())
+    # Player Profile Section
+    st.subheader("Player Profile")
+    sel_player = st.selectbox("Select Athlete", filtered_df['Player Name'])
+    player_data = filtered_df[filtered_df['Player Name'] == sel_player].iloc[0]
 
-st.divider()
+    p_col1, p_col2, p_col3 = st.columns([1, 2, 2])
+    with p_col1:
+        # Assumes your roster sheet has a PhotoURL column
+        photo = player_data.get('PhotoURL', "https://www.w3schools.com/howto/img_avatar.png")
+        st.markdown(f'<img src="{photo}" class="player-photo-large">', unsafe_allow_html=True)
+    
+    with p_col2:
+        st.metric("ASH Peak Force", f"{player_data['Peak Vertical Force [N]']} N")
+        st.metric("CMJ Jump Height", f"{player_data['Jump Height (Imp-Mom) [cm]']} cm")
+    
+    with p_col3:
+        st.metric("Max Swing Load", player_data['Sum Swing Max Player Load'])
+        st.metric("Total Throws", player_data['Total Throw Count'])
 
-# Correlation Section
-st.subheader("Performance Correlations")
-c1, c2 = st.columns([2, 1])
+    st.divider()
 
-with c1:
-    # Selectors for X and Y axis
-    x_axis = st.selectbox("Choose Physical Metric", 
-                          ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Jump Height (Imp-Mom) [cm]', 'Peak Power [W]'])
-    y_axis = st.selectbox("Choose Skill Metric", 
-                          ['Sum Swing Max Player Load', 'Swing Max Rotation Band 3 Count', 'Total Throw Player Load'])
+    # Correlation Plot
+    st.subheader("Performance Correlations")
+    col_x = st.selectbox("Gym Metric (X-Axis)", ['Peak Vertical Force [N]', 'Peak Power [W]', 'Jump Height (Imp-Mom) [cm]'])
+    col_y = st.selectbox("Field Metric (Y-Axis)", ['Sum Swing Max Player Load', 'Total Throw Count'])
 
-    fig = px.scatter(df, x=x_axis, y=y_axis, color="Position", 
+    fig = px.scatter(filtered_df, x=col_x, y=col_y, color="Position", 
                      hover_name="Player Name", trendline="ols",
-                     template="plotly_dark")
+                     template="plotly_white", color_discrete_sequence=["#FF8200", "#4895DB"])
     st.plotly_chart(fig, use_container_width=True)
 
-with c2:
-    st.write("### Position Rankings")
-    rank_metric = st.selectbox("Rank by:", [x_axis, y_axis])
-    ranking = df[['Player Name', rank_metric, 'Position']].sort_values(by=rank_metric, ascending=False)
-    st.dataframe(ranking, hide_index=True, use_container_width=True)
-
-# 5. Hidden Data View
-with st.expander("Admin: View Master Sheet"):
-    st.dataframe(df)
+    # Admin View
+    with st.expander("View Full Master Data"):
+        st.dataframe(filtered_df)
