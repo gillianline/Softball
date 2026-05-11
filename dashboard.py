@@ -1,52 +1,74 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-# --- PAGE CONFIG ---
+# 1. IMMEDIATE PAGE CONFIG
 st.set_page_config(page_title="Softball Performance", layout="wide")
 
-# --- 1. CRITICAL: CHECK SECRETS FIRST ---
-# This prevents the app from crashing silently if a key is missing
-if "PASSWORD" not in st.secrets:
-    st.error("Missing 'PASSWORD' in Streamlit Secrets.")
-    st.stop()
+# 2. HIDE BRANDING (Matches your VB style)
+st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION ---
-if "auth" not in st.session_state:
-    st.session_state.auth = False
+# 3. SIMPLEST PASSWORD GATE
+# This ensures the app stays "alive" while waiting for input
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
 
-if not st.session_state.auth:
-    st.title("🥎 Softball Analytics Login")
+if not st.session_state["authenticated"]:
+    st.title("🥎 Softball Access")
+    # Using a simple input without a lot of logic around it first
     pwd = st.text_input("Password", type="password")
-    if st.button("Login"):
+    if st.button("Unlock"):
         if pwd == st.secrets["PASSWORD"]:
-            st.session_state.auth = True
+            st.session_state["authenticated"] = True
             st.rerun()
         else:
-            st.error("Invalid Password")
+            st.error("Invalid")
     st.stop()
 
-# --- 3. DATA LOADING ---
+# 4. DATA LOADING (Only runs AFTER successful login)
 @st.cache_data(ttl=600)
-def load_data():
+def load_softball_data():
+    def clean(df):
+        df.columns = df.columns.str.strip()
+        # Mango Type 1 numeric cleaning
+        for col in df.columns:
+            if any(w in col.lower() for w in ['force', 'rfd', 'height', 'load', 'count']):
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+        return df
+
     try:
-        # We use a simple pandas read here to ensure the connection is stable
-        # Make sure your secret names match these EXACTLY
-        r = pd.read_csv(st.secrets["ROSTER_URL"])
-        a = pd.read_csv(st.secrets["ASH_URL"])
-        
-        # Simple Merge to test stability
-        df = pd.merge(r, a, on="Player Name", how="left")
+        # Loading logic
+        roster = clean(pd.read_csv(st.secrets["ROSTER_URL"]))
+        ash    = clean(pd.read_csv(st.secrets["ASH_URL"]))
+        cmj    = clean(pd.read_csv(st.secrets["CMJ_URL"]))
+        throws = clean(pd.read_csv(st.secrets["THROWS_URL"]))
+        swings = clean(pd.read_csv(st.secrets["SWINGS_URL"]))
+
+        # Progressive Merge
+        df = roster.merge(ash, on="Player Name", how="left")
+        df = df.merge(cmj, on="Player Name", how="left")
+        df = df.merge(throws, on="Player Name", how="left")
+        df = df.merge(swings, on="Player Name", how="left")
         return df
     except Exception as e:
-        st.error(f"Data Load Error: {e}")
+        st.error(f"Sync Error: {e}")
         return pd.DataFrame()
 
-# If we get here, the user is authenticated
-st.title("🥎 Dashboard Active")
-data = load_data()
+# 5. DASHBOARD EXECUTION
+df = load_softball_data()
 
-if not data.empty:
-    st.write("### Data Preview")
-    st.dataframe(data.head())
+if not df.empty:
+    st.success("✅ Systems Online")
+    
+    # Simple Selector to verify it works
+    athlete = st.selectbox("Athlete", df["Player Name"].unique())
+    st.dataframe(df[df["Player Name"] == athlete])
+    
+    # Correlation Plot
+    st.subheader("Physical vs. Skill Correlation")
+    nums = df.select_dtypes(include=['number']).columns.tolist()
+    if len(nums) >= 2:
+        fig = px.scatter(df, x=nums[0], y=nums[1], hover_name="Player Name", trendline="ols")
+        st.plotly_chart(fig)
 else:
-    st.warning("Data loaded but appears empty. Check your Google Sheet URLs.")
+    st.warning("Connected to server, but data is missing. Check your ROSTER_URL and ASH_URL.")
