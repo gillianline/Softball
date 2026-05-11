@@ -52,11 +52,12 @@ def load_all_data():
         
         def sanitize(df):
             df.columns = df.columns.str.strip()
-            # Rename for stability
-            if 'Jump Height (Imp-Mom) [cm]' in df.columns:
-                df.rename(columns={'Jump Height (Imp-Mom) [cm]': 'JumpHeight'}, inplace=True)
-            if 'RSI-modified (Imp-Mom) [m/s]' in df.columns:
-                df.rename(columns={'RSI-modified (Imp-Mom) [m/s]': 'RSI'}, inplace=True)
+            # Mapping specific long names to simple keys
+            name_map = {
+                'Jump Height (Imp-Mom) [cm]': 'JumpHeight',
+                'RSI-modified (Imp-Mom) [m/s]': 'RSI'
+            }
+            df.rename(columns=name_map, inplace=True)
 
             for col in df.columns:
                 if any(w in col.lower() for w in ['force', 'rfd', 'height', 'power', 'rsi']):
@@ -76,7 +77,6 @@ if not ash_df.empty and not cmj_df.empty:
     athlete_list = sorted(list(set(ash_df['Player Name'].unique()) | set(cmj_df['Player Name'].unique())))
     selected = st.selectbox("Search Athlete", athlete_list)
     
-    # Get Picture
     pic_row = roster_df[roster_df['Player Name'] == selected]
     photo = pic_row['Picture'].values[0] if not pic_row.empty and 'Picture' in roster_df.columns else "https://www.w3schools.com/howto/img_avatar.png"
 
@@ -101,8 +101,7 @@ if not ash_df.empty and not cmj_df.empty:
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Peak Force", f"{int(latest['Peak Vertical Force [N]'])} N")
             m2.metric("RFD (200ms)", f"{int(latest['RFD - 200ms [N/s]'])} N/s")
-            asym = latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
-            m3.metric("Force Asym", f"{asym}%", delta="- Risk" if asym > 10 else None, delta_color="inverse")
+            m3.metric("Force Asym", f"{latest.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
             m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
             st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', markers=True, title="Force History", color_discrete_sequence=["#FF8200"]), use_container_width=True)
 
@@ -120,35 +119,24 @@ if not ash_df.empty and not cmj_df.empty:
             c3.metric("Current RSI", f"{l_cmj['RSI']:.2f}")
             c4.metric("Status", "Recovered" if h_perc > -5 else "Fatigued", delta_color="normal" if h_perc > -5 else "inverse")
 
-            # --- DUAL AXIS TREND (PYTHON 3.14 COMPATIBLE SYNTAX) ---
+            # --- DUAL AXIS TREND (CONSTRUCTOR METHOD) ---
             st.subheader("Height vs. RSI Trend")
             
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['JumpHeight'], name="Height", line=dict(color='#FF8200', width=3)))
-            fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['RSI'], name="RSI", line=dict(color='#4895DB', width=3, dash='dot'), yaxis="y2"))
+            fig = go.Figure(
+                data=[
+                    go.Scatter(x=p_cmj['Date'], y=p_cmj['JumpHeight'], name="Height (cm)", line=dict(color='#FF8200', width=3)),
+                    go.Scatter(x=p_cmj['Date'], y=p_cmj['RSI'], name="RSI", line=dict(color='#4895DB', width=3, dash='dot'), yaxis="y2")
+                ],
+                layout=go.Layout(
+                    template="plotly_white",
+                    xaxis=dict(title="Date", showgrid=False),
+                    yaxis=dict(title="Jump Height (cm)", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200")),
+                    yaxis2=dict(title="RSI", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB"), overlaying="y", side="right", showgrid=False),
+                    legend=dict(orientation="h", y=1.1, x=1, xanchor="right"),
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
+            )
             
-            # Using a static layout dictionary to bypass validation errors
-            layout_dict = {
-                "template": "plotly_white",
-                "xaxis": {"showgrid": False, "title": "Date"},
-                "yaxis": {
-                    "title": "Jump Height (cm)",
-                    "titlefont": {"color": "#FF8200"},
-                    "tickfont": {"color": "#FF8200"}
-                },
-                "yaxis2": {
-                    "title": "RSI",
-                    "titlefont": {"color": "#4895DB"},
-                    "tickfont": {"color": "#4895DB"},
-                    "overlaying": "y",
-                    "side": "right",
-                    "showgrid": False
-                },
-                "legend": {"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right"},
-                "margin": {"l": 50, "r": 50, "t": 50, "b": 50}
-            }
-            
-            fig.update_layout(layout_dict)
             st.plotly_chart(fig, use_container_width=True)
 
             # --- HISTORY TABLE ---
