@@ -121,25 +121,47 @@ if not ash_df.empty and not cmj_df.empty:
         p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
         if not p_cmj.empty:
             latest_cmj = p_cmj.iloc[-1]
+            
+            # --- TOP ROW: THE BIG 4 ---
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Jump Height", f"{latest_cmj['Jump Height (Imp-Mom) [cm]']} cm")
             c2.metric("RSI-Modified", f"{latest_cmj['RSI-modified (Imp-Mom) [m/s]']}")
             c3.metric("Peak Power", f"{int(latest_cmj['Peak Power [W]'])} W")
             c4.metric("Stiffness", f"{int(latest_cmj['CMJ Stiffness [N/m]'])} N/m")
 
-            # Chart: Braking vs Deceleration RFD
-            st.subheader("Braking Strategy")
-            side_col1, side_col2 = st.columns(2)
-            with side_col1:
-                # Impulse Comparison
-                impulse_data = pd.DataFrame({
-                    'Metric': ['P1 Concentric', 'P2 Concentric'],
-                    'Value': [latest_cmj['P1 Concentric Impulse [N s]'], latest_cmj['P2 Concentric Impulse [N s]']]
-                })
-                st.plotly_chart(px.bar(impulse_data, x='Metric', y='Value', color='Metric', title="Concentric Impulse Phases", color_discrete_sequence=["#4895DB", "#FF8200"]), use_container_width=True)
+            st.divider()
+
+            # --- MIDDLE ROW: STRATEGY & TRENDS ---
+            col_left, col_right = st.columns(2)
             
-            with side_col2:
-                # RSI Trend
-                st.plotly_chart(px.line(p_cmj, x='Date', y='RSI-modified (Imp-Mom) [m/s]', title="Explosiveness (RSI-m) Trend", markers=True, color_discrete_sequence=["#FF8200"]), use_container_width=True)
+            with col_left:
+                st.subheader("Braking vs. Deceleration RFD")
+                # This shows if the athlete is 'sharp' or 'mushy' in the bottom of the jump
+                rfd_data = pd.DataFrame({
+                    'Metric': ['Eccentric Braking', 'Eccentric Deceleration'],
+                    'Value': [latest_cmj['Eccentric Braking RFD [N/s]'], latest_cmj['Eccentric Deceleration RFD [N/s]']]
+                })
+                fig_rfd = px.bar(rfd_data, x='Metric', y='Value', 
+                                 color='Metric', 
+                                 color_discrete_map={'Eccentric Braking': '#4895DB', 'Eccentric Deceleration': '#FF8200'},
+                                 template="plotly_white")
+                fig_rfd.update_layout(showlegend=False)
+                st.plotly_chart(fig_rfd, use_container_width=True)
+            
+            with col_right:
+                st.subheader("Jump Height Trend")
+                fig_trend = px.line(p_cmj, x='Date', y='Jump Height (Imp-Mom) [cm]', 
+                                    markers=True, 
+                                    color_discrete_sequence=["#FF8200"],
+                                    template="plotly_white")
+                st.plotly_chart(fig_trend, use_container_width=True)
+
+            # --- BOTTOM ROW: ASYMMETRY CHECK ---
+            st.subheader("CMJ Symmetry Analysis")
+            asym_cols = st.columns(3)
+            # Highlighting specific asymmetries in the jump strategy
+            asym_cols[0].metric("Concentric Mean Force Asym", f"{latest_cmj.get('Concentric Mean Force % (Asym) (%)', 0)}%")
+            asym_cols[1].metric("Eccentric Braking Asym", f"{latest_cmj.get('Eccentric Braking RFD % (Asym) (%)', 0)}%")
+            asym_cols[2].metric("Takeoff Peak Force Asym", f"{latest_cmj.get('Takeoff Peak Force % (Asym) (%)', 0)}%")
         else:
             st.warning("No CMJ data found for this athlete.")
