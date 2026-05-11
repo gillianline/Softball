@@ -54,11 +54,11 @@ if check_password():
         throws = heavy_sanitize(pd.read_csv(st.secrets["THROWS_URL"]))
         swings = heavy_sanitize(pd.read_csv(st.secrets["SWINGS_URL"]))
 
-        # Merge sequence (Assumes 'Player Name' is the key in all sheets)
-        master = roster.merge(ash, on="Player Name", how="left") \
-                       .merge(cmj, on="Player Name", how="left") \
-                       .merge(throws, on="Player Name", how="left") \
-                       .merge(swings, on="Player Name", how="left")
+        # Merge sequence (Assumes 'Name' is the key in all sheets)
+        master = roster.merge(ash, on="Name", how="left") \
+                       .merge(cmj, on="Name", how="left") \
+                       .merge(throws, on="Name", how="left") \
+                       .merge(swings, on="Name", how="left")
         return master
 
     df = load_all_data()
@@ -72,8 +72,8 @@ if check_password():
 
     # Player Profile Section
     st.subheader("Player Profile")
-    sel_player = st.selectbox("Select Athlete", filtered_df['Player Name'])
-    player_data = filtered_df[filtered_df['Player Name'] == sel_player].iloc[0]
+    sel_player = st.selectbox("Select Athlete", filtered_df['Name'])
+    player_data = filtered_df[filtered_df['Name'] == sel_player].iloc[0]
 
     p_col1, p_col2, p_col3 = st.columns([1, 2, 2])
     with p_col1:
@@ -97,7 +97,7 @@ if check_password():
     col_y = st.selectbox("Field Metric (Y-Axis)", ['Sum Swing Max Player Load', 'Total Throw Count'])
 
     fig = px.scatter(filtered_df, x=col_x, y=col_y, color="Position", 
-                     hover_name="Player Name", trendline="ols",
+                     hover_name="Name", trendline="ols",
                      template="plotly_white", color_discrete_sequence=["#FF8200", "#4895DB"])
     st.plotly_chart(fig, use_container_width=True)
 
