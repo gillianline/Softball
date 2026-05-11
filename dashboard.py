@@ -52,16 +52,15 @@ def load_all_data():
         
         def sanitize(df):
             df.columns = df.columns.str.strip()
-            # Dynamic Rename for CMJ specifics
+            # Rename for stability
             if 'Jump Height (Imp-Mom) [cm]' in df.columns:
-                df.rename(columns={'Jump Height (Imp-Mom) [cm]': 'Jump Height'}, inplace=True)
+                df.rename(columns={'Jump Height (Imp-Mom) [cm]': 'JumpHeight'}, inplace=True)
             if 'RSI-modified (Imp-Mom) [m/s]' in df.columns:
                 df.rename(columns={'RSI-modified (Imp-Mom) [m/s]': 'RSI'}, inplace=True)
 
             for col in df.columns:
                 if any(w in col.lower() for w in ['force', 'rfd', 'height', 'power', 'rsi']):
                     df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0.0)
-            
             if 'Date' in df.columns:
                 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
             return df
@@ -112,45 +111,50 @@ if not ash_df.empty and not cmj_df.empty:
         if not p_cmj.empty:
             b_cmj = p_cmj.iloc[0]
             l_cmj = p_cmj.iloc[-1]
-            h_perc = ((l_cmj['Jump Height'] - b_cmj['Jump Height']) / b_cmj['Jump Height']) * 100 if b_cmj['Jump Height'] != 0 else 0
+            h_perc = ((l_cmj['JumpHeight'] - b_cmj['JumpHeight']) / b_cmj['JumpHeight']) * 100 if b_cmj['JumpHeight'] != 0 else 0
             
             st.subheader("CMJ Baseline vs. Post-Match Recovery")
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Baseline Height", f"{b_cmj['Jump Height']:.1f} cm")
-            c2.metric("Latest Jump", f"{l_cmj['Jump Height']:.1f} cm", delta=f"{h_perc:+.1f}%")
+            c1.metric("Baseline Height", f"{b_cmj['JumpHeight']:.1f} cm")
+            c2.metric("Latest Jump", f"{l_cmj['JumpHeight']:.1f} cm", delta=f"{h_perc:+.1f}%")
             c3.metric("Current RSI", f"{l_cmj['RSI']:.2f}")
             c4.metric("Status", "Recovered" if h_perc > -5 else "Fatigued", delta_color="normal" if h_perc > -5 else "inverse")
 
-            # --- DUAL AXIS TREND (FIXED SYNTAX) ---
+            # --- DUAL AXIS TREND (PYTHON 3.14 COMPATIBLE SYNTAX) ---
             st.subheader("Height vs. RSI Trend")
+            
             fig = go.Figure()
+            fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['JumpHeight'], name="Height", line=dict(color='#FF8200', width=3)))
+            fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['RSI'], name="RSI", line=dict(color='#4895DB', width=3, dash='dot'), yaxis="y2"))
             
-            fig.add_trace(go.Scatter(
-                x=p_cmj['Date'], y=p_cmj['Jump Height'], 
-                name="Height", line=dict(color='#FF8200', width=3)
-            ))
+            # Using a static layout dictionary to bypass validation errors
+            layout_dict = {
+                "template": "plotly_white",
+                "xaxis": {"showgrid": False, "title": "Date"},
+                "yaxis": {
+                    "title": "Jump Height (cm)",
+                    "titlefont": {"color": "#FF8200"},
+                    "tickfont": {"color": "#FF8200"}
+                },
+                "yaxis2": {
+                    "title": "RSI",
+                    "titlefont": {"color": "#4895DB"},
+                    "tickfont": {"color": "#4895DB"},
+                    "overlaying": "y",
+                    "side": "right",
+                    "showgrid": False
+                },
+                "legend": {"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right"},
+                "margin": {"l": 50, "r": 50, "t": 50, "b": 50}
+            }
             
-            fig.add_trace(go.Scatter(
-                x=p_cmj['Date'], y=p_cmj['RSI'], 
-                name="RSI", line=dict(color='#4895DB', width=3, dash='dot'), 
-                yaxis="y2"
-            ))
-            
-            fig.update_layout(
-                template="plotly_white",
-                xaxis=dict(showgrid=False),
-                yaxis=dict(title="Jump Height (cm)", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200")),
-                yaxis2=dict(title="RSI", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB"), overlaying="y", side="right", showgrid=False),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
+            fig.update_layout(layout_dict)
             st.plotly_chart(fig, use_container_width=True)
 
             # --- HISTORY TABLE ---
             st.subheader("Jump History & Match Context")
             hist = p_cmj.copy()
-            hist['Vs. Baseline'] = (hist['Jump Height'] - b_cmj['Jump Height']).map('{:+.1f} cm'.format)
+            hist['Vs. Baseline'] = (hist['JumpHeight'] - b_cmj['JumpHeight']).map('{:+.1f} cm'.format)
             hist['Jump Date'] = hist['Date'].dt.strftime('%m/%d/%Y')
-            
-            cols = ['Jump Date', 'Jump Height', 'Vs. Baseline', 'RSI']
+            cols = ['Jump Date', 'JumpHeight', 'Vs. Baseline', 'RSI']
             st.write(hist[cols].to_html(index=False, classes='scout-table', escape=False), unsafe_allow_html=True)
