@@ -141,12 +141,50 @@ if check_password():
                 fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['Jump Height (Imp-Mom) [cm]'], name="Height (cm)", line=dict(color='#FF8200', width=3), marker=dict(size=8)))
                 fig.add_trace(go.Scatter(x=p_cmj['Date'], y=p_cmj['RSI-modified (Imp-Mom) [m/s]'], name="RSI-m", line=dict(color='#4895DB', width=3, dash='dot'), yaxis="y2"))
                 
-                fig.update_layout(template="plotly_white", legend=dict(orientation="h", y=1.1),
-                    yaxis=dict(title="Jump Height (cm)", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200")),
-                    yaxis2=dict(title="RSI-m", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB"), overlaying="y", side="right", showgrid=False)
+                # Dual Axis Chart - Fixed Layout Syntax
+                st.subheader("Height vs. RSI Trend")
+                fig = go.Figure()
+                
+                # Height Trace
+                fig.add_trace(go.Scatter(
+                    x=p_cmj['Date'], 
+                    y=p_cmj['Jump Height (Imp-Mom) [cm]'], 
+                    name="Height (cm)", 
+                    line=dict(color='#FF8200', width=3), 
+                    marker=dict(size=8)
+                ))
+                
+                # RSI Trace
+                fig.add_trace(go.Scatter(
+                    x=p_cmj['Date'], 
+                    y=p_cmj['RSI-modified (Imp-Mom) [m/s]'], 
+                    name="RSI-m", 
+                    line=dict(color='#4895DB', width=3, dash='dot'), 
+                    yaxis="y2"
+                ))
+                
+                # The fixed update_layout block
+                fig.update_layout(
+                    template="plotly_white",
+                    legend=dict(orientation="h", y=1.1, x=1, xanchor="right"),
+                    yaxis=dict(
+                        title="Jump Height (cm)", 
+                        titlefont=dict(color="#FF8200"), 
+                        tickfont=dict(color="#FF8200")
+                    ),
+                    yaxis2=dict(
+                        title="RSI-m", 
+                        titlefont=dict(color="#4895DB"), 
+                        tickfont=dict(color="#4895DB"), 
+                        overlaying="y", 
+                        side="right", 
+                        showgrid=False
+                    ),
+                    xaxis=dict(showgrid=False),
+                    margin=dict(l=20, r=20, t=50, b=20)
                 )
+                
                 st.plotly_chart(fig, use_container_width=True)
-
                 # History Table
                 st.subheader("Jump History & Match Context")
                 hist = p_cmj.copy()
