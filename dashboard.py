@@ -119,6 +119,14 @@ if not ash_df.empty:
 
     tab_ash, tab_cmj = st.tabs(["ASH TEST", "CMJ READINESS"])
 
+    # --- HELPER FUNCTION (Move this to the top) ---
+    def quick_metric(col, label, best, current, unit):
+        diff = ((current - best) / best * 100) if best != 0 else 0
+        # Logic: Red if more than 10% below best
+        color = "red" if diff < -10 else "green"
+        col.metric(label, f"{int(best)}{unit}")
+        col.markdown(f'<p class="metric-sub {color}">Latest: {current:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
+
     with tab_ash:
         if not cmj_filt.empty:
             c_lat = cmj_filt.iloc[-1]
