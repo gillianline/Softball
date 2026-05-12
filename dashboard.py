@@ -108,37 +108,47 @@ if not ash_df.empty:
         st.markdown("### CMJ Baseline vs. Post-Match Recovery")
         c_sync = cmj_df.rename(columns={'Athlete': 'Player Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
         
+        # 1. Detection
         d_col_cmj = next((c for c in ['Test Date', 'Date', 'date'] if c in c_sync.columns), 'Date')
         h_col = next((c for c in ['Jump Height (Imp-Mom) [cm]', 'Jump Height'] if c in c_sync.columns), 'Jump Height')
         r_col = next((c for c in ['RSI-modified [m/s]', 'RSI-modified (Imp-Mom) [m/s]', 'RSI'] if c in c_sync.columns), 'RSI')
         
-        ath_cmj_data = c_sync[c_sync['Player Name'] == selected].sort_values(d_col_cmj)
+        # 2. Force Filter and Type Conversion (Crucial for Altair)
+        chart_df = c_sync[c_sync['Player Name'] == selected].copy()
+        chart_df[d_col_cmj] = pd.to_datetime(chart_df[d_col_cmj])
+        chart_df[h_col] = pd.to_numeric(chart_df[h_col], errors='coerce')
+        chart_df[r_col] = pd.to_numeric(chart_df[r_col], errors='coerce')
+        chart_df = chart_df.dropna(subset=[d_col_cmj, h_col, r_col]).sort_values(d_col_cmj)
         
-        if not ath_cmj_data.empty:
+        if not chart_df.empty:
             import altair as alt
 
-            # 1. Base Chart (Shared X-Axis)
-            base = alt.Chart(ath_cmj_data).encode(
-                x=alt.X(f'{d_col_cmj}:T', title='Date')
+            # Shared X-Axis
+            base = alt.Chart(chart_df).encode(
+                x=alt.X(f'{d_col_cmj}:T', axis=alt.Axis(title='Date', format='%m/%d', labelAngle=-45))
             )
 
-            # 2. Jump Height Line (Orange - Left Axis)
-            line_h = base.mark_line(color='#FF8200', size=3).encode(
-                y=alt.Y(f'{h_col}:Q', title='Jump Height (cm)', scale=alt.Scale(zero=False))
+            # Left Axis: Jump Height (Orange)
+            line_h = base.mark_line(color='#FF8200', strokeWidth=3).encode(
+                y=alt.Y(f'{h_col}:Q', 
+                        axis=alt.Axis(title='Jump Height (cm)', titleColor='#FF8200', labelColor='#FF8200'),
+                        scale=alt.Scale(zero=False))
             )
-            points_h = base.mark_point(color='#FF8200', size=60, filled=True).encode(
+            points_h = base.mark_point(color='#FF8200', filled=True, size=50).encode(
                 y=alt.Y(f'{h_col}:Q')
             )
 
-            # 3. RSI Line (Blue - Right Axis)
-            line_r = base.mark_line(color='#4895DB', strokeDash=[5,5], size=2).encode(
-                y=alt.Y(f'{r_col}:Q', title='RSI-mod', scale=alt.Scale(zero=False))
+            # Right Axis: RSI (Blue)
+            line_r = base.mark_line(color='#4895DB', strokeDash=[5,5], strokeWidth=2).encode(
+                y=alt.Y(f'{r_col}:Q', 
+                        axis=alt.Axis(title='RSI-mod', titleColor='#4895DB', labelColor='#4895DB'),
+                        scale=alt.Scale(zero=False))
             )
-            points_r = base.mark_point(color='#4895DB', size=60).encode(
+            points_r = base.mark_point(color='#4895DB', size=50).encode(
                 y=alt.Y(f'{r_col}:Q')
             )
 
-            # 4. Combine with Dual Axis (resolve_scale makes it two axes)
+            # Combine and Force Rendering
             final_chart = alt.layer(
                 (line_h + points_h), 
                 (line_r + points_r)
@@ -146,14 +156,18 @@ if not ash_df.empty:
                 y='independent'
             ).properties(
                 width='container',
-                height=400
-            ).configure_axisLeft(
-                titleColor='#FF8200', labelColor='#FF8200'
-            ).configure_axisRight(
-                titleColor='#4895DB', labelColor='#4895DB'
+                height=400,
+                title=f"Performance Trend: {selected}"
+            ).configure_view(
+                strokeOpacity=0
             )
 
             st.altair_chart(final_chart, use_container_width=True)
+            
+            # --- BASELINE & TABLE ---
+            base_val = float(chart_df.iloc[0][h_col])
+            st.markdown(f"**Baseline Jump Height:** {base_val:.1f} cm (Red line logic bypassed for stability)")
+            
 
             # --- TABLE LOGIC ---
             st.markdown("#### Jump History")
