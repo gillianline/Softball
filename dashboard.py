@@ -172,28 +172,45 @@ if not ash_df.empty:
                 """, unsafe_allow_html=True)
                 st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
-            # 4. ASH SESSION HISTORY TABLE
+            # 3. ASH SESSION HISTORY TABLE WITH GAME CHECK
             st.subheader("ASH Session Log")
-            
-            # Prepare and clean the table data
+
+            # Create a list of dates that were "Games" from Swing/Throw data
+            # Adjust 'Session Type' to match your actual column name
+            game_dates = []
+            try:
+                # Check Swing Data
+                swing_games = swing_df[swing_df['Session Type'] == 'Game']['Date'].dt.date.unique()
+                # Check Throw Data
+                throw_games = throw_df[throw_df['Session Type'] == 'Game']['Date'].dt.date.unique()
+                game_dates = list(set(swing_games) | set(throw_games))
+            except:
+                pass # Fallback if columns aren't named exactly right
+
+            # Build the History Table
             ash_history = ash_filt[[
                 'Date', 
                 'Peak Vertical Force [N]', 
                 'RFD - 200ms [N/s]', 
-                'Start Time to Peak Force [s]',
+                'Start Time to Peak Force [s]', 
                 'Peak Vertical Force [N] (Asym)(%)'
             ]].copy()
+
+            # Add a 'Game?' column based on the date lookup
+            ash_history['Game?'] = ash_history['Date'].dt.date.apply(lambda x: "✔️ Yes" if x in game_dates else "—")
             
-            ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%Y')
-            ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %']
-            
+            # Formatting
+            ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
+            ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
+
             st.table(ash_history.sort_values('Date', ascending=False).style.format({
                 'Force (N)': '{:.0f}',
                 'RFD (N/s)': '{:.0f}',
                 'Time (s)': '{:.3f}',
                 'Asym %': '{:.1f}%'
             }))
-
+        else:
+            st.info("No ASH records found.")
     with tab_cmj:
         if not cmj_filt.empty:
             # 1. IDENTIFY LATEST VS BEST FOR SELECTED YEAR
