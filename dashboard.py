@@ -106,13 +106,6 @@ if not ash_df.empty:
         tab_ash, tab_cmj = st.tabs(["ASH TEST", "CMJ READINESS"])
 
     with tab_ash:
-        if not ash_filt.empty:
-            # 1. PROFILE PICTURE & HEADER
-            col_pic, col_name = st.columns([1, 4])
-            with col_pic:
-                # Merged from roster_df in your load_all_data function
-                image_url = latest_ash.get('Photo', "https://via.placeholder.com/150")
-                st.image(image_url, width=120)
             with col_name:
                 st.title(f"{selected}")
                 st.subheader("ASH (Athletic Shoulder) Performance Profile")
