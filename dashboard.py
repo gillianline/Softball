@@ -177,70 +177,7 @@ if not ash_df.empty:
                 """, unsafe_allow_html=True)
                 st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
-            # --- ROBUST GAME LOOKUP (Athlete Specific) ---
-            game_dates = set()
-            
-            def find_athlete_games(df, athlete_name, session_col):
-                if df is not None and not df.empty and session_col in df.columns:
-                    # Filter for the specific athlete AND session type 'Game'
-                    games = df[(df['Player Name'] == athlete_name) & 
-                               (df[session_col].astype(str).str.contains('Game', case=False, na=False))]
-                    return set(pd.to_datetime(games['Date']).dt.date)
-                return set()
 
-            try:
-                game_dates.update(find_athlete_games(swing_df, selected, 'Session Type'))
-                game_dates.update(find_athlete_games(throw_df, selected, 'Session Type'))
-            except NameError:
-                st.warning("Swing or Throw data not loaded; Game status unavailable.")
-
-            # Build Table
-            ash_history = ash_filt[[
-                'Date', 
-                'Peak Vertical Force [N]', 
-                'RFD - 200ms [N/s]', 
-                'Start Time to Peak Force [s]', 
-                'Peak Vertical Force [N] (Asym)(%)'
-            ]].copy()
-
-            # --- GENTLE NUMERIC CLEANING ---
-            # Instead of regex, we just convert and let 'coerce' handle the rest
-            cols_to_fix = [
-                'Peak Vertical Force [N]', 
-                'RFD - 200ms [N/s]', 
-                'Start Time to Peak Force [s]', 
-                'Peak Vertical Force [N] (Asym)(%)'
-            ]
-            
-            for col in cols_to_fix:
-                # Convert to string, remove %, then to numeric
-                ash_history[col] = pd.to_numeric(
-                    ash_history[col].astype(str).str.replace('%', '').str.strip(), 
-                    errors='coerce'
-                )
-
-            # --- GAME LOOKUP ---
-            # Check if any games exist at all to debug the dashes
-            if not game_dates:
-                st.caption("⚠️ No game dates found in Swing/Throw sheets for this athlete.")
-
-            ash_history['Game?'] = ash_history['Date'].dt.date.apply(
-                lambda x: "✔️ Yes" if x in game_dates else "—"
-            )
-            
-            # Final Formatting for display
-            ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
-            
-            # Rename columns for the UI
-            ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
-
-            # Display with style
-            st.table(ash_history.sort_values('Date', ascending=False).style.format({
-                'Force (N)': '{:.1f}', # Changed to .1f to see if data is actually there
-                'RFD (N/s)': '{:.0f}',
-                'Time (s)': '{:.3f}',
-                'Asym %': '{:.1f}%'
-            }))
             
             
     with tab_cmj:
