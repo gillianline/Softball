@@ -1,263 +1,121 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from datetime import timedelta
-import math
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
-# --- PAGE CONFIG ---
+# --- 1. PAGE SETUP ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
-# --- LADY VOL STYLE CSS ---
+# Lady Vol Visuals
 st.markdown("""
     <style>
-    .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+    .stApp { background-color: #FFFFFF; }
     [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
     .athlete-header {
-        background-color: #F8F9FA; padding: 20px; border-radius: 15px; border-left: 10px solid #FF8200; margin-bottom: 25px;
+        background-color: #F0F2F6; padding: 20px; border-radius: 15px; 
+        border-left: 10px solid #FF8200; margin-bottom: 25px;
     }
-    .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
-    .stTabs [role="tab"] { font-weight: 800; color: #4895DB; font-size: 18px; }
-    .stTabs [aria-selected="true"] { color: #FF8200; border-bottom-color: #FF8200; }
-    .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 10px;}
-    .scout-table th { background-color: #4895DB; color: white; padding: 8px; border-bottom: 2px solid #FF8200; text-transform: uppercase; font-size: 12px; }
-    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
-    #MainMenu, footer, header { visibility: hidden; }
+    .player-photo { border-radius: 50%; width: 120px; height: 120px; object-fit: cover; border: 3px solid #4895DB; }
     </style>
     """, unsafe_allow_html=True)
 
+# --- 2. DATA LOADING ---
 @st.cache_data(ttl=300)
-def load_all_data():
+def load_ash_data():
     try:
-        # 1. Load Primary Sheets
-        ash_df = pd.read_csv(st.secrets["ASH_URL"])
-        cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
-        roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
+        # Load the ASH sheet and Roster
+        df = pd.read_csv(st.secrets["ASH_URL"])
+        roster = pd.read_csv(st.secrets["ROSTER_URL"])
         
-        # Helper to clean columns and find a Date/Name column regardless of specific name
-        def robust_clean(df):
-            df.columns = df.columns.str.strip()
-            # Find any column that looks like 'Date'
-            d_col = next((c for c in df.columns if 'date' in c.lower()), None)
-            if d_col:
-                df[d_col] = pd.to_datetime(df[d_col], errors='coerce')
-                # Standardize the date column name for the rest of the app logic
-                df['Parsed_Date'] = df[d_col]
-            
-            # Find any column that looks like 'Player' or 'Name'
-            n_col = next((c for c in df.columns if 'name' in c.lower() or 'athlete' in c.lower() or 'player' in c.lower()), None)
-            if n_col:
-                df['Player Name'] = df[n_col].astype(str).str.strip()
-            
-            return df
-
-        ash_df = robust_clean(ash_df)
-        cmj_df = robust_clean(cmj_df)
-        roster_df = robust_clean(roster_df)
-
-        # Specific Hawkin metrics cleaning (keeps your previous logic)
-        hawkin_metrics = ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']
-        for col in hawkin_metrics:
-            if col in cmj_df.columns:
-                cmj_df[col] = pd.to_numeric(
-                    cmj_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), 
-                    errors='coerce'
-                ).fillna(0).astype(float)
+        # Standardize Columns (Strip spaces, etc)
+        df.columns = df.columns.str.strip()
+        roster.columns = roster.columns.str.strip()
         
-        return ash_df, cmj_df, roster_df
+        # Clean Dates: Find any column with "date" in it
+        d_col = next((c for c in df.columns if 'date' in c.lower()), None)
+        if d_col:
+            df['Parsed_Date'] = pd.to_datetime(df[d_col], errors='coerce').dt.tz_localize(None)
+        
+        # Clean Names: Find any column with "name" or "athlete" in it
+        n_col = next((c for c in df.columns if 'name' in c.lower() or 'athlete' in c.lower()), None)
+        if n_col:
+            df['Athlete_Name'] = df[n_col].astype(str).str.strip()
+            roster['Athlete_Name'] = roster[n_col].astype(str).str.strip()
+            
+        return df, roster
     except Exception as e:
-        # This will tell you exactly what went wrong if it still fails
         st.error(f"Sync Error: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        
-# --- INITIALIZE ---
-LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
-ash_df, cmj_df, roster_df = load_all_data()
+        return pd.DataFrame(), pd.DataFrame()
 
-# --- MAIN PAGE FILTERS ---
-st.title("🥎 Performance Hub")
-f1, f2 = st.columns(2)
+df, roster = load_ash_data()
 
-# Helper to find date column safely
-def find_date_col(df):
-    return next((c for c in ['Date', 'Test Date', 'date', 'test_date'] if c in df.columns), None)
+# --- 3. MAIN PAGE FILTERS ---
+st.title("🥎 Lady Vol Performance")
 
-with f1:
-    athlete_list = sorted(ash_df['Player Name'].unique()) if 'Player Name' in ash_df.columns else []
-    selected = st.selectbox("Search Athlete", athlete_list)
+if not df.empty:
+    f1, f2 = st.columns(2)
+    with f1:
+        selected_athlete = st.selectbox("Search Athlete", sorted(df['Athlete_Name'].unique()))
+    with f2:
+        years = sorted(df['Parsed_Date'].dt.year.dropna().unique().astype(int), reverse=True)
+        sel_year = st.selectbox("Select Season", ["All Time"] + years)
 
-with f2:
-    # Safely find date columns for both dataframes
-    ash_date_col = find_date_col(ash_df)
-    cmj_date_col = find_date_col(cmj_df)
-    
-    # Only concat if the columns actually exist
-    dates_to_concat = []
-    if ash_date_col: dates_to_concat.append(ash_df[ash_date_col])
-    if cmj_date_col: dates_to_concat.append(cmj_df[cmj_date_col])
-    
-    if dates_to_concat:
-        all_dates = pd.concat(dates_to_concat)
-        years = sorted(all_dates.dt.year.dropna().unique().astype(int), reverse=True)
-    else:
-        years = []
-        
-    sel_year = st.selectbox("Select Season", ["All Time"] + years)
+    # Filtering Logic
+    ash_f = df[df['Athlete_Name'] == selected_athlete].copy()
+    if sel_year != "All Time":
+        ash_f = ash_f[ash_f['Parsed_Date'].dt.year == sel_year]
+    ash_f = ash_f.sort_values('Parsed_Date')
 
-# --- FILTERING LOGIC ---
-def filter_data_robust(df, athlete, year):
-    if df.empty: return df
-    
-    # Find athlete column
-    name_col = next((c for c in ['Player Name', 'Athlete', 'Name'] if c in df.columns), None)
-    # Find date column
-    date_col = find_date_col(df)
-    
-    if not name_col or not date_col:
-        return pd.DataFrame() # Return empty if columns are missing
+    # --- 4. ATHLETE HEADER ---
+    pic_row = roster[roster['Athlete_Name'] == selected_athlete]
+    photo = pic_row['Picture'].values[0] if not pic_row.empty and 'Picture' in pic_row.columns else "https://www.w3schools.com/howto/img_avatar.png"
 
-    temp = df[df[name_col] == athlete].copy()
-    if year != "All Time":
-        temp = temp[temp[date_col].dt.year == year]
-    return temp.sort_values(date_col)
-
-# Apply the robust filters
-ash_f = filter_data_robust(ash_df, selected, sel_year)
-cmj_f = filter_data_robust(cmj_df, selected, sel_year)
-
-# --- HEADER ---
-# 1. Find the name column in the roster dynamically
-r_name_col = next((c for c in ['Player Name', 'Athlete', 'Name', 'Player'] if c in roster_df.columns), None)
-
-if r_name_col:
-    # 2. Filter roster for the selected athlete
-    pic_row = roster_df[roster_df[r_name_col] == selected]
-    
-    # 3. Handle the photo URL safely
-    if not pic_row.empty and 'Picture' in pic_row.columns:
-        photo = pic_row['Picture'].values[0]
-    else:
-        photo = "https://www.w3schools.com/howto/img_avatar.png" # Default avatar
-else:
-    # If no name column is found at all in the roster
-    photo = "https://www.w3schools.com/howto/img_avatar.png"
-
-st.markdown(f"""
-    <div class="athlete-header">
-        <div style="display: flex; align-items: center;">
-            <img src="{photo}" class="player-photo">
-            <div style="margin-left: 30px;">
-                <h1 style="margin:0;">{selected}</h1>
-                <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">SOFTBALL PERFORMANCE DASHBOARD</p>
+    st.markdown(f"""
+        <div class="athlete-header">
+            <div style="display: flex; align-items: center;">
+                <img src="{photo}" class="player-photo">
+                <div style="margin-left: 25px;">
+                    <h1 style="margin:0;">{selected_athlete}</h1>
+                    <p style="color:#4895DB; font-weight:700; margin:0;">SOFTBALL PERFORMANCE | ASH TEST PROFILE</p>
+                </div>
             </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-# --- TABS DEFINITION ---
-# This creates the navigation for your dashboard
-tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
-
-# --- TAB 1: ASH TEST ---
-with tab_ash:
+    # --- 5. ASH TEST CONTENT ---
     if not ash_f.empty:
-        # 1. Display Metrics
         latest = ash_f.iloc[-1]
-        m1, m2 = st.columns(2)
         
-        # Use .get() to avoid KeyErrors if a metric is missing
+        # Metrics Row
+        m1, m2, m3 = st.columns(3)
         m1.metric("Peak Force", f"{int(latest.get('Peak Vertical Force [N]', 0))} N")
         m2.metric("RFD (200ms)", f"{int(latest.get('RFD - 200ms [N/s]', 0))} N/s")
+        m3.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
         
-        # 2. ASH Trend Chart
-        # We use 'Parsed_Date' because the robust_clean function created it
-        fig_ash = go.Figure(data=[
-            go.Scatter(
-                x=ash_f['Parsed_Date'], 
-                y=ash_f['Peak Vertical Force [N]'], 
-                mode='lines+markers', 
-                line=dict(color="#FF8200", width=3),
-                marker=dict(size=8)
-            )
-        ])
+        # Trend Chart (Clean Matplotlib Look)
+        st.write("")
+        st.markdown("#### Peak Force Trend")
+        fig, ax = plt.subplots(figsize=(12, 4))
         
-        fig_ash.update_layout(
-            template="plotly_white",
-            margin=dict(t=20, b=20, l=20, r=20),
-            height=350,
-            xaxis=dict(title="Session Date", showgrid=False),
-            yaxis=dict(title="Force (N)", showgrid=True)
-        )
+        ax.plot(ash_f['Parsed_Date'], ash_f['Peak Vertical Force [N]'], 
+                color='#FF8200', marker='o', linewidth=3, markersize=8)
         
-        st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG)
+        # Styling to match a dashboard
+        ax.set_facecolor('none')
+        for spine in ['top', 'right']: ax.spines[spine].set_visible(False)
+        ax.grid(axis='y', linestyle='--', alpha=0.3)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+        plt.xticks(rotation=0)
         
-    else:
-        st.warning("No ASH data found for this selection.")
-# --- TAB 2: CMJ RECOVERY ---
-with tab_cmj:
-    # 1. Find columns containing 'height' and 'rsi'
-    h_col = next((c for c in cmj_f.columns if 'height' in c.lower()), None)
-    r_col = next((c for c in cmj_f.columns if 'rsi' in c.lower()), None)
-
-    # 2. Check if both columns were found
-    if not cmj_f.empty and h_col and r_col:
-        # Construct the chart using the found column names
-        softball_dual_axis = {
-            "data": [
-                {
-                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
-                    "y": cmj_f[h_col].tolist(),
-                    "name": "Jump Height (cm)", 
-                    "type": "scatter", 
-                    "mode": "lines+markers",
-                    "line": {"color": "#FF8200", "width": 3},
-                    "marker": {"size": 8}
-                },
-                {
-                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
-                    "y": cmj_f[r_col].tolist(),
-                    "name": "RSI-mod", 
-                    "type": "scatter", 
-                    "mode": "lines+markers",
-                    "yaxis": "y2", 
-                    "line": {"color": "#4895DB", "width": 2, "dash": "dot"},
-                    "marker": {"size": 8}
-                }
-            ],
-            "layout": {
-                "template": "plotly_white",
-                "height": 450,
-                "legend": {"orientation": "h", "y": 1.15, "x": 0.5, "xanchor": "center"},
-                "xaxis": {"showgrid": False, "title": "Session Date"},
-                "yaxis": {
-                    "title": "Jump Height (cm)", 
-                    "titlefont": {"color": "#FF8200"}, 
-                    "tickfont": {"color": "#FF8200"},
-                    "showgrid": True
-                },
-                "yaxis2": {
-                    "title": "RSI-mod", 
-                    "titlefont": {"color": "#4895DB"}, 
-                    "tickfont": {"color": "#4895DB"}, 
-                    "overlaying": "y", 
-                    "side": "right", 
-                    "showgrid": False
-                },
-                "margin": {"l": 50, "r": 50, "t": 60, "b": 40}
-            }
-        }
-
-        st.plotly_chart(softball_dual_axis, use_container_width=True, theme=None, config=LOCKED_CONFIG)
+        st.pyplot(fig)
         
         # Session History Table
-        st.markdown("#### 📋 Session History")
-        st.dataframe(
-            cmj_f[['Parsed_Date', h_col, r_col]].rename(columns={'Parsed_Date': 'Date'}), 
-            hide_index=True, use_container_width=True
-        )
+        st.markdown("#### Session History")
+        history_df = ash_f[['Parsed_Date', 'Peak Vertical Force [N]', 'RFD - 200ms [N/s]']].copy()
+        history_df['Date'] = history_df['Parsed_Date'].dt.strftime('%m/%d/%Y')
+        st.dataframe(history_df[['Date', 'Peak Vertical Force [N]', 'RFD - 200ms [N/s]']], 
+                     hide_index=True, use_container_width=True)
     else:
-        # If it failed to find columns, this will help you debug
-        st.warning("⚠️ Could not find specific Jump Height or RSI columns.")
-        if not cmj_f.empty:
-            st.write("Columns found in your CMJ sheet:", list(cmj_f.columns))
-        else:
-            st.info("The CMJ dataset for this athlete is currently empty.")
+        st.warning("No ASH data found for this selection.")
+else:
+    st.info("Please ensure ASH_URL and ROSTER_URL are set in your Secrets.")
