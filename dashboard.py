@@ -123,77 +123,70 @@ if not ash_df.empty:
     with tab_ash:
         if not ash_filt.empty:
             # 1. CALCULATE BASELINES (Season Averages)
+            # Ensure numeric conversion to avoid math errors
+            ash_filt['Peak Vertical Force [N]'] = pd.to_numeric(ash_filt['Peak Vertical Force [N]'], errors='coerce').fillna(0)
             base_f = ash_filt['Peak Vertical Force [N]'].mean()
-            base_r = ash_filt['RFD - 200ms [N/s]'].mean()
 
             # 2. MATCH CONTEXT LOOKUP
-            # This creates a dictionary of Dates -> Match Names from Throw/Swing data
             match_map = {}
             try:
-                # Combine Swing and Throw data to find Game entries
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
-                # Filter for this athlete and anything labeled 'Game'
                 athlete_games = all_sessions[
                     (all_sessions['Player Name'] == selected) & 
                     (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
                 ]
                 
-                # Create a map of the Date to the Game Name (assuming a 'Notes' or 'Opponent' column exists)
-                # If you don't have an Opponent column, it will just say 'Game'
                 for _, row in athlete_games.iterrows():
-                    d = row['Date'].date()
-                    label = row.get('Opponent', 'Match') # Change 'Opponent' to your actual column name
-                    match_map[d] = f"{label} ({row['Date'].strftime('%m/%d')})"
+                    if pd.notnull(row['Date']):
+                        d = row['Date'].date()
+                        # Use 'Opponent' if it exists, otherwise just 'Game'
+                        opp = row.get('Opponent', 'Game')
+                        match_map[d] = f"{opp} ({row['Date'].strftime('%m/%d')})"
             except:
                 pass
 
-            # 3. BUILD THE ASH HISTORY & CONTEXT TABLE
+            # 3. BUILD THE TABLE
             ash_history = ash_filt[[
                 'Date', 
                 'Peak Vertical Force [N]', 
-                'RFD - 200ms [N/s]', 
-                'Start Time to Peak Force [s]'
+                'RFD - 200ms [N/s]'
             ]].copy()
 
-            # Helper to find the most recent game before the test date
             def get_prev_match(test_date):
-                test_date = test_date.date()
-                past_matches = [d for d in match_map.keys() if d < test_date]
-                if not past_matches:
-                    return "N/A"
-                latest_match_date = max(past_matches)
-                return match_map[latest_match_date]
+                t_date = test_date.date()
+                past_matches = [d for d in match_map.keys() if d < t_date]
+                return match_map[max(past_matches)] if past_matches else "N/A"
 
             ash_history['Previous Match'] = ash_history['Date'].apply(get_prev_match)
-            
-            # Calculate Variance from Baseline
             ash_history['Vs. Baseline'] = ash_history['Peak Vertical Force [N]'] - base_f
             
             # Formatting for the UI
             ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%Y')
-            
-            # Reorder and Rename to match your Volleyball style
-            ash_history = ash_history[[
-                'Date', 'Previous Match', 'Peak Vertical Force [N]', 'Vs. Baseline', 'RFD - 200ms [N/s]'
-            ]]
+            ash_history = ash_history[['Date', 'Previous Match', 'Peak Vertical Force [N]', 'Vs. Baseline', 'RFD - 200ms [N/s]']]
             ash_history.columns = ['Test Date', 'Previous Match', 'Peak Force', 'Vs. Baseline', 'RFD']
 
             st.subheader("ASH History & Match Context")
             
-            # Apply color to the 'Vs. Baseline' column
+            # 4. STYLING - Using .map() instead of .applymap()
             def color_variance(val):
-                color = 'green' if val > 0 else 'red'
+                color = '#28a745' if val > 0 else '#dc3545'
                 return f'color: {color}; font-weight: bold'
 
-            st.table(ash_history.sort_values('Test Date', ascending=False).style.format({
-                'Peak Force': '{:.0f} N',
-                'Vs. Baseline': '{:+.1f} N',
-                'RFD': '{:.0f} N/s'
-            }).applymap(color_variance, subset=['Vs. Baseline']))
+            # Force Vs. Baseline to be numeric for the styler
+            ash_history['Vs. Baseline'] = pd.to_numeric(ash_history['Vs. Baseline'], errors='coerce').fillna(0)
+
+            st.table(
+                ash_history.sort_values('Test Date', ascending=False)
+                .style.format({
+                    'Peak Force': '{:.0f} N',
+                    'Vs. Baseline': '{:+.1f} N',
+                    'RFD': '{:.0f} N/s'
+                })
+                .map(color_variance, subset=['Vs. Baseline']) # This replaces .applymap
+            )
 
         else:
-            st.info("No ASH data found to build history table.")
-            
+            st.info("No ASH data found.")
             
             
     with tab_cmj:
