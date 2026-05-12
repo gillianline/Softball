@@ -84,22 +84,30 @@ st.markdown(f"""
 
 tab_ash, tab_cmj = st.tabs(["⚡ ASH PROFILE", "🚀 CMJ RECOVERY"])
 
-# --- TAB 1: ASH TEST (FIXED KEYERROR) ---
-with tab_ash:
-    # Use dynamic date detection for the sort
-    d_col_ash = next((c for c in ['Date', 'Test Date', 'date'] if c in ash_df.columns), 'Date')
-    p_ash = ash_df[ash_df['Player Name'] == selected].sort_values(d_col_ash)
-    
-    if not p_ash.empty:
+# --- TAB 1: ASH PROFILE ---
         latest = p_ash.iloc[-1]
+        
+        # Robust conversion to handle N/A, strings, or missing data
+        def safe_float(val):
+            try:
+                # Remove %, whitespace, and handle potential 'N/A'
+                clean_val = str(val).replace('%', '').strip()
+                return float(clean_val)
+            except (ValueError, TypeError):
+                return 0.0
+
+        asym = safe_float(latest.get('Peak Vertical Force [N] (Asym)(%)', 0))
+
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Peak Force", f"{int(latest['Peak Vertical Force [N]'])} N")
         m2.metric("RFD (200ms)", f"{int(latest['RFD - 200ms [N/s]'])} N/s")
-        asym = float(str(latest.get('Peak Vertical Force [N] (Asym)(%)', 0)).replace('%', ''))
-        m3.metric("Force Asym", f"{asym}%", delta="- Risk" if asym > 10 else None, delta_color="inverse")
+        
+        # Metric logic for the Lady Vol dashboard
+        m3.metric("Force Asym", f"{asym}%", 
+                  delta="- Risk" if asym > 10 else None, 
+                  delta_color="inverse")
+        
         m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
-        st.plotly_chart(px.line(p_ash, x=d_col_ash, y='Peak Vertical Force [N]', markers=True, color_discrete_sequence=["#FF8200"], template="plotly_white"), use_container_width=True)
-
 # --- TAB 2: CMJ RECOVERY (DUAL-AXIS FROM VOLLEYBALL) ---
 with tab_cmj:
     st.markdown("### CMJ Baseline vs. Post-Match Recovery")
