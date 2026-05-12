@@ -107,122 +107,67 @@ if not ash_df.empty:
 
     with tab_ash:
         if not ash_filt.empty:
-            # --- SECTION REMOVED: No more duplicate photo/title here ---
-
-            # 1. MANUAL ASYMMETRY CALCULATION
+            # 1. MANUAL ASYMMETRY & FORCE CALCULATION
+            # Pulling raw values from the latest test
             l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
             r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
             
+            # Calculate Asymmetry manually to ensure accuracy
             if l_f > 0 and r_f > 0:
                 clean_asym = (abs(l_f - r_f) / max(l_f, r_f)) * 100
             else:
-                raw_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
-                try:
-                    clean_asym = float(str(raw_val).replace('%', '').strip())
-                except:
-                    clean_asym = 0.0
+                clean_asym = 0.0
 
-            # 2. CALCULATE BASELINES & BESTS
-            ash_filt['Peak Vertical Force [N]'] = pd.to_numeric(ash_filt['Peak Vertical Force [N]'], errors='coerce').fillna(0)
-            best_f = ash_filt['Peak Vertical Force [N]'].max()
-            best_r = ash_filt['RFD - 200ms [N/s]'].max()
-            best_t = ash_filt['Start Time to Peak Force [s]'].min()
-            base_f = ash_filt['Peak Vertical Force [N]'].mean()
-
-            def colored_metric(label, best_val, current_val, unit, is_time=False):
-                diff = ((current_val - best_val) / best_val * 100) if best_val != 0 else 0
-                is_bad = diff > 10 if is_time else diff < -10
-                color = "red-text" if is_bad else "green-text"
-                st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
-                st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
-
-            # 3. TOP METRIC ROW
-            m1, m2, m3, m4 = st.columns(4)
-            with m1: colored_metric("Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
-            with m2: colored_metric("Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
-            with m3: 
-                st.metric("Asymmetry", f"{clean_asym:.1f}%", 
-                          delta="High" if clean_asym > 10 else "Normal", 
-                          delta_color="inverse")
-            with m4: colored_metric("Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
-
-            st.divider()
+            # 2. TOP METRIC ROW
+            m1, m2, m3 = st.columns(3)
             
-            # 4. BILATERAL PROFILE (Left vs Right)
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.subheader("Force Distribution")
-                side_df = pd.DataFrame({
-                    'Side': ['Left (Lead)', 'Right (Trail)'], 
-                    'Force [N]': [l_f, r_f]
-                })
-                fig = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]', color='Side', 
-                             color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'}, 
-                             template="plotly_white")
-                st.plotly_chart(fig, use_container_width=True)
+            # Left Peak Force
+            m1.metric("Left Peak Force", f"{l_f} N")
             
-            with c2:
-                st.subheader("Balance Details")
-                l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
-                r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
-                asym_color = '#dc3545' if clean_asym > 10 else '#28a745'
-
-                st.markdown(f"""
-                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0; text-align:center;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                            <div style="width:45%;"><p style="color:#4895DB; font-weight:800; margin:0;">LEFT</p><h2>{l_f}N</h2><p style="color:grey; font-size:12px;">{l_rfd} RFD</p></div>
-                            <div style="width:45%;"><p style="color:#FF8200; font-weight:800; margin:0;">RIGHT</p><h2>{r_f}N</h2><p style="color:grey; font-size:12px;">{r_rfd} RFD</p></div>
-                        </div>
-                        <p style="margin:0; font-size:11px; color:grey; font-weight:700;">CALCULATED ASYMMETRY</p>
-                        <h1 style="margin:0; color:{asym_color};">{clean_asym:.1f}%</h1>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                dom_side = "Left" if l_f > r_f else "Right"
-                st.info(f"Dominance: **{dom_side}**")
-
-            st.divider()
-
-            # 5. MATCH CONTEXT LOOKUP & TABLE
-            st.subheader("ASH History & Match Context")
-            match_map = {}
-            try:
-                all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
-                athlete_games = all_sessions[
-                    (all_sessions['Player Name'] == selected) & 
-                    (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
-                ]
-                for _, row in athlete_games.iterrows():
-                    match_map[row['Date'].date()] = f"{row.get('Opponent', 'Game')} ({row['Date'].strftime('%m/%d')})"
-            except: 
-                pass
-
-            ash_hist_df = ash_filt[['Date', 'Peak Vertical Force [N]', 'RFD - 200ms [N/s]']].copy()
+            # Right Peak Force
+            m2.metric("Right Peak Force", f"{r_f} N")
             
-            def get_prev_match(test_date):
-                t_date = test_date.date()
-                past_matches = [d for d in match_map.keys() if d < t_date]
-                return match_map[max(past_matches)] if past_matches else "N/A"
-
-            ash_hist_df['Previous Match'] = ash_hist_df['Date'].apply(get_prev_match)
-            ash_hist_df['Vs. Baseline'] = ash_hist_df['Peak Vertical Force [N]'] - base_f
-            
-            ash_display = ash_hist_df[['Date', 'Previous Match', 'Peak Vertical Force [N]', 'Vs. Baseline', 'RFD - 200ms [N/s]']].copy()
-            ash_display['Date'] = ash_display['Date'].dt.strftime('%m/%d/%Y')
-            ash_display.columns = ['Test Date', 'Previous Match', 'Peak Force', 'Vs. Baseline', 'RFD']
-
-            st.table(
-                ash_display.sort_values('Test Date', ascending=False)
-                .style.format({
-                    'Peak Force': '{:.0f} N', 
-                    'Vs. Baseline': '{:+.1f} N', 
-                    'RFD': '{:.0f} N/s'
-                })
-                .map(lambda x: f'color: {"#28a745" if x > 0 else "#dc3545"}; font-weight: bold', subset=['Vs. Baseline'])
+            # Calculated Asymmetry
+            # Colors turn red if asymmetry exceeds 10%
+            m3.metric(
+                "Asymmetry", 
+                f"{clean_asym:.1f}%", 
+                delta="High" if clean_asym > 10 else "Normal", 
+                delta_color="inverse"
             )
 
+            st.divider()
+
+            # 3. VISUAL BALANCE BOX
+            # High-contrast summary box for quick review
+            asym_color = '#dc3545' if clean_asym > 10 else '#28a745'
+            
+            st.markdown(f"""
+                <div style="background-color:#F8F9FA; padding:20px; border-radius:15px; border:1px solid #E0E0E0; text-align:center;">
+                    <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
+                        <div>
+                            <p style="color:#4895DB; font-weight:800; margin:0; font-size:14px;">LEFT ARM</p>
+                            <h1 style="margin:0; font-size:48px;">{l_f}<span style="font-size:20px;">N</span></h1>
+                        </div>
+                        <div style="border-left:1px solid #E0E0E0; height:60px; margin-top:10px;"></div>
+                        <div>
+                            <p style="color:#FF8200; font-weight:800; margin:0; font-size:14px;">RIGHT ARM</p>
+                            <h1 style="margin:0; font-size:48px;">{r_f}<span style="font-size:20px;">N</span></h1>
+                        </div>
+                    </div>
+                    <p style="margin:0; font-size:12px; color:grey; font-weight:700; letter-spacing:1px;">TOTAL ASYMMETRY</p>
+                    <h1 style="margin:0; color:{asym_color}; font-size:56px;">{clean_asym:.1f}%</h1>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # 4. DOMINANCE INDICATOR
+            if l_f != r_f:
+                dom_side = "Left" if l_f > r_f else "Right"
+                st.info(f"Dominant Side: **{dom_side}**")
+
         else:
-            st.info("No ASH records found for this selection.")
+            st.info("No ASH records found for the selected athlete.")
+            
             
     with tab_cmj:
         if not cmj_filt.empty:
