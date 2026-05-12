@@ -143,6 +143,10 @@ st.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
+# --- TABS DEFINITION ---
+# This creates the navigation for your dashboard
+tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
+
 # --- TAB 1: ASH ---
 with tab_ash:
     if not ash_f.empty:
