@@ -98,20 +98,29 @@ if not ash_df.empty:
 
     tab_ash, tab_cmj = st.tabs(["⚡ ASH PROFILE", "🚀 CMJ RECOVERY"])
 
-    # --- TAB 1: ASH TEST ---
+   # --- TAB 1: ASH TEST ---
     with tab_ash:
         p_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
         if not p_ash.empty:
             latest = p_ash.iloc[-1]
+            
+            # --- SAFETY WRAP: Force asym to a float ---
+            try:
+                asym = float(str(latest.get('Peak Vertical Force [N] (Asym)(%)', 0)).replace('%', ''))
+            except:
+                asym = 0.0
+
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Peak Force", f"{int(latest['Peak Vertical Force [N]'])} N")
             m2.metric("RFD (200ms)", f"{int(latest['RFD - 200ms [N/s]'])} N/s")
-            asym = latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
-            m3.metric("Force Asym", f"{asym}%", delta="- Risk" if asym > 10 else None, delta_color="inverse")
+            
+            # Now the comparison (asym > 10) will work perfectly
+            m3.metric("Force Asym", f"{asym}%", 
+                      delta="- Risk" if asym > 10 else None, 
+                      delta_color="inverse")
+            
             m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
             
-            st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', markers=True, color_discrete_sequence=["#FF8200"], template="plotly_white"), use_container_width=True)
-
     # --- TAB 2: CMJ RECOVERY (WITH SWING/THROW MATCH LOGIC) ---
     with tab_cmj:
         st.markdown("### CMJ Baseline vs. Post-Match Recovery")
