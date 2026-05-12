@@ -120,70 +120,57 @@ if not ash_df.empty:
     tab_ash, tab_cmj = st.tabs(["ASH TEST", "CMJ READINESS"])
 
     with tab_ash:
-        if not ash_filt.empty:
-            best_f, best_r = ash_filt['Peak Vertical Force [N]'].max(), ash_filt['RFD - 200ms [N/s]'].max()
-            best_t = ash_filt['Start Time to Peak Force [s]'].min()
-
-            def colored_metric(label, best_val, current_val, unit, is_time=False):
-                diff = ((current_val - best_val) / best_val * 100) if best_val != 0 else 0
-                is_bad = diff > 10 if is_time else diff < -10
-                color = "red-text" if is_bad else "green-text"
-                st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
-                st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
-
-            m1, m2, m3, m4 = st.columns(4)
-            with m1: colored_metric(f"{label} Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
-            with m2: colored_metric(f"{label} Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
-            with m3: st.metric("Latest Asymmetry", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
-            with m4: colored_metric(f"{label} Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
-
-            st.divider()
-            
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.subheader("Left vs Right Force Profile")
-                l_f, r_f = latest_ash.get('Peak Vertical Force [N] (L)', 0), latest_ash.get('Peak Vertical Force [N] (R)', 0)
-                side_df = pd.DataFrame({'Side': ['Left', 'Right'], 'Force [N]': [l_f, r_f]})
-                fig = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]', color='Side', 
-                             color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'}, template="plotly_white")
-                st.plotly_chart(fig, use_container_width=True)
-            with c2:
-                st.subheader("Bilateral Profile")
-                l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
-                r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
-                raw_asym = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
-                st.markdown(f"""
-                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0;">
-                        <div style="display:flex; justify-content:space-between;">
-                            <div style="text-align:center; width:45%;"><p style="color:#4895DB; font-weight:800; margin:0; font-size:12px;">LEFT</p><h2 style="margin:0;">{l_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{l_rfd} RFD</p></div>
-                            <div style="text-align:center; width:45%;"><p style="color:#FF8200; font-weight:800; margin:0; font-size:12px;">RIGHT</p><h2 style="margin:0;">{r_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{r_rfd} RFD</p></div>
-                        </div>
-                        <div style="text-align:center; border-top:1px solid #E0E0E0; padding-top:10px; margin-top:10px;">
-                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">ASYMMETRY</p>
-                            <h3 style="margin:0; color:{'#dc3545' if abs(raw_asym) > 10 else '#28a745'}">{raw_asym}%</h3>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
-
-    with tab_cmj:
         if not cmj_filt.empty:
             c_lat = cmj_filt.iloc[-1]
-            b_h, b_rsi = cmj_filt['Jump Height (Imp-Mom) [cm]'].max(), cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
+            
+            # 1. Calculate Bests for the selected range
+            b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
+            b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
 
+            # 2. Metric Display
             cm1, cm2, cm3 = st.columns(3)
+            
+            # Jump Height Metric
             quick_metric(cm1, "Best Jump Height", b_h, c_lat['Jump Height (Imp-Mom) [cm]'], "cm")
-            quick_metric(cm2, "Best RSI-m", b_rsi, c_lat['RSI-modified (Imp-Mom) [m/s]'], "")
-            cm3.metric("Current Weight", f"{c_lat.get('BW [KG]', 0)}kg")
+            
+            # RSI Metric (Forced to 2 decimal places)
+            rsi_current = c_lat['RSI-modified (Imp-Mom) [m/s]']
+            rsi_diff = ((rsi_current - b_rsi) / b_rsi * 100) if b_rsi != 0 else 0
+            rsi_color = "red" if rsi_diff < -10 else "green"
+            
+            cm2.metric("Best RSI-m", f"{b_rsi:.2f}")
+            cm2.markdown(f'<p class="metric-sub {rsi_color}">Latest: {rsi_current:.2f} ({rsi_diff:+.1f}%)</p>', unsafe_allow_html=True)
+            
+            # Body Weight Metric
+            cm3.metric("Current Weight", f"{c_lat.get('BW [KG]', 0):.1f}kg")
 
             st.write("")
-            # CLEAN TREND GRAPH
-            fig_cmj = px.line(cmj_filt, x='Date', y='Jump Height (Imp-Mom) [cm]', markers=True, template="plotly_white", color_discrete_sequence=["#4895DB"])
-            fig_cmj.update_xaxes(tickformat="%m/%d/%y", tickangle=-45, nticks=15, title="")
-            fig_cmj.update_layout(height=400, margin=dict(t=10, b=10, l=10, r=10))
+            
+            # 3. CLEAN TREND GRAPH (Fixed for All-Time view)
+            fig_cmj = px.line(
+                cmj_filt, 
+                x='Date', 
+                y='Jump Height (Imp-Mom) [cm]', 
+                markers=True, 
+                template="plotly_white", 
+                color_discrete_sequence=["#4895DB"]
+            )
+            
+            # Formatting the axis to prevent "All Time" date overlapping
+            fig_cmj.update_xaxes(
+                tickformat="%b %d, %y", # Format as 'Jan 01, 26'
+                tickangle=-45, 
+                nticks=12,            # Limits the number of labels to keep it clean
+                title=""
+            )
+            
+            fig_cmj.update_layout(
+                height=400, 
+                yaxis_title="Jump Height (cm)",
+                margin=dict(t=10, b=10, l=10, r=10)
+            )
+            
             st.plotly_chart(fig_cmj, use_container_width=True)
+            
         else:
-            st.info("No CMJ records for this period.")
-
-else:
-    st.error("Could not load data. Check your Google Sheet URLs.")
+            st.info("No CMJ records found for the selected season.")
