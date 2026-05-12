@@ -103,37 +103,68 @@ with tab_ash:
         }, use_container_width=True)
 
 with tab_cmj:
-    h_col = next((c for c in ['Jump Height (Imp-Mom) [cm]', 'Jump Height'] if c in cmj_f.columns), None)
-    r_col = next((c for c in ['RSI-modified [m/s]', 'RSI'] if c in cmj_f.columns), None)
+    # 1. Dynamic Column Detection (Finds columns containing specific keywords)
+    h_col = next((c for c in cmj_f.columns if 'height' in c.lower()), None)
+    r_col = next((c for c in cmj_f.columns if 'rsi' in c.lower()), None)
 
     if not cmj_f.empty and h_col and r_col:
-        # --- THE "BYPASS" DUAL AXIS CONSTRUCTOR ---
-        # We pass a RAW DICTIONARY to st.plotly_chart to avoid the Plotly Validator crash
+        # 2. Data Cleaning for Charting
+        # Force numeric values and remove rows with missing data
+        plot_df = cmj_f.copy()
+        plot_df[h_col] = pd.to_numeric(plot_df[h_col], errors='coerce')
+        plot_df[r_col] = pd.to_numeric(plot_df[r_col], errors='coerce')
+        plot_df = plot_df.dropna(subset=[h_col, r_col])
+
+        # 3. The "Bypass" Dual Axis Constructor (Raw Dictionary)
         chart_dict = {
             "data": [
                 {
-                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
-                    "y": cmj_f[h_col].tolist(),
-                    "name": "Height (cm)", "type": "scatter", "mode": "lines+markers",
-                    "line": {"color": "#FF8200", "width": 3}
+                    "x": plot_df['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
+                    "y": plot_df[h_col].tolist(),
+                    "name": "Jump Height", "type": "scatter", "mode": "lines+markers",
+                    "line": {"color": "#FF8200", "width": 3},
+                    "marker": {"size": 8}
                 },
                 {
-                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
-                    "y": cmj_f[r_col].tolist(),
+                    "x": plot_df['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
+                    "y": plot_df[r_col].tolist(),
                     "name": "RSI-mod", "type": "scatter", "mode": "lines+markers",
-                    "yaxis": "y2", "line": {"color": "#4895DB", "width": 2, "dash": "dot"}
+                    "yaxis": "y2", "line": {"color": "#4895DB", "width": 2, "dash": "dot"},
+                    "marker": {"size": 8}
                 }
             ],
             "layout": {
                 "template": "plotly_white",
-                "legend": {"orientation": "h", "y": 1.1},
-                "yaxis": {"title": "Height (cm)", "titlefont": {"color": "#FF8200"}, "tickfont": {"color": "#FF8200"}},
-                "yaxis2": {"title": "RSI", "titlefont": {"color": "#4895DB"}, "tickfont": {"color": "#4895DB"}, "overlaying": "y", "side": "right", "showgrid": False},
-                "margin": {"l": 50, "r": 50, "t": 50, "b": 20}
+                "height": 450,
+                "legend": {"orientation": "h", "y": 1.1, "x": 0.5, "xanchor": "center"},
+                "xaxis": {"title": "Date", "showgrid": False},
+                "yaxis": {
+                    "title": "Height (cm)", 
+                    "titlefont": {"color": "#FF8200"}, 
+                    "tickfont": {"color": "#FF8200"},
+                    "showgrid": False
+                },
+                "yaxis2": {
+                    "title": "RSI-mod", 
+                    "titlefont": {"color": "#4895DB"}, 
+                    "tickfont": {"color": "#4895DB"}, 
+                    "overlaying": "y", 
+                    "side": "right", 
+                    "showgrid": False
+                },
+                "margin": {"l": 50, "r": 50, "t": 60, "b": 40}
             }
         }
+        
         st.plotly_chart(chart_dict, use_container_width=True)
         
-        # Simple Table
+        # 4. History Table
         st.markdown("#### Session History")
-        st.table(cmj_f[['Parsed_Date', h_col, r_col]].rename(columns={'Parsed_Date': 'Date'}))
+        table_df = plot_df[['Parsed_Date', h_col, r_col]].copy()
+        table_df['Date'] = table_df['Parsed_Date'].dt.strftime('%m/%d/%Y')
+        st.dataframe(table_df[['Date', h_col, r_col]], use_container_width=True, hide_index=True)
+        
+    else:
+        # Debug message to tell you what the code IS finding
+        st.warning(f"Could not find Jump Height or RSI columns for {selected}.")
+        st.write("Columns found in your sheet:", list(cmj_f.columns))
