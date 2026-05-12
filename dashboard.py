@@ -75,19 +75,22 @@ if not df.empty:
         available_years = sorted(p_athlete_data['Date'].dt.year.dropna().unique().astype(int), reverse=True)
         selected_year = st.selectbox("Select Season", ["All Time"] + available_years)
 
+    # --- THE CRITICAL FILTER ---
     if selected_year == "All Time":
         p_filtered = p_athlete_data
+        season_label = "All-Time"
     else:
         p_filtered = p_athlete_data[p_athlete_data['Date'].dt.year == selected_year]
+        season_label = f"{selected_year} Season"
 
     if not p_filtered.empty:
         p_latest = p_filtered.iloc[-1]
         latest_date_str = p_latest['Date'].strftime('%m/%d/%Y')
 
-        # --- CALCULATE BESTS (ALL TIME) ---
-        best_force = p_athlete_data['Peak Vertical Force [N]'].max()
-        best_rfd = p_athlete_data['RFD - 200ms [N/s]'].max()
-        best_time = p_athlete_data['Start Time to Peak Force [s]'].min()
+        # --- CALCULATE BESTS WITHIN FILTERED RANGE ---
+        best_force = p_filtered['Peak Vertical Force [N]'].max()
+        best_rfd = p_filtered['RFD - 200ms [N/s]'].max()
+        best_time = p_filtered['Start Time to Peak Force [s]'].min()
 
         # Calculation function for raw delta comparison
         def get_delta_str(current, best, unit=""):
@@ -104,7 +107,7 @@ if not df.empty:
                     <div style="margin-left: 30px;">
                         <h1 style="margin:0;">{selected}</h1>
                         <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
-                        <p style="color:#FF8200; font-weight:800; margin:0;">LATEST TEST DATE: {latest_date_str}</p>
+                        <p style="color:#FF8200; font-weight:800; margin:0;">LAST TEST IN RANGE: {latest_date_str}</p>
                     </div>
                 </div>
             </div>
@@ -115,7 +118,7 @@ if not df.empty:
         
         # Peak Force
         m1.metric(
-            label="All-Time Best Force", 
+            label=f"{season_label} Best Force", 
             value=f"{int(best_force)} N",
             delta=f"Latest: {get_delta_str(p_latest['Peak Vertical Force [N]'], best_force, ' N')}",
             delta_color="normal"
@@ -123,22 +126,22 @@ if not df.empty:
         
         # RFD
         m2.metric(
-            label="All-Time Best RFD", 
+            label=f"{season_label} Best RFD", 
             value=f"{int(best_rfd)} N/s",
             delta=f"Latest: {get_delta_str(p_latest['RFD - 200ms [N/s]'], best_rfd, ' N/s')}",
             delta_color="normal"
         )
         
-        # Asymmetry (Just latest raw number)
+        # Asymmetry (Latest within selection)
         asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
         m3.metric(
-            label="Latest Asymmetry", 
+            label=f"Latest Asymmetry ({selected_year})", 
             value=f"{asym}%"
         )
         
         # Time to Peak
         m4.metric(
-            label="All-Time Best Time", 
+            label=f"{season_label} Best Time", 
             value=f"{best_time}s",
             delta=f"Latest: {get_delta_str(p_latest.get('Start Time to Peak Force [s]', 0), best_time, 's')}",
             delta_color="normal"
@@ -160,7 +163,7 @@ if not df.empty:
                 st.info("Additional data points needed for trend analysis.")
 
         with col_right:
-            st.subheader(f"Latest L/R Split ({latest_date_str})")
+            st.subheader(f"Session L/R Split ({latest_date_str})")
             l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
             r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
             side_df = pd.DataFrame({'Side': ['Left', 'Right'], 'Force [N]': [l_force, r_force]})
@@ -170,6 +173,6 @@ if not df.empty:
             st.plotly_chart(fig_side, use_container_width=True)
             
     else:
-        st.warning(f"No test data available for the selected range.")
+        st.warning(f"No test data available for {selected} in {selected_year}.")
 else:
     st.warning("Dashboard data not loaded. Check Google Sheet connectivity.")
