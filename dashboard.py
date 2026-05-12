@@ -67,24 +67,39 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/e/e4/Tennessee_Volunteers_logo.svg", width=100)
     st.header("Global Filters")
     
-    # 1. Season/Year Filter
-    all_dates = pd.concat([ash_df['Date'], cmj_df['Date']])
-    years = sorted(all_dates.dt.year.dropna().unique().astype(int), reverse=True)
+    # 1. Dynamic Year Detection (Fixed for KeyError)
+    def get_years(df):
+        # Look for any variation of a date column
+        d_col = next((c for c in ['Date', 'Test Date', 'date', 'test date'] if c in df.columns), None)
+        if d_col is not None:
+            return pd.to_datetime(df[d_col], errors='coerce').dt.year
+        return pd.Series(dtype='int')
+
+    all_years_series = pd.concat([get_years(ash_df), get_years(cmj_df)])
+    years = sorted(all_years_series.dropna().unique().astype(int), reverse=True)
     sel_year = st.selectbox("Select Season", ["All Time"] + years)
     
     # 2. Athlete Search
-    all_athletes = sorted(ash_df['Player Name'].unique())
+    all_athletes = sorted(ash_df['Player Name'].unique()) if 'Player Name' in ash_df.columns else []
     selected = st.selectbox("Search Athlete", all_athletes)
 
 # --- GLOBAL FILTERING LOGIC ---
 def apply_year_filter(df, year):
-    if year == "All Time": return df
-    return df[df['Date'].dt.year == year]
+    if year == "All Time": 
+        return df
+    # Find the date column again to filter specifically for this df
+    d_col = next((c for c in ['Date', 'Test Date', 'date', 'test date'] if c in df.columns), None)
+    if d_col:
+        # Convert to datetime temporarily to check the year
+        temp_date = pd.to_datetime(df[d_col], errors='coerce')
+        return df[temp_date.dt.year == year]
+    return df
 
 ash_f = apply_year_filter(ash_df, sel_year)
 cmj_f = apply_year_filter(cmj_df, sel_year)
 swing_f = apply_year_filter(swing_df, sel_year)
 throw_f = apply_year_filter(throw_df, sel_year)
+
 
 # --- ATHLETE HEADER ---
 pic_row = roster_df[roster_df['Player Name'] == selected]
