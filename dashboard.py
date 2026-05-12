@@ -179,17 +179,62 @@ if not ash_df.empty:
 
             st.divider()
             st.subheader("Readiness Trend")
-            cmj_chart = {
+            # --- STABLE CMJ DUAL AXIS CHART ---
+            st.subheader("Readiness Trend")
+            
+            # Format dates to avoid timezone/format errors in Python 3.14
+            chart_dates = cmj_filt['Date'].dt.strftime('%Y-%m-%d').tolist()
+            
+            cmj_stable_fig = {
                 "data": [
-                    {"x": cmj_filt['Date'].dt.strftime('%Y-%m-%d').tolist(), "y": cmj_filt['Jump Height (Imp-Mom) [cm]'].tolist(), "name": "Height (cm)", "type": "scatter", "mode": "lines+markers", "line": {"color": "#FF8200"}},
-                    {"x": cmj_filt['Date'].dt.strftime('%Y-%m-%d').tolist(), "y": cmj_filt['RSI-modified (Imp-Mom) [m/s]'].tolist(), "name": "RSI-m", "type": "scatter", "mode": "lines+markers", "yaxis": "y2", "line": {"color": "#4895DB", "dash": "dot"}}
+                    {
+                        "x": chart_dates,
+                        "y": cmj_filt['Jump Height (Imp-Mom) [cm]'].tolist(),
+                        "name": "Jump Height (cm)",
+                        "type": "scatter",
+                        "mode": "lines+markers",
+                        "line": {"color": "#FF8200", "width": 3},
+                        "marker": {"size": 8}
+                    },
+                    {
+                        "x": chart_dates,
+                        "y": cmj_filt['RSI-modified (Imp-Mom) [m/s]'].tolist(),
+                        "name": "RSI-m",
+                        "type": "scatter",
+                        "mode": "lines+markers",
+                        "yaxis": "y2", # Links to the secondary axis
+                        "line": {"color": "#4895DB", "width": 2, "dash": "dot"},
+                        "marker": {"size": 8}
+                    }
                 ],
                 "layout": {
-                    "template": "plotly_white", "legend": {"orientation": "h", "y": 1.1},
-                    "yaxis": {"title": "Height (cm)", "titlefont": {"color": "#FF8200"}},
-                    "yaxis2": {"title": "RSI-m", "overlaying": "y", "side": "right", "showgrid": False},
-                    "xaxis": {"tickangle": -45}
+                    "template": "plotly_white",
+                    "height": 450,
+                    "legend": {"orientation": "h", "y": 1.15, "x": 0.5, "xanchor": "center"},
+                    "xaxis": {
+                        "showgrid": False, 
+                        "tickangle": -45, 
+                        "nticks": 10,
+                        "type": "category" # Forces discrete dates to prevent overlapping
+                    },
+                    "yaxis": {
+                        "title": "Jump Height (cm)", 
+                        "titlefont": {"color": "#FF8200"}, 
+                        "tickfont": {"color": "#FF8200"},
+                        "showgrid": True
+                    },
+                    "yaxis2": {
+                        "title": "RSI-m", 
+                        "titlefont": {"color": "#4895DB"}, 
+                        "tickfont": {"color": "#4895DB"}, 
+                        "overlaying": "y", 
+                        "side": "right", 
+                        "showgrid": False,
+                        "anchor": "x" # Explicitly anchors to the x-axis for 3.14 stability
+                    },
+                    "margin": {"l": 50, "r": 50, "t": 60, "b": 60}
                 }
             }
-            st.plotly_chart(cmj_chart, use_container_width=True)
-        else: st.warning("No CMJ data found.")
+
+            # Use theme=None to prevent Streamlit from trying to override the stable dict
+            st.plotly_chart(cmj_stable_fig, use_container_width=True, theme=None)
