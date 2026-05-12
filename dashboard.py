@@ -203,19 +203,34 @@ if not ash_df.empty:
                 'Peak Vertical Force [N] (Asym)(%)'
             ]].copy()
 
+            # --- CRITICAL FIX: Ensure columns are numeric before styling ---
+            # This strips any stray characters and converts to numbers
+            for col in ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']:
+                ash_history[col] = pd.to_numeric(ash_history[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+            
+            # Special handling for Asym to strip % signs
+            ash_history['Peak Vertical Force [N] (Asym)(%)'] = pd.to_numeric(
+                ash_history['Peak Vertical Force [N] (Asym)(%)'].astype(str).str.replace('%', '').strip(), 
+                errors='coerce'
+            ).fillna(0)
+
+            # Compare ASH date to the Master Game Date list
             ash_history['Game?'] = ash_history['Date'].dt.date.apply(
                 lambda x: "✔️ Yes" if x in game_dates else "—"
             )
             
+            # Final Formatting for display names
             ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
             ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
 
+            # Now the formatter will work because the data is guaranteed to be numeric
             st.table(ash_history.sort_values('Date', ascending=False).style.format({
                 'Force (N)': '{:.0f}',
                 'RFD (N/s)': '{:.0f}',
                 'Time (s)': '{:.3f}',
                 'Asym %': '{:.1f}%'
             }))
+            
             
     with tab_cmj:
         if not cmj_filt.empty:
