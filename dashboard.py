@@ -172,69 +172,59 @@ if not ash_df.empty:
             c_best_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
             c_best_r = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
 
+            # 1. READINESS METRICS
             cm1, cm2, cm3 = st.columns(3)
-            with cm1: colored_metric(f"{label} Best Height", c_best_h, c_lat['Jump Height (Imp-Mom) [cm]'], " cm")
-            with cm2: colored_metric(f"{label} Best RSI-m", c_best_r, c_lat['RSI-modified (Imp-Mom) [m/s]'], "")
-            with cm3: st.metric("Body Weight", f"{c_lat.get('BW [KG]', 0):.1f} kg")
+            with cm1: 
+                colored_metric(f"{label} Best Height", c_best_h, c_lat['Jump Height (Imp-Mom) [cm]'], " cm")
+            with cm2: 
+                colored_metric(f"{label} Best RSI-m", c_best_r, c_lat['RSI-modified (Imp-Mom) [m/s]'], "")
+            with cm3: 
+                st.metric("Body Weight", f"{c_lat.get('BW [KG]', 0):.1f} kg")
 
             st.divider()
-            st.subheader("Readiness Trend")
-            # --- STABLE CMJ DUAL AXIS CHART ---
-            st.subheader("Readiness Trend")
-            
-            # Format dates to avoid timezone/format errors in Python 3.14
-            chart_dates = cmj_filt['Date'].dt.strftime('%Y-%m-%d').tolist()
-            
-            cmj_stable_fig = {
-                "data": [
-                    {
-                        "x": chart_dates,
-                        "y": cmj_filt['Jump Height (Imp-Mom) [cm]'].tolist(),
-                        "name": "Jump Height (cm)",
-                        "type": "scatter",
-                        "mode": "lines+markers",
-                        "line": {"color": "#FF8200", "width": 3},
-                        "marker": {"size": 8}
-                    },
-                    {
-                        "x": chart_dates,
-                        "y": cmj_filt['RSI-modified (Imp-Mom) [m/s]'].tolist(),
-                        "name": "RSI-m",
-                        "type": "scatter",
-                        "mode": "lines+markers",
-                        "yaxis": "y2", # Links to the secondary axis
-                        "line": {"color": "#4895DB", "width": 2, "dash": "dot"},
-                        "marker": {"size": 8}
-                    }
-                ],
-                "layout": {
-                    "template": "plotly_white",
-                    "height": 450,
-                    "legend": {"orientation": "h", "y": 1.15, "x": 0.5, "xanchor": "center"},
-                    "xaxis": {
-                        "showgrid": False, 
-                        "tickangle": -45, 
-                        "nticks": 10,
-                        "type": "category" # Forces discrete dates to prevent overlapping
-                    },
-                    "yaxis": {
-                        "title": "Jump Height (cm)", 
-                        "titlefont": {"color": "#FF8200"}, 
-                        "tickfont": {"color": "#FF8200"},
-                        "showgrid": True
-                    },
-                    "yaxis2": {
-                        "title": "RSI-m", 
-                        "titlefont": {"color": "#4895DB"}, 
-                        "tickfont": {"color": "#4895DB"}, 
-                        "overlaying": "y", 
-                        "side": "right", 
-                        "showgrid": False,
-                        "anchor": "x" # Explicitly anchors to the x-axis for 3.14 stability
-                    },
-                    "margin": {"l": 50, "r": 50, "t": 60, "b": 60}
-                }
-            }
 
-            # Use theme=None to prevent Streamlit from trying to override the stable dict
-            st.plotly_chart(cmj_stable_fig, use_container_width=True, theme=None)
+            # 2. JUMP HEIGHT TREND (Primary Readiness)
+            st.subheader(f"Jump Height Trend ({label})")
+            fig_height = px.line(
+                cmj_filt, 
+                x='Date', 
+                y='Jump Height (Imp-Mom) [cm]', 
+                markers=True, 
+                template="plotly_white", 
+                color_discrete_sequence=["#FF8200"]
+            )
+            fig_height.update_xaxes(tickformat="%b %d", tickangle=-45)
+            fig_height.update_layout(yaxis_title="Height (cm)", height=350)
+            st.plotly_chart(fig_height, use_container_width=True)
+
+            # 3. RSI-m TREND (Secondary Readiness)
+            st.subheader(f"RSI-m Profile")
+            fig_rsi = px.area(
+                cmj_filt, 
+                x='Date', 
+                y='RSI-modified (Imp-Mom) [m/s]', 
+                markers=True, 
+                template="plotly_white", 
+                color_discrete_sequence=["#4895DB"]
+            )
+            fig_rsi.update_xaxes(tickformat="%b %d", tickangle=-45)
+            fig_rsi.update_layout(yaxis_title="RSI-m", height=300)
+            st.plotly_chart(fig_rsi, use_container_width=True)
+            
+            # 4. MECHANICAL SUMMARY
+            st.divider()
+            st.subheader("Latest Mechanical Breakdown")
+            breakdown_cols = st.columns(2)
+            
+            with breakdown_cols[0]:
+                st.write("**Concentric Power**")
+                st.write(f"Peak Power: {int(c_lat.get('Peak Power [W]', 0))} W")
+                st.write(f"Takeoff Velocity: {c_lat.get('Vertical Velocity at Takeoff [m/s]', 0):.2f} m/s")
+            
+            with breakdown_cols[1]:
+                st.write("**Eccentric Loading**")
+                st.write(f"Braking RFD: {int(c_lat.get('Eccentric Braking RFD [N/s]', 0))} N/s")
+                st.write(f"Stiffness: {int(c_lat.get('CMJ Stiffness [N/m]', 0))} N/m")
+
+        else: 
+            st.warning("No CMJ data found for this selection.")
