@@ -127,24 +127,50 @@ if not ash_df.empty:
 
     with tab_ash:
         if not ash_filt.empty:
-            # ASH Metrics
-            best_f = ash_filt['Peak Vertical Force [N]'].max()
-            best_r = ash_filt['RFD - 200ms [N/s]'].max()
-            
-            m1, m2, m3 = st.columns(3)
-            quick_metric(m1, "Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
-            quick_metric(m2, "Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
-            m3.metric("Latest Asymmetry", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
+            best_f, best_r = ash_filt['Peak Vertical Force [N]'].max(), ash_filt['RFD - 200ms [N/s]'].max()
+            best_t = ash_filt['Start Time to Peak Force [s]'].min()
+
+            def colored_metric(label, best_val, current_val, unit, is_time=False):
+                diff = ((current_val - best_val) / best_val * 100) if best_val != 0 else 0
+                is_bad = diff > 10 if is_time else diff < -10
+                color = "red-text" if is_bad else "green-text"
+                st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
+                st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
+
+            m1, m2, m3, m4 = st.columns(4)
+            with m1: colored_metric(f"{label} Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
+            with m2: colored_metric(f"{label} Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
+            with m3: st.metric("Latest Asymmetry", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
+            with m4: colored_metric(f"{label} Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
 
             st.divider()
             
-            # ASH Chart
-            fig_ash = px.line(ash_filt, x='Date', y='Peak Vertical Force [N]', markers=True, 
-                             template="plotly_white", color_discrete_sequence=["#FF8200"])
-            fig_ash.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=12, title="")
-            st.plotly_chart(fig_ash, use_container_width=True)
-        else:
-            st.info("No ASH records found.")
+            c1, c2 = st.columns([2, 1])
+            with c1:
+                st.subheader("Left vs Right Force Profile")
+                l_f, r_f = latest_ash.get('Peak Vertical Force [N] (L)', 0), latest_ash.get('Peak Vertical Force [N] (R)', 0)
+                side_df = pd.DataFrame({'Side': ['Left (Lead)', 'Right (Trail)'], 'Force [N]': [l_f, r_f]})
+                fig = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]', color='Side', 
+                             color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'}, template="plotly_white")
+                st.plotly_chart(fig, use_container_width=True)
+            with c2:
+                st.subheader("Bilateral Profile")
+                l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
+                r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
+                raw_asym = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
+                st.markdown(f"""
+                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <div style="text-align:center; width:45%;"><p style="color:#4895DB; font-weight:800; margin:0; font-size:12px;">LEFT</p><h2 style="margin:0;">{l_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{l_rfd} RFD</p></div>
+                            <div style="text-align:center; width:45%;"><p style="color:#FF8200; font-weight:800; margin:0; font-size:12px;">RIGHT</p><h2 style="margin:0;">{r_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{r_rfd} RFD</p></div>
+                        </div>
+                        <div style="text-align:center; border-top:1px solid #E0E0E0; padding-top:10px; margin-top:10px;">
+                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">ASYMMETRY</p>
+                            <h3 style="margin:0; color:{'#dc3545' if abs(raw_asym) > 10 else '#28a745'}">{raw_asym}%</h3>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
     with tab_cmj:
         if not cmj_filt.empty:
