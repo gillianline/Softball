@@ -85,16 +85,16 @@ if not df.empty:
         latest_date_str = p_latest['Date'].strftime('%m/%d/%Y')
 
         # --- CALCULATE BESTS (ALL TIME) ---
-        # Note: For Time to Peak, "Best" is the minimum value.
         best_force = p_athlete_data['Peak Vertical Force [N]'].max()
         best_rfd = p_athlete_data['RFD - 200ms [N/s]'].max()
         best_time = p_athlete_data['Start Time to Peak Force [s]'].min()
 
-        # Calculation function for % of best
-        def get_pct(current, best):
-            if best == 0: return "0%"
-            diff = ((current - best) / best) * 100
-            return f"{diff:+.1f}% of Best"
+        # Calculation function for raw delta comparison
+        def get_delta_str(current, best, unit=""):
+            if best == 0: return "N/A"
+            diff_val = current - best
+            diff_pct = (diff_val / best) * 100
+            return f"{current:.1f}{unit} ({diff_pct:+.1f}%)"
 
         # Athlete Header Card
         st.markdown(f"""
@@ -104,45 +104,44 @@ if not df.empty:
                     <div style="margin-left: 30px;">
                         <h1 style="margin:0;">{selected}</h1>
                         <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
-                        <p style="color:#FF8200; font-weight:800; margin:0;">LATEST TEST: {latest_date_str}</p>
+                        <p style="color:#FF8200; font-weight:800; margin:0;">LATEST TEST DATE: {latest_date_str}</p>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # Metric Row - Recent vs All-Time Best
+        # Metric Row
         m1, m2, m3, m4 = st.columns(4)
         
         # Peak Force
         m1.metric(
-            label="Latest Peak Force", 
-            value=f"{int(p_latest['Peak Vertical Force [N]'])} N",
-            delta=get_pct(p_latest['Peak Vertical Force [N]'], best_force)
+            label="All-Time Best Force", 
+            value=f"{int(best_force)} N",
+            delta=f"Latest: {get_delta_str(p_latest['Peak Vertical Force [N]'], best_force, ' N')}",
+            delta_color="normal"
         )
         
         # RFD
         m2.metric(
-            label="Latest RFD (200ms)", 
-            value=f"{int(p_latest['RFD - 200ms [N/s]'])} N/s",
-            delta=get_pct(p_latest['RFD - 200ms [N/s]'], best_rfd)
+            label="All-Time Best RFD", 
+            value=f"{int(best_rfd)} N/s",
+            delta=f"Latest: {get_delta_str(p_latest['RFD - 200ms [N/s]'], best_rfd, ' N/s')}",
+            delta_color="normal"
         )
         
-        # Asymmetry (Static comparison as it's a balance metric)
+        # Asymmetry (Just latest raw number)
         asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
         m3.metric(
             label="Latest Asymmetry", 
-            value=f"{asym}%", 
-            delta="- High Risk" if asym > 10 else "Optimal", 
-            delta_color="inverse" if asym > 10 else "normal"
+            value=f"{asym}%"
         )
         
         # Time to Peak
-        # Delta is "inverse" here because a negative % (faster) is better.
         m4.metric(
-            label="Latest Time to Peak", 
-            value=f"{p_latest.get('Start Time to Peak Force [s]', 0)}s",
-            delta=get_pct(p_latest.get('Start Time to Peak Force [s]', 0), best_time),
-            delta_color="inverse" 
+            label="All-Time Best Time", 
+            value=f"{best_time}s",
+            delta=f"Latest: {get_delta_str(p_latest.get('Start Time to Peak Force [s]', 0), best_time, 's')}",
+            delta_color="normal"
         )
 
         st.divider()
