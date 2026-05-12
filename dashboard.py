@@ -16,13 +16,12 @@ st.markdown("""
     .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
     .stTabs [role="tab"] { font-weight: 800; color: #4895DB; font-size: 18px; }
     .stTabs [aria-selected="true"] { color: #FF8200; border-bottom-color: #FF8200; }
+    .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 10px;}
+    .scout-table th { background-color: #4895DB; color: white; padding: 8px; border-bottom: 2px solid #FF8200; text-transform: uppercase; font-size: 12px; }
+    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- UTILITY: DYNAMIC COLUMN FINDER ---
-def find_col(df, options):
-    return next((c for c in options if c in df.columns), None)
 
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
@@ -34,13 +33,11 @@ def load_data():
         
         for df in [ash, cmj, roster]:
             df.columns = df.columns.str.strip()
-            # Clean names and dates
-            n_col = find_col(df, ['Player Name', 'Athlete', 'Name', 'Player'])
-            if n_col:
-                df[n_col] = df[n_col].astype(str).str.strip().str.upper()
-            d_col = find_col(df, ['Date', 'Test Date', 'date'])
-            if d_col:
-                df['Parsed_Date'] = pd.to_datetime(df[d_col], errors='coerce').dt.tz_localize(None)
+            # Find name/date columns regardless of specific labeling
+            n_col = next((c for c in ['Player Name', 'Athlete', 'Name'] if c in df.columns), None)
+            d_col = next((c for c in ['Date', 'Test Date', 'date'] if c in df.columns), None)
+            if n_col: df[n_col] = df[n_col].astype(str).str.strip()
+            if d_col: df['Parsed_Date'] = pd.to_datetime(df[d_col], errors='coerce').dt.tz_localize(None)
                 
         return ash, cmj, roster
     except Exception as e:
@@ -54,30 +51,29 @@ st.title("🥎 Performance Hub")
 f1, f2 = st.columns(2)
 
 with f1:
-    n_col_main = find_col(ash_df, ['Player Name', 'Athlete', 'Name', 'Player'])
-    # Only show athletes that actually have data
-    athlete_list = sorted(ash_df[n_col_main].unique()) if n_col_main else []
+    n_col = next((c for c in ['Player Name', 'Athlete', 'Name'] if c in ash_df.columns), 'Player Name')
+    athlete_list = sorted(ash_df[n_col].unique())
     selected = st.selectbox("Search Athlete", athlete_list)
 
 with f2:
     years = sorted(ash_df['Parsed_Date'].dt.year.dropna().unique().astype(int), reverse=True)
     sel_year = st.selectbox("Select Season", ["All Time"] + years)
 
-# --- GLOBAL FILTERING ---
-def get_filtered_data(df, athlete, year):
-    n_col = find_col(df, ['Player Name', 'Athlete', 'Name', 'Player'])
+# --- FILTERING ---
+def filter_df(df, athlete, year):
+    n_col = next((c for c in ['Player Name', 'Athlete', 'Name'] if c in df.columns), 'Player Name')
     temp = df[df[n_col] == athlete].copy()
     if year != "All Time":
         temp = temp[temp['Parsed_Date'].dt.year == year]
-    return temp.sort_values('Parsed_Date').dropna(subset=['Parsed_Date'])
+    return temp.sort_values('Parsed_Date')
 
-ash_f = get_filtered_data(ash_df, selected, sel_year)
-cmj_f = get_filtered_data(cmj_df, selected, sel_year)
+ash_f = filter_df(ash_df, selected, sel_year)
+cmj_f = filter_df(cmj_df, selected, sel_year)
 
 # --- HEADER ---
-r_name = find_col(roster_df, ['Player Name', 'Athlete', 'Name', 'Player'])
-pic_row = roster_df[roster_df[r_name] == selected] if r_name else pd.DataFrame()
-photo = pic_row['Picture'].values[0] if not pic_row.empty and 'Picture' in pic_row.columns else "https://www.w3schools.com/howto/img_avatar.png"
+r_name = next((c for c in ['Player Name', 'Athlete', 'Name'] if c in roster_df.columns), 'Player Name')
+pic_row = roster_df[roster_df[r_name] == selected]
+photo = pic_row['Picture'].values[0] if not pic_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
 
 st.markdown(f"""
     <div class="athlete-header">
@@ -93,7 +89,6 @@ st.markdown(f"""
 
 tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
 
-# --- TAB 1: ASH ---
 with tab_ash:
     if not ash_f.empty:
         latest = ash_f.iloc[-1]
@@ -101,63 +96,44 @@ with tab_ash:
         m1.metric("Peak Force", f"{int(latest.get('Peak Vertical Force [N]', 0))} N")
         m2.metric("RFD (200ms)", f"{int(latest.get('RFD - 200ms [N/s]', 0))} N/s")
         
-        # Plotly Trace - Explicit and Robust
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=ash_f['Parsed_Date'], 
-            y=ash_f['Peak Vertical Force [N]'],
-            mode='lines+markers',
-            line=dict(color='#FF8200', width=4),
-            marker=dict(size=8)
-        ))
-        fig.update_layout(
-            margin=dict(l=20, r=20, t=20, b=20),
-            height=350,
-            template="plotly_white",
-            xaxis=dict(showgrid=False, title="Date"),
-            yaxis=dict(title="Force (N)")
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("No ASH data found.")
+        # Single Axis Stable Chart
+        st.plotly_chart({
+            "data": [{"x": ash_f['Parsed_Date'].tolist(), "y": ash_f['Peak Vertical Force [N]'].tolist(), "type": "scatter", "mode": "lines+markers", "line": {"color": "#FF8200"}}],
+            "layout": {"template": "plotly_white", "xaxis": {"title": "Date"}, "yaxis": {"title": "Force (N)"}}
+        }, use_container_width=True)
 
-# --- TAB 2: CMJ ---
 with tab_cmj:
-    h_col = find_col(cmj_f, ['Jump Height (Imp-Mom) [cm]', 'Jump Height'])
-    r_col = find_col(cmj_f, ['RSI-modified [m/s]', 'RSI-modified (Imp-Mom) [m/s]', 'RSI'])
-    
+    h_col = next((c for c in ['Jump Height (Imp-Mom) [cm]', 'Jump Height'] if c in cmj_f.columns), None)
+    r_col = next((c for c in ['RSI-modified [m/s]', 'RSI'] if c in cmj_f.columns), None)
+
     if not cmj_f.empty and h_col and r_col:
-        # Dual-Axis Recovery Plot
-        fig_cmj = go.Figure()
+        # --- THE "BYPASS" DUAL AXIS CONSTRUCTOR ---
+        # We pass a RAW DICTIONARY to st.plotly_chart to avoid the Plotly Validator crash
+        chart_dict = {
+            "data": [
+                {
+                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
+                    "y": cmj_f[h_col].tolist(),
+                    "name": "Height (cm)", "type": "scatter", "mode": "lines+markers",
+                    "line": {"color": "#FF8200", "width": 3}
+                },
+                {
+                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
+                    "y": cmj_f[r_col].tolist(),
+                    "name": "RSI-mod", "type": "scatter", "mode": "lines+markers",
+                    "yaxis": "y2", "line": {"color": "#4895DB", "width": 2, "dash": "dot"}
+                }
+            ],
+            "layout": {
+                "template": "plotly_white",
+                "legend": {"orientation": "h", "y": 1.1},
+                "yaxis": {"title": "Height (cm)", "titlefont": {"color": "#FF8200"}, "tickfont": {"color": "#FF8200"}},
+                "yaxis2": {"title": "RSI", "titlefont": {"color": "#4895DB"}, "tickfont": {"color": "#4895DB"}, "overlaying": "y", "side": "right", "showgrid": False},
+                "margin": {"l": 50, "r": 50, "t": 50, "b": 20}
+            }
+        }
+        st.plotly_chart(chart_dict, use_container_width=True)
         
-        fig_cmj.add_trace(go.Scatter(
-            x=cmj_f['Parsed_Date'], y=cmj_f[h_col],
-            name="Jump Height (cm)", mode='lines+markers',
-            line=dict(color='#FF8200', width=3)
-        ))
-        
-        fig_cmj.add_trace(go.Scatter(
-            x=cmj_f['Parsed_Date'], y=cmj_f[r_col],
-            name="RSI-mod", mode='lines+markers',
-            line=dict(color='#4895DB', width=2, dash='dot'),
-            yaxis="y2"
-        ))
-        
-        fig_cmj.update_layout(
-            height=400,
-            template="plotly_white",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            yaxis=dict(title="Height (cm)", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200")),
-            yaxis2=dict(title="RSI", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB"), anchor="x", overlaying="y", side="right"),
-            margin=dict(l=50, r=50, t=50, b=20)
-        )
-        
-        st.plotly_chart(fig_cmj, use_container_width=True)
-        
-        # History List
-        st.markdown("#### Season Sessions")
-        history = cmj_f[['Parsed_Date', h_col, r_col]].copy()
-        history['Display Date'] = history['Parsed_Date'].dt.strftime('%m/%d/%Y')
-        st.dataframe(history[['Display Date', h_col, r_col]], use_container_width=True, hide_index=True)
-    else:
-        st.warning("No CMJ data found.")
+        # Simple Table
+        st.markdown("#### Session History")
+        st.table(cmj_f[['Parsed_Date', h_col, r_col]].rename(columns={'Parsed_Date': 'Date'}))
