@@ -172,22 +172,25 @@ if not ash_df.empty:
                 """, unsafe_allow_html=True)
                 st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
-            # 3. ASH SESSION HISTORY TABLE WITH GAME CHECK
-            st.subheader("ASH Session Log")
+            # --- ROBUST GAME LOOKUP ---
+            game_dates = set()
+            
+            # Helper to find game dates in other dataframes
+            def find_game_days(df, session_col):
+                if df is not None and not df.empty and session_col in df.columns:
+                    # Convert to standard date and filter for 'Game'
+                    games = df[df[session_col].astype(str).str.contains('Game', case=False, na=False)]
+                    return set(pd.to_datetime(games['Date']).dt.date)
+                return set()
 
-            # Create a list of dates that were "Games" from Swing/Throw data
-            # Adjust 'Session Type' to match your actual column name
-            game_dates = []
+            # Check both Swing and Throw (ensure these variables exist in your script)
             try:
-                # Check Swing Data
-                swing_games = swing_df[swing_df['Session Type'] == 'Game']['Date'].dt.date.unique()
-                # Check Throw Data
-                throw_games = throw_df[throw_df['Session Type'] == 'Game']['Date'].dt.date.unique()
-                game_dates = list(set(swing_games) | set(throw_games))
-            except:
-                pass # Fallback if columns aren't named exactly right
+                game_dates.update(find_game_days(swing_df, 'Session Type'))
+                game_dates.update(find_game_days(throw_df, 'Session Type'))
+            except NameError:
+                st.warning("Swing or Throw data not loaded; Game status unavailable.")
 
-            # Build the History Table
+            # Build Table
             ash_history = ash_filt[[
                 'Date', 
                 'Peak Vertical Force [N]', 
@@ -196,10 +199,12 @@ if not ash_df.empty:
                 'Peak Vertical Force [N] (Asym)(%)'
             ]].copy()
 
-            # Add a 'Game?' column based on the date lookup
-            ash_history['Game?'] = ash_history['Date'].dt.date.apply(lambda x: "✔️ Yes" if x in game_dates else "—")
+            # Compare ASH date to the Master Game Date list
+            ash_history['Game?'] = ash_history['Date'].dt.date.apply(
+                lambda x: "✔️ Yes" if x in game_dates else "—"
+            )
             
-            # Formatting
+            # Final Formatting
             ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
             ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
 
@@ -209,8 +214,7 @@ if not ash_df.empty:
                 'Time (s)': '{:.3f}',
                 'Asym %': '{:.1f}%'
             }))
-        else:
-            st.info("No ASH records found.")
+            
     with tab_cmj:
         if not cmj_filt.empty:
             # 1. IDENTIFY LATEST VS BEST FOR SELECTED YEAR
