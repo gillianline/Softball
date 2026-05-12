@@ -67,26 +67,52 @@ ash_df, cmj_df, roster_df = load_all_data()
 st.title("🥎 Performance Hub")
 f1, f2 = st.columns(2)
 
+# Helper to find date column safely
+def find_date_col(df):
+    return next((c for c in ['Date', 'Test Date', 'date', 'test_date'] if c in df.columns), None)
+
 with f1:
-    # Standardize name matching
-    athlete_list = sorted(ash_df['Player Name'].unique()) if not ash_df.empty else []
+    athlete_list = sorted(ash_df['Player Name'].unique()) if 'Player Name' in ash_df.columns else []
     selected = st.selectbox("Search Athlete", athlete_list)
 
 with f2:
-    all_dates = pd.concat([ash_df['Date'], cmj_df['Test Date']])
-    years = sorted(all_dates.dt.year.dropna().unique().astype(int), reverse=True)
+    # Safely find date columns for both dataframes
+    ash_date_col = find_date_col(ash_df)
+    cmj_date_col = find_date_col(cmj_df)
+    
+    # Only concat if the columns actually exist
+    dates_to_concat = []
+    if ash_date_col: dates_to_concat.append(ash_df[ash_date_col])
+    if cmj_date_col: dates_to_concat.append(cmj_df[cmj_date_col])
+    
+    if dates_to_concat:
+        all_dates = pd.concat(dates_to_concat)
+        years = sorted(all_dates.dt.year.dropna().unique().astype(int), reverse=True)
+    else:
+        years = []
+        
     sel_year = st.selectbox("Select Season", ["All Time"] + years)
 
 # --- FILTERING LOGIC ---
-def filter_data(df, athlete, year, date_col):
+def filter_data_robust(df, athlete, year):
     if df.empty: return df
-    temp = df[df['Player Name'] == athlete].copy()
+    
+    # Find athlete column
+    name_col = next((c for c in ['Player Name', 'Athlete', 'Name'] if c in df.columns), None)
+    # Find date column
+    date_col = find_date_col(df)
+    
+    if not name_col or not date_col:
+        return pd.DataFrame() # Return empty if columns are missing
+
+    temp = df[df[name_col] == athlete].copy()
     if year != "All Time":
         temp = temp[temp[date_col].dt.year == year]
     return temp.sort_values(date_col)
 
-ash_f = filter_data(ash_df, selected, sel_year, 'Date')
-cmj_f = filter_data(cmj_df, selected, sel_year, 'Test Date')
+# Apply the robust filters
+ash_f = filter_data_robust(ash_df, selected, sel_year)
+cmj_f = filter_data_robust(cmj_df, selected, sel_year)
 
 # --- HEADER ---
 pic_row = roster_df[roster_df['Player Name'] == selected]
