@@ -106,37 +106,58 @@ if not ash_df.empty:
         tab_ash, tab_cmj = st.tabs(["ASH TEST", "CMJ READINESS"])
 
         with tab_ash:
-            if not ash_filt.empty:
-                # 1. ASYMMETRY REPAIR
-                asym_raw = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
+        if not ash_filt.empty:
+            # 1. PROFILE PICTURE & HEADER
+            col_pic, col_name = st.columns([1, 4])
+            with col_pic:
+                # Merged from roster_df in load_all_data
+                image_url = latest_ash.get('Photo', "https://via.placeholder.com/150")
+                st.image(image_url, width=120)
+            with col_name:
+                st.title(f"{selected}")
+                st.subheader("ASH (Athletic Shoulder) Performance Profile")
+
+            # 2. MANUAL ASYMMETRY CALCULATION (Fixes the 0.0% error)
+            l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
+            r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
+            
+            if l_f > 0 and r_f > 0:
+                # Calculate % difference based on the higher value
+                clean_asym = (abs(l_f - r_f) / max(l_f, r_f)) * 100
+            else:
+                # Fallback to sheet value if L/R are missing
+                raw_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
                 try:
-                    # Robust cleaning: convert to string, remove % sign, convert to float
-                    clean_asym = float(str(asym_raw).replace('%', '').strip())
-                except (ValueError, TypeError):
+                    clean_asym = float(str(raw_val).replace('%', '').strip())
+                except:
                     clean_asym = 0.0
 
-                # 2. CALC METRICS
-                ash_filt['Peak Vertical Force [N]'] = pd.to_numeric(ash_filt['Peak Vertical Force [N]'], errors='coerce').fillna(0)
-                best_f = ash_filt['Peak Vertical Force [N]'].max()
-                best_r = ash_filt['RFD - 200ms [N/s]'].max()
-                best_t = ash_filt['Start Time to Peak Force [s]'].min()
-                base_f = ash_filt['Peak Vertical Force [N]'].mean()
+            # 3. CALCULATE BASELINES & BESTS
+            ash_filt['Peak Vertical Force [N]'] = pd.to_numeric(ash_filt['Peak Vertical Force [N]'], errors='coerce').fillna(0)
+            best_f = ash_filt['Peak Vertical Force [N]'].max()
+            best_r = ash_filt['RFD - 200ms [N/s]'].max()
+            best_t = ash_filt['Start Time to Peak Force [s]'].min()
 
-                def colored_metric(label, best_val, current_val, unit, is_time=False):
-                    diff = ((current_val - best_val) / best_val * 100) if best_val != 0 else 0
-                    is_bad = diff > 10 if is_time else diff < -10
-                    color = "red-text" if is_bad else "green-text"
-                    st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
-                    st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
+            def colored_metric(label, best_val, current_val, unit, is_time=False):
+                diff = ((current_val - best_val) / best_val * 100) if best_val != 0 else 0
+                is_bad = diff > 10 if is_time else diff < -10
+                color = "red-text" if is_bad else "green-text"
+                st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
+                st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
 
-                # 3. TOP METRIC ROW
-                m1, m2, m3, m4 = st.columns(4)
-                with m1: colored_metric("Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
-                with m2: colored_metric("Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
-                with m3: st.metric("Asymmetry", f"{clean_asym:.1f}%", delta="High" if abs(clean_asym) > 10 else "Normal", delta_color="inverse")
-                with m4: colored_metric("Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
+            # 4. TOP METRIC ROW (Now uses clean_asym)
+            m1, m2, m3, m4 = st.columns(4)
+            with m1: colored_metric("Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
+            with m2: colored_metric("Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
+            with m3: 
+                # This now reflects the 18.8% (or whatever the L/R math dictates)
+                st.metric("Asymmetry", f"{clean_asym:.1f}%", 
+                          delta="High" if clean_asym > 10 else "Normal", 
+                          delta_color="inverse")
+            with m4: colored_metric("Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
 
-                st.divider()
+            st.divider()
+            
 
                 # 4. BILATERAL DETAILS
                 c1, c2 = st.columns([2, 1])
