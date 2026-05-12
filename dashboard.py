@@ -221,7 +221,6 @@ if not ash_df.empty:
     with tab_cmj:
         if not cmj_filt.empty:
             # 1. PREP DATA & KPI LIST
-            # Ensure all target columns are numeric for calculations and graphing
             metrics_map = {
                 'Jump Height (Imp-Mom) [cm]': 'Jump Height (cm)',
                 'Peak Power [W]': 'Peak Power (W)',
@@ -264,24 +263,25 @@ if not ash_df.empty:
             # 3. SIDE-BY-SIDE TREND GRAPHS (2x3 Grid)
             st.subheader("Performance Trends: All Metrics")
             
-            # Helper to create small trend sparklines
-            def create_sparkline(df, y_col, title_text, color="#FF8200"):
+            def create_sparkline(df, y_col, title_text):
                 fig = px.line(df, x='Date', y=y_col, markers=True, template="plotly_white", 
-                             color_discrete_sequence=[color])
+                             color_discrete_sequence=["#FF8200"])
                 fig.update_layout(
-                    height=250, title={'text': title_text, 'x': 0.5, 'xanchor': 'center'},
-                    xaxis_title="", yaxis_title="", margin=dict(t=40, b=10, l=10, r=10)
+                    height=300, title={'text': title_text, 'x': 0.5, 'xanchor': 'center'},
+                    xaxis_title="", yaxis_title="", margin=dict(t=40, b=10, l=10, r=10),
+                    # FORCES Y-AXIS TO START AT 0
+                    yaxis=dict(range=[0, df[y_col].max() * 1.1])
                 )
                 return fig
 
-            # Displaying graphs in 3 rows of 2 for better readability on desktop
+            # Corrected Grid Layout
             g_row1_col1, g_row1_col2 = st.columns(2)
             with g_row1_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[0], metrics_map[metrics_list[0]]), use_container_width=True)
             with g_row1_col2: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[1], metrics_map[metrics_list[1]]), use_container_width=True)
 
             g_row2_col1, g_row2_col2 = st.columns(2)
             with g_row2_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[2], metrics_map[metrics_list[2]]), use_container_width=True)
-            with g_row2_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[3], metrics_map[metrics_list[3]]), use_container_width=True)
+            with g_row2_col2: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[3], metrics_map[metrics_list[3]]), use_container_width=True)
 
             g_row3_col1, g_row3_col2 = st.columns(2)
             with g_row3_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[4], metrics_map[metrics_list[4]]), use_container_width=True)
