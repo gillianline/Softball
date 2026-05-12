@@ -5,33 +5,25 @@ import plotly.express as px
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Softball ASH Performance", layout="wide")
 
-# --- CUSTOM SCOUT CSS ---
+# --- CUSTOM CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
     .athlete-header {
-        background-color: #F8F9FA;
-        padding: 20px;
-        border-radius: 15px;
-        border-left: 10px solid #FF8200;
-        margin-bottom: 25px;
+        background-color: #F8F9FA; padding: 20px; border-radius: 15px;
+        border-left: 10px solid #FF8200; margin-bottom: 25px;
     }
-    .player-photo {
-        border-radius: 50%;
-        width: 150px;
-        height: 150px;
-        object-fit: cover;
-        border: 4px solid #4895DB;
-    }
+    .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
+    .metric-sub { font-size: 14px; font-weight: 700; }
+    .red-text { color: #dc3545; }
+    .green-text { color: #28a745; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- PASSWORD GATE ---
-if "auth" not in st.session_state:
-    st.session_state.auth = False
-
+if "auth" not in st.session_state: st.session_state.auth = False
 if not st.session_state.auth:
     _, col2, _ = st.columns([1,1,1])
     with col2:
@@ -65,114 +57,87 @@ def load_performance_data():
 df = load_performance_data()
 
 if not df.empty:
-    filt_col1, filt_col2 = st.columns(2)
-    with filt_col1:
+    f_col1, f_col2 = st.columns(2)
+    with f_col1:
         selected = st.selectbox("Search Athlete", sorted(df['Player Name'].unique()))
     
     p_athlete_data = df[df['Player Name'] == selected].sort_values('Date')
     
-    with filt_col2:
+    with f_col2:
         available_years = sorted(p_athlete_data['Date'].dt.year.dropna().unique().astype(int), reverse=True)
         selected_year = st.selectbox("Select Season", ["All Time"] + available_years)
 
-    # --- THE CRITICAL FILTER ---
     if selected_year == "All Time":
         p_filtered = p_athlete_data
         season_label = "All-Time"
     else:
         p_filtered = p_athlete_data[p_athlete_data['Date'].dt.year == selected_year]
-        season_label = f"{selected_year} Season"
+        season_label = f"{selected_year}"
 
     if not p_filtered.empty:
         p_latest = p_filtered.iloc[-1]
-        latest_date_str = p_latest['Date'].strftime('%m/%d/%Y')
-
-        # --- CALCULATE BESTS WITHIN FILTERED RANGE ---
+        
+        # Calculations
         best_force = p_filtered['Peak Vertical Force [N]'].max()
         best_rfd = p_filtered['RFD - 200ms [N/s]'].max()
         best_time = p_filtered['Start Time to Peak Force [s]'].min()
 
-        # Calculation function for raw delta comparison
-        def get_delta_str(current, best, unit=""):
-            if best == 0: return "N/A"
-            diff_val = current - best
-            diff_pct = (diff_val / best) * 100
-            return f"{current:.1f}{unit} ({diff_pct:+.1f}%)"
+        # Helper for color-coded metrics
+        def colored_metric(label, main_val, latest_val, best_val, unit):
+            diff_pct = ((latest_val - best_val) / best_val * 100) if best_val != 0 else 0
+            color_class = "red-text" if diff_pct < -10 else "green-text"
+            st.metric(label=label, value=f"{main_val}{unit}")
+            st.markdown(f'<p class="metric-sub {color_class}">Latest: {latest_val:.1f}{unit} ({diff_pct:+.1f}%)</p>', unsafe_allow_html=True)
 
-        # Athlete Header Card
-        st.markdown(f"""
-            <div class="athlete-header">
-                <div style="display: flex; align-items: center;">
-                    <img src="{p_latest.get('Picture', 'https://www.w3schools.com/howto/img_avatar.png')}" class="player-photo">
-                    <div style="margin-left: 30px;">
-                        <h1 style="margin:0;">{selected}</h1>
-                        <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
-                        <p style="color:#FF8200; font-weight:800; margin:0;">LAST TEST IN RANGE: {latest_date_str}</p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        # Header
+        st.markdown(f"""<div class="athlete-header"><div style="display: flex; align-items: center;"><img src="{p_latest.get('Picture', 'https://www.w3schools.com/howto/img_avatar.png')}" class="player-photo"><div style="margin-left: 30px;"><h1 style="margin:0;">{selected}</h1><p style="color:#4895DB; font-weight:700; margin:0;">ASH TEST PROFILE | {season_label}</p></div></div></div>""", unsafe_allow_html=True)
 
-        # Metric Row
+        # Metrics
         m1, m2, m3, m4 = st.columns(4)
-        
-        # Peak Force
-        m1.metric(
-            label=f"{season_label} Best Force", 
-            value=f"{int(best_force)} N",
-            delta=f"Latest: {get_delta_str(p_latest['Peak Vertical Force [N]'], best_force, ' N')}",
-            delta_color="normal"
-        )
-        
-        # RFD
-        m2.metric(
-            label=f"{season_label} Best RFD", 
-            value=f"{int(best_rfd)} N/s",
-            delta=f"Latest: {get_delta_str(p_latest['RFD - 200ms [N/s]'], best_rfd, ' N/s')}",
-            delta_color="normal"
-        )
-        
-        # Asymmetry (Latest within selection)
-        asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
-        m3.metric(
-            label=f"Latest Asymmetry ({selected_year})", 
-            value=f"{asym}%"
-        )
-        
-        # Time to Peak
-        m4.metric(
-            label=f"{season_label} Best Time", 
-            value=f"{best_time}s",
-            delta=f"Latest: {get_delta_str(p_latest.get('Start Time to Peak Force [s]', 0), best_time, 's')}",
-            delta_color="normal"
-        )
+        with m1: colored_metric(f"{season_label} Best Force", int(best_force), p_latest['Peak Vertical Force [N]'], best_force, " N")
+        with m2: colored_metric(f"{season_label} Best RFD", int(best_rfd), p_latest['RFD - 200ms [N/s]'], best_rfd, " N/s")
+        with m3: 
+            st.metric("Latest Asymmetry", f"{p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
+            st.markdown('<p class="metric-sub" style="color:grey;">L/R Balance</p>', unsafe_allow_html=True)
+        with m4:
+            # For time, smaller is better, so color logic is flipped
+            time_diff = ((p_latest['Start Time to Peak Force [s]'] - best_time) / best_time * 100) if best_time != 0 else 0
+            t_color = "red-text" if time_diff > 10 else "green-text"
+            st.metric(f"{season_label} Best Time", f"{best_time}s")
+            st.markdown(f'<p class="metric-sub {t_color}">Latest: {p_latest["Start Time to Peak Force [s]"]:.2f}s ({time_diff:+.1f}%)</p>', unsafe_allow_html=True)
 
         st.divider()
 
-        # Visualizations
-        col_left, col_right = st.columns(2)
-
-        with col_left:
-            st.subheader(f"Peak Force Trend ({selected_year})")
-            if len(p_filtered) > 1:
-                fig_trend = px.line(p_filtered, x='Date', y='Peak Vertical Force [N]', 
-                                    markers=True, template="plotly_white", color_discrete_sequence=["#FF8200"])
-                fig_trend.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=10)
-                st.plotly_chart(fig_trend, use_container_width=True)
-            else:
-                st.info("Additional data points needed for trend analysis.")
-
-        with col_right:
-            st.subheader(f"Session L/R Split ({latest_date_str})")
+        # Split Comparisons
+        c1, c2 = st.columns([2, 1])
+        
+        with c1:
+            st.subheader(f"Left vs Right Force Profile")
             l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
             r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
-            side_df = pd.DataFrame({'Side': ['Left', 'Right'], 'Force [N]': [l_force, r_force]})
-            fig_side = px.bar(side_df, x='Side', y='Force [N]', 
-                              color='Side', color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
+            side_df = pd.DataFrame({'Side': ['Left (Lead)', 'Right (Trail)'], 'Force [N]': [l_force, r_force]})
+            fig_side = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]',
+                              color='Side', color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'},
                               template="plotly_white")
+            fig_side.update_traces(textposition='outside')
             st.plotly_chart(fig_side, use_container_width=True)
-            
-    else:
-        st.warning(f"No test data available for {selected} in {selected_year}.")
+
+        with c2:
+            st.subheader("Bilateral Breakdown")
+            breakdown = pd.DataFrame({
+                "Metric": ["Peak Force", "Avg RFD", "Asym %"],
+                "Left": [f"{l_force}N", f"{int(p_latest.get('RFD - 200ms [N/s] (L)', 0))}N/s", "-"],
+                "Right": [f"{r_force}N", f"{int(p_latest.get('RFD - 200ms [N/s] (R)', 0))}N/s", "-"]
+            })
+            st.table(breakdown)
+            st.info(f"Dominant Side: {'Right' if r_force > l_force else 'Left'}")
+
+        # Trend
+        st.subheader(f"Force Trend Timeline ({season_label})")
+        fig_trend = px.line(p_filtered, x='Date', y='Peak Vertical Force [N]', markers=True, 
+                            template="plotly_white", color_discrete_sequence=["#FF8200"])
+        fig_trend.update_xaxes(tickformat="%b %d, %y", tickangle=-45)
+        st.plotly_chart(fig_trend, use_container_width=True)
+
 else:
-    st.warning("Dashboard data not loaded. Check Google Sheet connectivity.")
+    st.warning("Data load failed. Check Google Sheet connectivity.")
