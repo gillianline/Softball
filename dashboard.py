@@ -203,14 +203,14 @@ if not ash_df.empty:
                 'Peak Vertical Force [N] (Asym)(%)'
             ]].copy()
 
-            # --- CRITICAL FIX: Ensure columns are numeric before styling ---
-            # This strips any stray characters and converts to numbers
+            # --- THE FIX: Use .str.strip() instead of .strip() ---
             for col in ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']:
                 ash_history[col] = pd.to_numeric(ash_history[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
             
-            # Special handling for Asym to strip % signs
-            ash_history['Peak Vertical Force [N] (Asym)(%)'] = pd.to_numeric(
-                ash_history['Peak Vertical Force [N] (Asym)(%)'].astype(str).str.replace('%', '').strip(), 
+            # Use .str.replace and .str.strip correctly here:
+            asym_col_name = 'Peak Vertical Force [N] (Asym)(%)'
+            ash_history[asym_col_name] = pd.to_numeric(
+                ash_history[asym_col_name].astype(str).str.replace('%', '').str.strip(), 
                 errors='coerce'
             ).fillna(0)
 
@@ -219,11 +219,10 @@ if not ash_df.empty:
                 lambda x: "✔️ Yes" if x in game_dates else "—"
             )
             
-            # Final Formatting for display names
+            # Final Formatting
             ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
             ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
 
-            # Now the formatter will work because the data is guaranteed to be numeric
             st.table(ash_history.sort_values('Date', ascending=False).style.format({
                 'Force (N)': '{:.0f}',
                 'RFD (N/s)': '{:.0f}',
