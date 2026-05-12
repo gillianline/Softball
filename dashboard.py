@@ -53,7 +53,6 @@ def load_performance_data():
         ash_df.columns = ash_df.columns.str.strip()
         roster_df.columns = roster_df.columns.str.strip()
         
-        # Numeric Sanitizer
         num_cols = ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']
         for col in ash_df.columns:
             if any(m in col for m in num_cols) or 'Asym' in col:
@@ -70,22 +69,18 @@ df = load_performance_data()
 
 # --- DASHBOARD UI ---
 if not df.empty:
-    # Top Level Filters
     filt_col1, filt_col2 = st.columns(2)
     
     with filt_col1:
         athlete_list = sorted(df['Player Name'].unique())
         selected = st.selectbox("Search Athlete", athlete_list)
     
-    # Filter data for selected athlete to populate years
     p_athlete_data = df[df['Player Name'] == selected].sort_values('Date')
     
     with filt_col2:
-        # Extract years from the athlete's specific data
         available_years = sorted(p_athlete_data['Date'].dt.year.dropna().unique().astype(int), reverse=True)
         selected_year = st.selectbox("Select Season", ["All Time"] + available_years)
 
-    # Apply Year Filter
     if selected_year == "All Time":
         p_filtered = p_athlete_data
     else:
@@ -93,6 +88,7 @@ if not df.empty:
 
     if not p_filtered.empty:
         p_latest = p_filtered.iloc[-1]
+        latest_date_str = p_latest['Date'].strftime('%m/%d/%Y') if pd.notnull(p_latest['Date']) else 'N/A'
 
         # Athlete Header Card
         st.markdown(f"""
@@ -102,21 +98,21 @@ if not df.empty:
                     <div style="margin-left: 30px;">
                         <h1 style="margin:0;">{selected}</h1>
                         <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
-                        <p style="color:#8E8E93; margin:0;">Latest Test: {p_latest['Date'].strftime('%m/%d/%Y') if pd.notnull(p_latest['Date']) else 'N/A'}</p>
+                        <p style="color:#FF8200; font-weight:800; margin:0;">LATEST TEST METRICS: {latest_date_str}</p>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # Metric Row
+        # Metric Row - Clearly labeled as Latest Test
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Peak Force", f"{int(p_latest['Peak Vertical Force [N]'])} N")
-        m2.metric("RFD (200ms)", f"{int(p_latest['RFD - 200ms [N/s]'])} N/s")
+        m1.metric("Latest Peak Force", f"{int(p_latest['Peak Vertical Force [N]'])} N")
+        m2.metric("Latest RFD (200ms)", f"{int(p_latest['RFD - 200ms [N/s]'])} N/s")
         
         asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
-        m3.metric("Force Asymmetry", f"{asym}%", delta="- Injury Risk" if asym > 10 else None, delta_color="inverse")
+        m3.metric("Latest Asymmetry", f"{asym}%", delta="- Injury Risk" if asym > 10 else None, delta_color="inverse")
         
-        m4.metric("Time to Peak", f"{p_latest.get('Start Time to Peak Force [s]', 0)}s")
+        m4.metric("Latest Time to Peak", f"{p_latest.get('Start Time to Peak Force [s]', 0)}s")
 
         st.divider()
 
@@ -124,18 +120,25 @@ if not df.empty:
         col_left, col_right = st.columns(2)
 
         with col_left:
-            st.subheader(f"Force Trend ({selected_year})")
+            st.subheader(f"Force Trend: {selected_year}")
             if len(p_filtered) > 1:
                 fig_trend = px.line(p_filtered, x='Date', y='Peak Vertical Force [N]', 
                                     markers=True, template="plotly_white", color_discrete_sequence=["#FF8200"])
-                # Ensure the x-axis shows proper dates even if filtered
-                fig_trend.update_xaxes(dtick="M1", tickformat="%b %d\n%Y")
+                
+                # FIXED: Clean Date Formatting and Spacing
+                fig_trend.update_xaxes(
+                    tickformat="%b %d, %y",
+                    tickangle=-45,
+                    nticks=10, # Limits the number of labels to prevent crowding
+                    showgrid=False
+                )
+                fig_trend.update_layout(margin=dict(t=10, b=10, l=10, r=10))
                 st.plotly_chart(fig_trend, use_container_width=True)
             else:
-                st.info("Additional test dates in this range required for trend lines.")
+                st.info("Additional data points needed for trend analysis.")
 
         with col_right:
-            st.subheader("Side-by-Side Comparison")
+            st.subheader(f"Latest L/R Split ({latest_date_str})")
             l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
             r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
             
@@ -150,7 +153,6 @@ if not df.empty:
             st.plotly_chart(fig_side, use_container_width=True)
             
     else:
-        st.warning(f"No data found for {selected} in {selected_year}.")
-
+        st.warning(f"No test data available for the selected range.")
 else:
-    st.warning("Data load failed. Please check your source sheets.")
+    st.warning("Dashboard data not loaded. Check Google Sheet connectivity.")
