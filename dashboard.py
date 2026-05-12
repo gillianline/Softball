@@ -220,30 +220,27 @@ if not ash_df.empty:
             
     with tab_cmj:
         if not cmj_filt.empty:
-            # 1. IDENTIFY LATEST VS BEST FOR SELECTED YEAR
-            c_lat = cmj_filt.iloc[-1]
+            # 1. PREP DATA & KPI LIST
+            # Ensure all target columns are numeric for calculations and graphing
+            metrics_map = {
+                'Jump Height (Imp-Mom) [cm]': 'Jump Height (cm)',
+                'Peak Power [W]': 'Peak Power (W)',
+                'RSI-modified (Imp-Mom) [m/s]': 'RSI-m',
+                'Force at Zero Velocity [N]': 'Force @ Zero Velocity (N)',
+                'Eccentric Braking RFD [N/s]': 'Ecc. Braking RFD (N/s)',
+                'Concentric Peak Velocity [m/s]': 'Conc. Peak Velocity (m/s)'
+            }
             
-            # Season Bests/Baselines for the selected metrics
-            metrics_list = [
-                'Jump Height (Imp-Mom) [cm]',
-                'Peak Power [W]',
-                'Force at Zero Velocity [N]',
-                'Eccentric Braking RFD [N/s]',
-                'RSI-modified (Imp-Mom) [m/s]',
-                'Concentric Peak Velocity [m/s]'
-            ]
-            
-            # Ensure all target columns are numeric
+            metrics_list = list(metrics_map.keys())
             for m in metrics_list:
                 cmj_filt[m] = pd.to_numeric(cmj_filt[m], errors='coerce').fillna(0)
+            
+            c_lat = cmj_filt.iloc[-1]
 
             # 2. TOP METRIC GRID (6 Metrics)
-            st.subheader(f"CMJ Performance Summary: {label}")
-            m_row1 = st.columns(3)
-            m_row2 = st.columns(3)
+            st.subheader(f"CMJ Season Bests & Latest Status")
             
-            # Helper to display CMJ metrics consistently
-            def cmj_metric(col, label_text, col_name, unit, precision=".1f"):
+            def cmj_metric_box(col, label_text, col_name, unit, precision=".1f"):
                 best_val = cmj_filt[col_name].max()
                 curr_val = c_lat[col_name]
                 diff = ((curr_val - best_val) / best_val * 100) if best_val != 0 else 0
@@ -252,63 +249,43 @@ if not ash_df.empty:
                 color = "red-text" if diff < -10 else "green-text"
                 col.markdown(f'<p class="metric-sub {color}">Latest: {curr_val:{precision}}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
 
-            # Row 1
-            cmj_metric(m_row1[0], "Best Jump Height", 'Jump Height (Imp-Mom) [cm]', " cm")
-            cmj_metric(m_row1[1], "Best Peak Power", 'Peak Power [W]', " W", precision=".0f")
-            cmj_metric(m_row1[2], "Best RSI-m", 'RSI-modified (Imp-Mom) [m/s]', "")
+            m_row1 = st.columns(3)
+            cmj_metric_box(m_row1[0], "Best Jump Height", metrics_list[0], " cm")
+            cmj_metric_box(m_row1[1], "Best Peak Power", metrics_list[1], " W", precision=".0f")
+            cmj_metric_box(m_row1[2], "Best RSI-m", metrics_list[2], "")
 
-            # Row 2
-            cmj_metric(m_row2[0], "Force @ Zero Velocity", 'Force at Zero Velocity [N]', " N", precision=".0f")
-            cmj_metric(m_row2[1], "Ecc. Braking RFD", 'Eccentric Braking RFD [N/s]', " N/s", precision=".0f")
-            cmj_metric(m_row2[2], "Conc. Peak Velocity", 'Concentric Peak Velocity [m/s]', " m/s", precision=".2f")
+            m_row2 = st.columns(3)
+            cmj_metric_box(m_row2[0], "Force @ Zero Velocity", metrics_list[3], " N", precision=".0f")
+            cmj_metric_box(m_row2[1], "Ecc. Braking RFD", metrics_list[4], " N/s", precision=".0f")
+            cmj_metric_box(m_row2[2], "Conc. Peak Velocity", metrics_list[5], " m/s", precision=".2f")
 
             st.divider()
 
-            # 3. MULTI-METRIC TREND GRAPH
-            st.subheader("Performance Trends")
+            # 3. SIDE-BY-SIDE TREND GRAPHS (2x3 Grid)
+            st.subheader("Performance Trends: All Metrics")
             
-            # Select which metric to view on the graph
-            graph_metric = st.selectbox("Select Metric to View Trend", metrics_list)
-            
-            fig_cmj = px.line(
-                cmj_filt, 
-                x='Date', 
-                y=graph_metric, 
-                markers=True, 
-                template="plotly_white", 
-                color_discrete_sequence=["#FF8200"]
-            )
-            
-            fig_cmj.update_layout(
-                height=450,
-                yaxis_title=graph_metric,
-                xaxis_title="",
-                margin=dict(t=10, b=10, l=10, r=10)
-            )
-            
-            st.plotly_chart(fig_cmj, use_container_width=True)
+            # Helper to create small trend sparklines
+            def create_sparkline(df, y_col, title_text, color="#FF8200"):
+                fig = px.line(df, x='Date', y=y_col, markers=True, template="plotly_white", 
+                             color_discrete_sequence=[color])
+                fig.update_layout(
+                    height=250, title={'text': title_text, 'x': 0.5, 'xanchor': 'center'},
+                    xaxis_title="", yaxis_title="", margin=dict(t=40, b=10, l=10, r=10)
+                )
+                return fig
 
-            # 4. DETAILED CMJ HISTORY TABLE
-            st.subheader("CMJ Test Log")
-            cmj_display = cmj_filt[['Date'] + metrics_list].copy()
-            
-            # Calculate Season Averages for Baselines
-            baselines = {m: cmj_filt[m].mean() for m in metrics_list}
-            
-            # Format Date
-            cmj_display['Date'] = cmj_display['Date'].dt.strftime('%m/%d/%Y')
-            
-            st.table(
-                cmj_display.sort_values('Date', ascending=False)
-                .style.format({
-                    'Jump Height (Imp-Mom) [cm]': '{:.1f}cm',
-                    'Peak Power [W]': '{:.0f}W',
-                    'Force at Zero Velocity [N]': '{:.0f}N',
-                    'Eccentric Braking RFD [N/s]': '{:.0f}N/s',
-                    'RSI-modified (Imp-Mom) [m/s]': '{:.2f}',
-                    'Concentric Peak Velocity [m/s]': '{:.2f}m/s'
-                })
-            )
+            # Displaying graphs in 3 rows of 2 for better readability on desktop
+            g_row1_col1, g_row1_col2 = st.columns(2)
+            with g_row1_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[0], metrics_map[metrics_list[0]]), use_container_width=True)
+            with g_row1_col2: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[1], metrics_map[metrics_list[1]]), use_container_width=True)
+
+            g_row2_col1, g_row2_col2 = st.columns(2)
+            with g_row2_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[2], metrics_map[metrics_list[2]]), use_container_width=True)
+            with g_row2_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[3], metrics_map[metrics_list[3]]), use_container_width=True)
+
+            g_row3_col1, g_row3_col2 = st.columns(2)
+            with g_row3_col1: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[4], metrics_map[metrics_list[4]]), use_container_width=True)
+            with g_row3_col2: st.plotly_chart(create_sparkline(cmj_filt, metrics_list[5], metrics_map[metrics_list[5]]), use_container_width=True)
 
         else:
-            st.info(f"No CMJ records found for {selected} in {selected_year}.")
+            st.info("No CMJ records found for the selected criteria.")
