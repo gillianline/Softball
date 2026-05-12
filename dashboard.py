@@ -106,27 +106,23 @@ if not ash_df.empty:
         tab_ash, tab_cmj = st.tabs(["ASH TEST", "CMJ READINESS"])
 
     with tab_ash:
-            with col_name:
-                st.title(f"{selected}")
-                st.subheader("ASH (Athletic Shoulder) Performance Profile")
+        if not ash_filt.empty:
+            # --- SECTION REMOVED: No more duplicate photo/title here ---
 
-            # 2. MANUAL ASYMMETRY CALCULATION
-            # Pull raw Newtons to calculate manually (fixes the 0.0% sheet error)
+            # 1. MANUAL ASYMMETRY CALCULATION
             l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
             r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
             
             if l_f > 0 and r_f > 0:
                 clean_asym = (abs(l_f - r_f) / max(l_f, r_f)) * 100
             else:
-                # Fallback to sheet if L/R is missing
                 raw_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
                 try:
                     clean_asym = float(str(raw_val).replace('%', '').strip())
                 except:
                     clean_asym = 0.0
 
-            # 3. CALCULATE BASELINES & BESTS
-            # Ensure Force column is numeric for season stats
+            # 2. CALCULATE BASELINES & BESTS
             ash_filt['Peak Vertical Force [N]'] = pd.to_numeric(ash_filt['Peak Vertical Force [N]'], errors='coerce').fillna(0)
             best_f = ash_filt['Peak Vertical Force [N]'].max()
             best_r = ash_filt['RFD - 200ms [N/s]'].max()
@@ -140,7 +136,7 @@ if not ash_df.empty:
                 st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
                 st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
 
-            # 4. TOP METRIC ROW
+            # 3. TOP METRIC ROW
             m1, m2, m3, m4 = st.columns(4)
             with m1: colored_metric("Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
             with m2: colored_metric("Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
@@ -152,7 +148,7 @@ if not ash_df.empty:
 
             st.divider()
             
-            # 5. BILATERAL PROFILE (Left vs Right)
+            # 4. BILATERAL PROFILE (Left vs Right)
             c1, c2 = st.columns([2, 1])
             with c1:
                 st.subheader("Force Distribution")
@@ -187,11 +183,10 @@ if not ash_df.empty:
 
             st.divider()
 
-            # 6. MATCH CONTEXT LOOKUP & TABLE
+            # 5. MATCH CONTEXT LOOKUP & TABLE
             st.subheader("ASH History & Match Context")
             match_map = {}
             try:
-                # Assuming swing_df and throw_df are available globally
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
                 athlete_games = all_sessions[
                     (all_sessions['Player Name'] == selected) & 
@@ -202,10 +197,8 @@ if not ash_df.empty:
             except: 
                 pass
 
-            # Prep history data
             ash_hist_df = ash_filt[['Date', 'Peak Vertical Force [N]', 'RFD - 200ms [N/s]']].copy()
             
-            # Find the most recent game before each test date
             def get_prev_match(test_date):
                 t_date = test_date.date()
                 past_matches = [d for d in match_map.keys() if d < t_date]
@@ -214,12 +207,10 @@ if not ash_df.empty:
             ash_hist_df['Previous Match'] = ash_hist_df['Date'].apply(get_prev_match)
             ash_hist_df['Vs. Baseline'] = ash_hist_df['Peak Vertical Force [N]'] - base_f
             
-            # Format display dataframe
             ash_display = ash_hist_df[['Date', 'Previous Match', 'Peak Vertical Force [N]', 'Vs. Baseline', 'RFD - 200ms [N/s]']].copy()
             ash_display['Date'] = ash_display['Date'].dt.strftime('%m/%d/%Y')
             ash_display.columns = ['Test Date', 'Previous Match', 'Peak Force', 'Vs. Baseline', 'RFD']
 
-            # Display table with formatting and conditional color
             st.table(
                 ash_display.sort_values('Test Date', ascending=False)
                 .style.format({
@@ -231,7 +222,7 @@ if not ash_df.empty:
             )
 
         else:
-            st.info("No ASH records found for this selection.") 
+            st.info("No ASH records found for this selection.")
             
     with tab_cmj:
         if not cmj_filt.empty:
