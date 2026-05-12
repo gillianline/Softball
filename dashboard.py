@@ -46,10 +46,16 @@ if not st.session_state.auth:
 @st.cache_data(ttl=300)
 def load_all_softball_data():
     try:
+        required_keys = ["ASH_URL", "CMJ_URL", "ROSTER_URL", "SWING_URL", "THROW_URL"]
+        for key in required_keys:
+            if key not in st.secrets:
+                st.error(f"Missing Secret Key: {key}")
+                st.stop()
+
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
         cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
-        swing_df = pd.read_csv(st.secrets["SWINGS_URL"])
+        swing_df = pd.read_csv(st.secrets["SWING_URL"])
         throw_df = pd.read_csv(st.secrets["THROW_URL"])
         
         def sanitize(df):
