@@ -172,6 +172,28 @@ if not ash_df.empty:
                 """, unsafe_allow_html=True)
                 st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
+            # 4. ASH SESSION HISTORY TABLE
+            st.subheader("ASH Session Log")
+            
+            # Prepare and clean the table data
+            ash_history = ash_filt[[
+                'Date', 
+                'Peak Vertical Force [N]', 
+                'RFD - 200ms [N/s]', 
+                'Start Time to Peak Force [s]',
+                'Peak Vertical Force [N] (Asym)(%)'
+            ]].copy()
+            
+            ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%Y')
+            ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %']
+            
+            st.table(ash_history.sort_values('Date', ascending=False).style.format({
+                'Force (N)': '{:.0f}',
+                'RFD (N/s)': '{:.0f}',
+                'Time (s)': '{:.3f}',
+                'Asym %': '{:.1f}%'
+            }))
+
     with tab_cmj:
         if not cmj_filt.empty:
             # 1. IDENTIFY LATEST VS BEST FOR SELECTED YEAR
