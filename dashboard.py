@@ -115,23 +115,39 @@ if not df.empty:
             st.subheader(f"Left vs Right Force Profile")
             l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
             r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
-            side_df = pd.DataFrame({'Side': ['Left (Lead)', 'Right (Trail)'], 'Force [N]': [l_force, r_force]})
+            side_df = pd.DataFrame({'Side': ['Left', 'Right'], 'Force [N]': [l_force, r_force]})
             fig_side = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]',
-                              color='Side', color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'},
+                              color='Side', color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
                               template="plotly_white")
             fig_side.update_traces(textposition='outside')
             st.plotly_chart(fig_side, use_container_width=True)
 
         with c2:
             st.subheader("Bilateral Breakdown")
+            
+            # Pull raw metrics for the table
+            l_rfd = int(p_latest.get('RFD - 200ms [N/s] (L)', 0))
+            r_rfd = int(p_latest.get('RFD - 200ms [N/s] (R)', 0))
+            raw_asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
+            
+            # Create a clean breakdown for the coach
             breakdown = pd.DataFrame({
-                "Metric": ["Peak Force", "Avg RFD", "Asym %"],
-                "Left": [f"{l_force}N", f"{int(p_latest.get('RFD - 200ms [N/s] (L)', 0))}N/s", "-"],
-                "Right": [f"{r_force}N", f"{int(p_latest.get('RFD - 200ms [N/s] (R)', 0))}N/s", "-"]
+                "Metric": ["Peak Force", "Avg RFD", "Asymmetry"],
+                "Left": [f"{l_force} N", f"{l_rfd} N/s", ""],
+                "Right": [f"{r_force} N", f"{r_rfd} N/s", ""],
+                "Total/Diff": ["-", "-", f"{raw_asym}%"]
             })
+            
             st.table(breakdown)
-            st.info(f"Dominant Side: {'Right' if r_force > l_force else 'Left'}")
-
+            
+            # Contextual Insight
+            if abs(raw_asym) > 10:
+                st.warning(f"Significant Asymmetry Detected: {raw_asym}%")
+            else:
+                st.success(f"Optimal Symmetry Profile")
+                
+            st.info(f"Dominant Side: {'Right (Trail)' if r_force > l_force else 'Left (Lead)'}")
+            
         # Trend
         st.subheader(f"Force Trend Timeline ({season_label})")
         fig_trend = px.line(p_filtered, x='Date', y='Peak Vertical Force [N]', markers=True, 
