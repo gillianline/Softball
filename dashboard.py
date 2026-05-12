@@ -26,28 +26,40 @@ st.markdown("""
 @st.cache_data(ttl=300)
 def load_all_data():
     try:
-        # Load Raw Data
+        # 1. Load Raw Data
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
         cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
         swing_df = pd.read_csv(st.secrets["SWING_URL"])
         throw_df = pd.read_csv(st.secrets["THROW_URL"])
         
-        # Standardize Columns
+        # 2. Clean Column Names
         for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
             df.columns = df.columns.str.strip()
             if 'Date' in df.columns:
                 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        
-        # CRITICAL FIX: Merge Roster (Photos) into Performance Data
-        # This makes 'Photo' available in latest_ash
-        ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
-        cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+
+        # 3. DYNAMIC PHOTO COLUMN FIX
+        # This finds whatever column you named the photos and renames it to 'Photo'
+        photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
+        if photo_col:
+            roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
+        else:
+            # Fallback if no photo column exists at all
+            roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
+
+        # 4. MERGE (Ensuring 'Photo' and 'Player Name' exist)
+        if 'Player Name' in roster_df.columns:
+            # Merge photo into performance dataframes
+            ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+            cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
         
         return ash_df, cmj_df, swing_df, throw_df
+
     except Exception as e:
         st.error(f"Data Sync Error: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
 
 ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
