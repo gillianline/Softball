@@ -115,27 +115,56 @@ if not ash_df.empty:
         ath_cmj_data = c_sync[c_sync['Player Name'] == selected].sort_values(d_col_cmj)
         
         if not ath_cmj_data.empty:
-            base_row = ath_cmj_data.iloc[0] 
+            base_val = float(ath_cmj_data.iloc[0][h_col])
             
-            # --- DUAL AXIS STABLE CONSTRUCTOR ---
-            fig = go.Figure(
-                data=[
-                    go.Scatter(x=ath_cmj_data[d_col_cmj], y=ath_cmj_data[h_col], name="Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)),
-                    go.Scatter(x=ath_cmj_data[d_col_cmj], y=ath_cmj_data[r_col], name="RSI-mod", mode='lines+markers', line=dict(color='#FF8200', width=2, dash='dot'), yaxis="y2")
+            # --- BYPASSING PLOTLY VALIDATORS USING RAW DICT ---
+            chart_data = {
+                "data": [
+                    {
+                        "x": ath_cmj_data[d_col_cmj].dt.strftime('%Y-%m-%d').tolist(),
+                        "y": ath_cmj_data[h_col].tolist(),
+                        "name": "Height (cm)",
+                        "type": "scatter",
+                        "mode": "lines+markers",
+                        "line": {"color": "#4895DB", "width": 3}
+                    },
+                    {
+                        "x": ath_cmj_data[d_col_cmj].dt.strftime('%Y-%m-%d').tolist(),
+                        "y": ath_cmj_data[r_col].tolist(),
+                        "name": "RSI-mod",
+                        "type": "scatter",
+                        "mode": "lines+markers",
+                        "yaxis": "y2",
+                        "line": {"color": "#FF8200", "width": 2, "dash": "dot"}
+                    }
                 ],
-                layout=go.Layout(
-                    template="plotly_white",
-                    xaxis=dict(title="Date", showgrid=False),
-                    yaxis=dict(title="Height (cm)", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB")),
-                    yaxis2=dict(title="RSI-mod", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200"), overlaying="y", side="right", showgrid=False),
-                    legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"),
-                    margin=dict(l=50, r=50, t=30, b=10)
-                )
-            )
-            fig.add_hline(y=base_row[h_col], line_dash="dash", line_color="red", annotation_text="Baseline")
-            st.plotly_chart(fig, use_container_width=True)
+                "layout": {
+                    "template": "plotly_white",
+                    "xaxis": {"title": "Date", "showgrid": False},
+                    "yaxis": {"title": "Height (cm)", "titlefont": {"color": "#4895DB"}, "tickfont": {"color": "#4895DB"}},
+                    "yaxis2": {
+                        "title": "RSI-mod",
+                        "titlefont": {"color": "#FF8200"},
+                        "tickfont": {"color": "#FF8200"},
+                        "overlaying": "y",
+                        "side": "right",
+                        "showgrid": False
+                    },
+                    "legend": {"orientation": "h", "y": -0.3, "x": 0.5, "xanchor": "center"},
+                    "margin": {"l": 50, "r": 50, "t": 30, "b": 10},
+                    "shapes": [{
+                        "type": "line",
+                        "xref": "paper", "x0": 0, "x1": 1,
+                        "yref": "y", "y0": base_val, "y1": base_val,
+                        "line": {"color": "red", "width": 2, "dash": "dash"}
+                    }]
+                }
+            }
+            
+            # This bypasses all the go.Layout code that was crashing
+            st.plotly_chart(chart_data, use_container_width=True)
 
-            # History Table Logic
+            # --- TABLE LOGIC REMAINS THE SAME ---
             st.markdown("#### Jump History")
             combined_skills = pd.concat([swing_df, throw_df], ignore_index=True)
             comp_list = []
@@ -147,7 +176,7 @@ if not ash_df.empty:
                     m_info = f"{pm_row['Session Type']} ({pd.to_datetime(pm_row['Date']).strftime('%m/%d')})"
                 except: m_info = "N/A"
                 
-                diff = float(row[h_col]) - float(base_row[h_col])
+                diff = float(row[h_col]) - base_val
                 comp_list.append({"Date": j_date.strftime('%m/%d/%Y'), "Match": m_info, "Height": f"{row[h_col]:.1f} cm", "Diff": diff, "RSI": f"{row[r_col]:.2f}"})
 
             html = """<table class="scout-table"><tr><th>Date</th><th>Prev Match</th><th>Height</th><th>Vs Baseline</th><th>RSI</th></tr>"""
