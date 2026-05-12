@@ -121,50 +121,70 @@ if not ash_df.empty:
             
             m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
             
-    # --- TAB 2: CMJ RECOVERY (WITH SWING/THROW MATCH LOGIC) ---
+    # --- TAB 2: CMJ RECOVERY (ROBUST VERSION) ---
     with tab_cmj:
         st.markdown("### CMJ Baseline vs. Post-Match Recovery")
         
-        # Ensure name columns match
+        # 1. SYNC NAMES: Standardize to 'Player Name'
         c_sync = cmj_df.rename(columns={'Athlete': 'Player Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
-        ath_cmj_data = c_sync[c_sync['Player Name'] == selected].sort_values('Test Date')
         
-        # Define Baseline (Week 4)
+        # 2. DYNAMIC DATE DETECTION: Find which column holds the date
+        date_col = None
+        for col in ['Test Date', 'Date', 'date', 'test date']:
+            if col in c_sync.columns:
+                date_col = col
+                break
+        
+        if date_col is None:
+            st.error("⚠️ Data Error: Could not find a date column (Test Date/Date) in the CMJ sheet.")
+            st.stop()
+
+        # 3. SORT & FILTER: Use the detected date column
+        # Ensure date is actually a datetime object for sorting
+        c_sync[date_col] = pd.to_datetime(c_sync[date_col], errors='coerce')
+        ath_cmj_data = c_sync[c_sync['Player Name'] == selected].sort_values(date_col)
+        
+        # Logic: Baseline = Wk 4, Comparison = Wk > 4
         baseline_cmj = ath_cmj_data[ath_cmj_data['Week'] == 4]
         post_match_cmj = ath_cmj_data[ath_cmj_data['Week'] > 4]
 
         if not baseline_cmj.empty:
             base_row = baseline_cmj.iloc[-1]
+            # Verify metric columns exist
             h_col = 'Jump Height (Imp-Mom) [cm]'
             r_col = 'RSI-modified [m/s]'
             
-            # 1. KPIs
+            # KPI Metrics
             latest_post = post_match_cmj.iloc[-1] if not post_match_cmj.empty else None
             if latest_post is not None:
-                h_diff = ((latest_post[h_col] - base_row[h_col]) / base_row[h_col]) * 100
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Week 4 Baseline", f"{base_row[h_col]:.1f} cm")
-                m2.metric("Latest Jump", f"{latest_post[h_col]:.1f} cm", f"{h_diff:+.1f}%")
-                m3.metric("RSI Status", f"{latest_post[r_col]:.2f}", delta="Recovered" if h_diff > -5 else "Fatigued")
+                h_base = base_row[h_col] if base_row[h_col] > 0 else 1
+                h_diff = ((latest_post[h_col] - base_row[h_col]) / h_base) * 100
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Week 4 Baseline", f"{base_row[h_col]:.1f} cm")
+                c2.metric("Latest Jump", f"{latest_post[h_col]:.1f} cm", f"{h_diff:+.1f}%")
+                c3.metric("RSI Status", f"{latest_post[r_col]:.2f}", 
+                          delta="Recovered" if h_diff > -5 else "Fatigued", 
+                          delta_color="normal" if h_diff > -5 else "inverse")
 
-            # 2. History Table with Swing/Throw Match Context
+            # 4. HISTORY TABLE with Dynamic Match Context
             st.markdown("#### Jump History & Match Context")
             comparison_list = []
             
-            # Combine Swing and Throw data for Match identification
+            # Combine skills sheets for game searching
             combined_skills = pd.concat([swing_df, throw_df], ignore_index=True)
+            combined_skills['Date'] = pd.to_datetime(combined_skills['Date'], errors='coerce')
             
             for _, row in post_match_cmj.iterrows():
-                jump_date = pd.to_datetime(row['Test Date'])
+                jump_date = pd.to_datetime(row[date_col])
                 
-                # Filter for Game/Match in Session Type
                 try:
+                    # Find the most recent game before this jump
                     prev_matches = combined_skills[
                         (combined_skills['Player Name'] == selected) & 
                         (combined_skills['Date'] < jump_date) & 
                         (combined_skills['Session Type'].str.contains('Game|Match', case=False, na=False))
                     ]
-                    # Get the most recent match before this specific jump date
                     prev_match_row = prev_matches.sort_values('Date', ascending=False).iloc[0]
                     prev_match_info = f"{prev_match_row['Session Type']} ({prev_match_row['Date'].strftime('%m/%d')})"
                 except:
@@ -179,9 +199,9 @@ if not ash_df.empty:
                     "RSI": f"{row[r_col]:.2f}"
                 })
 
-            # Style Table
+            # Render styled HTML Table
             table_html = """<table class="scout-table">
-                <tr><th>Jump Date</th><th>Previous Match Context</th><th>Height</th><th>Vs. Baseline</th><th>RSI</th></tr>"""
+                <tr><th>Jump Date</th><th>Previous Match</th><th>Height</th><th>Vs. Baseline</th><th>RSI</th></tr>"""
             for item in comparison_list:
                 color = "#28a745" if item['Diff'] >= 0 else "#dc3545"
                 table_html += f"""<tr>
@@ -190,16 +210,25 @@ if not ash_df.empty:
                 </tr>"""
             st.markdown(table_html + "</table>", unsafe_allow_html=True)
 
-            # 3. Dual-Axis Chart
+            # 5. DUAL-AXIS RECOVERY CHART
             st.markdown("#### Height vs. RSI Trend")
+            from plotly.subplots import make_subplots
+            
             fig = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-            fig.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[h_col], name="Height (cm)", line=dict(color='#4895DB', width=3)), secondary_y=False)
-            fig.add_trace(go.Scatter(x=ath_cmj_data['Test Date'], y=ath_cmj_data[r_col], name="RSI", line=dict(color='#FF8200', width=2, dash='dot')), secondary_y=True)
+            
+            fig.add_trace(go.Scatter(x=ath_cmj_data[date_col], y=ath_cmj_data[h_col], 
+                                     name="Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)), secondary_y=False)
+            
+            fig.add_trace(go.Scatter(x=ath_cmj_data[date_col], y=ath_cmj_data[r_col], 
+                                     name="RSI-mod", mode='lines+markers', line=dict(color='#FF8200', width=2, dash='dot')), secondary_y=True)
+            
             fig.add_hline(y=base_row[h_col], line_dash="dash", line_color="red", annotation_text="Baseline")
             
-            fig.update_layout(height=400, template="simple_white", margin=dict(l=50, r=50, t=30, b=10), legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
+            fig.update_layout(height=400, template="simple_white", margin=dict(l=50, r=50, t=30, b=10),
+                              legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"))
+            
             fig.update_yaxes(title_text="Height (cm)", secondary_y=False)
             fig.update_yaxes(title_text="RSI-mod", secondary_y=True)
-            st.plotly_chart(fig, use_container_width=True, key=f"cmj_trend_{selected}")
+            st.plotly_chart(fig, use_container_width=True, key=f"cmj_recovery_final_{selected}")
         else:
-            st.info("No Week 4 Baseline found.")
+            st.info(f"No Week 4 Baseline found for {selected}. Ensure 'Week' column contains the number 4.")
