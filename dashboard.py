@@ -176,68 +176,74 @@ if not ash_df.empty:
         if not cmj_filt.empty:
             c_lat = cmj_filt.iloc[-1]
             
-            # 1. THE BIG 3 (What actually matters for the athlete)
+            # 1. THE BIG NUMBERS
+            # Force RSI to 2 decimals and Jump Height to 1
+            curr_h = c_lat['Jump Height (Imp-Mom) [cm]']
+            curr_rsi = c_lat['RSI-modified (Imp-Mom) [m/s]']
+            curr_pow = int(c_lat.get('Peak Power [W]', 0))
+            
+            # Get Bests for the range
+            b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
+            b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
+
+            # Display Logic
             m1, m2, m3 = st.columns(3)
             
             with m1:
-                st.metric("Explosiveness", f"{c_lat['Jump Height (Imp-Mom) [cm]']:.1f} cm")
-                st.caption("Raw vertical lift and power.")
+                diff_h = ((curr_h - b_h) / b_h * 100) if b_h != 0 else 0
+                st.metric("Jump Height", f"{curr_h:.1f} cm", delta=f"{diff_h:+.1f}% vs Best")
+                st.write(f"Season Best: **{b_h:.1f} cm**")
 
             with m2:
-                # Standardizing RSI to 2 decimals
-                rsi_val = c_lat['RSI-modified (Imp-Mom) [m/s]']
-                st.metric("Quickness", f"{rsi_val:.2f}")
-                st.caption("How fast they get off the ground.")
+                diff_rsi = ((curr_rsi - b_rsi) / b_rsi * 100) if b_rsi != 0 else 0
+                st.metric("RSI-modified", f"{curr_rsi:.2f}", delta=f"{diff_rsi:+.1f}% vs Best")
+                st.write(f"Season Best: **{b_rsi:.2f}**")
 
             with m3:
-                # Peak Power is the "Engine" size
-                p_power = int(c_lat.get('Peak Power [W]', 0))
-                st.metric("Engine Size", f"{p_power} W")
-                st.caption("Total wattage produced.")
+                st.metric("Peak Power", f"{curr_pow} W")
+                st.write(f"Body Weight: **{c_lat.get('BW [KG]', 0):.1f} kg**")
 
             st.divider()
 
-            # 2. THE PERFORMANCE COMPARISON
-            # Instead of a complex chart, let's use a clear "Today vs. Best" view
-            b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
-            b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
+            # 2. THE TREND (Simplified for clarity)
+            st.subheader("Jump Height History")
+            fig_cmj = px.line(
+                cmj_filt, 
+                x='Date', 
+                y='Jump Height (Imp-Mom) [cm]', 
+                markers=True, 
+                template="plotly_white", 
+                color_discrete_sequence=["#4895DB"]
+            )
             
-            # Visual progress bars for the coach
-            def performance_bar(label, current, best, unit):
-                percent = min((current / best) * 100, 100) if best > 0 else 0
-                st.write(f"**{label}**: {current}{unit} / {best}{unit}")
-                st.progress(percent / 100)
-
-            st.subheader("Current Form vs. Season Best")
-            c_left, c_right = st.columns(2)
-            with c_left:
-                performance_bar("Jump Height", c_lat['Jump Height (Imp-Mom) [cm]'], b_h, "cm")
-            with c_right:
-                performance_bar("RSI (Quickness)", round(rsi_val, 2), round(b_rsi, 2), "")
-
-            st.divider()
-
-            # 3. ROTATIONAL READINESS (Specific for Softball)
-            # We look at Stiffness and Braking—this is how they "stop" and transfer force
-            st.subheader("Bilateral Mechanics")
+            # Fix the "All Time" Date weirdness
+            fig_cmj.update_xaxes(
+                tickformat="%b %d, %y", 
+                tickangle=-45, 
+                nticks=10,
+                title=""
+            )
             
-            # Metric Columns for the Coach
-            st1, st2, st3 = st.columns(3)
+            fig_cmj.update_layout(
+                height=400, 
+                yaxis_title="Height (cm)",
+                margin=dict(t=10, b=10, l=10, r=10)
+            )
             
-            with st1:
-                stiff = int(c_lat.get('CMJ Stiffness [N/m]', 0))
-                st.write("**Stiffness**")
-                st.write(f"{stiff} N/m")
-            
-            with st2:
-                brake = int(c_lat.get('Eccentric Braking RFD [N/s]', 0))
-                st.write("**Braking Power**")
-                st.write(f"{brake} N/s")
+            st.plotly_chart(fig_cmj, use_container_width=True)
 
-            with st3:
-                asym_cmj = c_lat.get('Concentric Mean Force % (Asym) (%)', 0)
+            # 3. QUICK MECHANICAL CHECK
+            st.write("")
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.write("**Landing Stiffness**")
+                st.write(f"{int(c_lat.get('CMJ Stiffness [N/m]', 0))} N/m")
+            with col_b:
+                st.write("**Braking RFD**")
+                st.write(f"{int(c_lat.get('Eccentric Braking RFD [N/s]', 0))} N/s")
+            with col_c:
                 st.write("**L/R Balance**")
-                st.write(f"{asym_cmj}%")
+                st.write(f"{c_lat.get('Concentric Mean Force % (Asym) (%)', 0):.1f}%")
 
         else:
             st.info("No CMJ records found for the selected season.")
