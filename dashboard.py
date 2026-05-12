@@ -34,7 +34,7 @@ def load_all_data():
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
         
         # 2. Process CMJ (Hawkin Dynamics Logic)
-        cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
+        cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         cmj_df.columns = cmj_df.columns.str.strip()
         cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
         
