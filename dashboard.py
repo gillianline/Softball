@@ -30,7 +30,7 @@ def load_all_data():
     try:
         # 1. Load Primary Sheets
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
-        cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
+        cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
         
         # Helper to clean columns and find a Date/Name column regardless of specific name
