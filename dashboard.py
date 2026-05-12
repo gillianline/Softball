@@ -85,6 +85,7 @@ st.markdown(f"""
 tab_ash, tab_cmj = st.tabs(["⚡ ASH PROFILE", "🚀 CMJ RECOVERY"])
 
 # --- TAB 1: ASH PROFILE ---
+with tab_ash:
         latest = p_ash.iloc[-1]
         
         # Robust conversion to handle N/A, strings, or missing data
