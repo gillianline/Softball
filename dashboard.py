@@ -188,7 +188,6 @@ if not ash_df.empty:
             curr_pow = c_lat.get('Peak Power [W]', 0)
 
             # 2. THE COMPARISON ROW
-            # This layout puts the "Best" front and center and compares the "Latest" directly
             m1, m2, m3 = st.columns(3)
             
             with m1:
@@ -208,9 +207,8 @@ if not ash_df.empty:
 
             st.divider()
 
-            # 3. PERFORMANCE TREND (CLEANED UP)
-            st.subheader(f"Season Performance: {selected}")
-            
+            # 3. PERFORMANCE TREND
+            st.subheader(f"Season Performance Trend")
             fig_cmj = px.line(
                 cmj_filt, 
                 x='Date', 
@@ -219,39 +217,33 @@ if not ash_df.empty:
                 template="plotly_white", 
                 color_discrete_sequence=["#4895DB"]
             )
-            
-            # Formatting to handle the "All Time" timeline correctly
-            fig_cmj.update_xaxes(
-                tickformat="%b %d, %y", 
-                tickangle=-45, 
-                nticks=10,
-                title=""
-            )
-            
-            fig_cmj.update_layout(
-                height=400, 
-                yaxis_title="Jump Height (cm)",
-                margin=dict(t=10, b=10, l=10, r=10)
-            )
-            
+            fig_cmj.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=10, title="")
+            fig_cmj.update_layout(height=350, yaxis_title="Height (cm)", margin=dict(t=10, b=10, l=10, r=10))
             st.plotly_chart(fig_cmj, use_container_width=True)
 
-            # 4. MECHANICAL SUMMARY (SIDE-BY-SIDE)
-            st.write("")
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                st.write("**Stiffness**")
-                st.write(f"{int(c_lat.get('CMJ Stiffness [N/m]', 0))} N/m")
-            with c2:
-                st.write("**Braking RFD**")
-                st.write(f"{int(c_lat.get('Eccentric Braking RFD [N/s]', 0))} N/s")
-            with c3:
-                st.write("**Takeoff Force**")
-                st.write(f"{int(c_lat.get('Takeoff Peak Force [N]', 0))} N")
-            with c4:
-                asym = c_lat.get('Concentric Mean Force % (Asym) (%)', 0)
-                st.write("**L/R Balance**")
-                st.write(f"{asym:.1f}%")
+            # 4. POST-GAME / SESSION HISTORY TABLE
+            st.subheader("Session History & Readiness")
+            
+            # Prepare the table data
+            history_df = cmj_filt[[
+                'Date', 
+                'Jump Height (Imp-Mom) [cm]', 
+                'RSI-modified (Imp-Mom) [m/s]', 
+                'Peak Power [W]',
+                'Concentric Mean Force % (Asym) (%)'
+            ]].copy()
+            
+            # Formatting for clean display
+            history_df['Date'] = history_df['Date'].dt.strftime('%m/%d/%Y')
+            history_df.columns = ['Date', 'Height (cm)', 'RSI-m', 'Power (W)', 'Asym %']
+            
+            # Sorting so most recent is at the top
+            st.table(history_df.sort_values('Date', ascending=False).style.format({
+                'Height (cm)': '{:.1f}',
+                'RSI-m': '{:.2f}',
+                'Power (W)': '{:.0f}',
+                'Asym %': '{:.1f}%'
+            }))
 
         else:
             st.info(f"No CMJ records found for {selected} in {selected_year}.")
