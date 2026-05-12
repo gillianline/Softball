@@ -25,20 +25,36 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_all_data():
     try:
         # 1. Load Primary Sheets
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
+        cmj_df = pd.read_csv(st.secrets["CMJ_SHEET_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
         
-        # 2. Process CMJ (Hawkin Dynamics Logic)
-        cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
-        cmj_df.columns = cmj_df.columns.str.strip()
-        cmj_df['Test Date'] = pd.to_datetime(cmj_df['Test Date'], errors='coerce')
-        
-        # Numeric Cleaning for Hawkin Metrics
+        # Helper to clean columns and find a Date/Name column regardless of specific name
+        def robust_clean(df):
+            df.columns = df.columns.str.strip()
+            # Find any column that looks like 'Date'
+            d_col = next((c for c in df.columns if 'date' in c.lower()), None)
+            if d_col:
+                df[d_col] = pd.to_datetime(df[d_col], errors='coerce')
+                # Standardize the date column name for the rest of the app logic
+                df['Parsed_Date'] = df[d_col]
+            
+            # Find any column that looks like 'Player' or 'Name'
+            n_col = next((c for c in df.columns if 'name' in c.lower() or 'athlete' in c.lower() or 'player' in c.lower()), None)
+            if n_col:
+                df['Player Name'] = df[n_col].astype(str).str.strip()
+            
+            return df
+
+        ash_df = robust_clean(ash_df)
+        cmj_df = robust_clean(cmj_df)
+        roster_df = robust_clean(roster_df)
+
+        # Specific Hawkin metrics cleaning (keeps your previous logic)
         hawkin_metrics = ['Jump Height (Imp-Mom) [cm]', 'RSI-modified [m/s]']
         for col in hawkin_metrics:
             if col in cmj_df.columns:
@@ -46,19 +62,13 @@ def load_all_data():
                     cmj_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), 
                     errors='coerce'
                 ).fillna(0).astype(float)
-
-        # 3. Process ASH Headers & Dates
-        ash_df.columns = ash_df.columns.str.strip()
-        ash_df['Date'] = pd.to_datetime(ash_df['Date'], errors='coerce')
-
-        # 4. Process Roster
-        roster_df.columns = roster_df.columns.str.strip()
         
         return ash_df, cmj_df, roster_df
     except Exception as e:
+        # This will tell you exactly what went wrong if it still fails
         st.error(f"Sync Error: {e}")
-        return [pd.DataFrame()]*3
-
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
 # --- INITIALIZE ---
 LOCKED_CONFIG = {'staticPlot': True, 'displayModeBar': False}
 ash_df, cmj_df, roster_df = load_all_data()
