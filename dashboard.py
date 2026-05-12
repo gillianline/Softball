@@ -176,79 +176,68 @@ if not ash_df.empty:
         if not cmj_filt.empty:
             c_lat = cmj_filt.iloc[-1]
             
-            # 1. READINESS LOGIC
-            # We compare current Jump Height to their rolling average to determine "Freshness"
-            avg_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].mean()
-            curr_h = c_lat['Jump Height (Imp-Mom) [cm]']
-            readiness_score = ((curr_h - avg_h) / avg_h) * 100
+            # 1. THE BIG 3 (What actually matters for the athlete)
+            m1, m2, m3 = st.columns(3)
             
-            # Status determination
-            if readiness_score < -10:
-                status, status_col = "🔴 FATIGUED", "#dc3545"
-            elif readiness_score < -5:
-                status, status_col = "🟡 MONITOR", "#FF8200"
-            else:
-                status, status_col = "🟢 READY", "#28a745"
+            with m1:
+                st.metric("Explosiveness", f"{c_lat['Jump Height (Imp-Mom) [cm]']:.1f} cm")
+                st.caption("Raw vertical lift and power.")
 
-            # 2. TOP LEVEL STATUS
-            st.markdown(f"""
-                <div style="background-color:{status_col}22; padding:15px; border-radius:10px; border:2px solid {status_col}; text-align:center;">
-                    <h2 style="margin:0; color:{status_col};">{status}</h2>
-                    <p style="margin:0; color:grey; font-weight:700;">{readiness_score:+.1f}% vs. Season Average</p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.write("")
+            with m2:
+                # Standardizing RSI to 2 decimals
+                rsi_val = c_lat['RSI-modified (Imp-Mom) [m/s]']
+                st.metric("Quickness", f"{rsi_val:.2f}")
+                st.caption("How fast they get off the ground.")
 
-            # 3. THE "WHY" METRICS (Efficiency vs. Power)
-            cm1, cm2, cm3 = st.columns(3)
-            
-            # Explosive Strategy (RSI-m)
-            rsi_val = c_lat['RSI-modified (Imp-Mom) [m/s]']
-            cm1.metric("Explosive Efficiency (RSI-m)", f"{rsi_val:.2f}")
-            cm1.caption("How fast they move relative to how high they jump.")
-
-            # Raw Output (Peak Power)
-            p_power = int(c_lat.get('Peak Power [W]', 0))
-            cm2.metric("Raw Power Output", f"{p_power} W")
-            cm2.caption("The total 'engine' output during the jump.")
-
-            # Strategy (Takeoff Velocity)
-            v_velo = c_lat.get('Vertical Velocity at Takeoff [m/s]', 0)
-            cm3.metric("Takeoff Velocity", f"{v_velo:.2f} m/s")
-            cm3.caption("Speed at the moment of leaving the ground.")
+            with m3:
+                # Peak Power is the "Engine" size
+                p_power = int(c_lat.get('Peak Power [W]', 0))
+                st.metric("Engine Size", f"{p_power} W")
+                st.caption("Total wattage produced.")
 
             st.divider()
 
-            # 4. VISUAL STORY: STRETCH-SHORTENING CYCLE
-            st.subheader("Jump Strategy: Strategy vs. Output")
+            # 2. THE PERFORMANCE COMPARISON
+            # Instead of a complex chart, let's use a clear "Today vs. Best" view
+            b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
+            b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
             
-            # Creating a scatter plot to see where they sit today vs history
-            fig_strategy = px.scatter(
-                cmj_filt, 
-                x='RSI-modified (Imp-Mom) [m/s]', 
-                y='Jump Height (Imp-Mom) [cm]',
-                color_discrete_sequence=["#BDBDBD"],
-                template="plotly_white",
-                title="Efficiency (RSI) vs. Performance (Height)"
-            )
-            # Highlight the LATEST point in Orange
-            fig_strategy.add_scatter(
-                x=[rsi_val], y=[curr_h], 
-                mode='markers', 
-                marker=dict(size=15, color='#FF8200', line=dict(width=2, color='Black')),
-                name="Latest Test"
-            )
+            # Visual progress bars for the coach
+            def performance_bar(label, current, best, unit):
+                percent = min((current / best) * 100, 100) if best > 0 else 0
+                st.write(f"**{label}**: {current}{unit} / {best}{unit}")
+                st.progress(percent / 100)
+
+            st.subheader("Current Form vs. Season Best")
+            c_left, c_right = st.columns(2)
+            with c_left:
+                performance_bar("Jump Height", c_lat['Jump Height (Imp-Mom) [cm]'], b_h, "cm")
+            with c_right:
+                performance_bar("RSI (Quickness)", round(rsi_val, 2), round(b_rsi, 2), "")
+
+            st.divider()
+
+            # 3. ROTATIONAL READINESS (Specific for Softball)
+            # We look at Stiffness and Braking—this is how they "stop" and transfer force
+            st.subheader("Bilateral Mechanics")
             
-            fig_strategy.update_layout(showlegend=False, height=400)
-            st.plotly_chart(fig_strategy, use_container_width=True)
+            # Metric Columns for the Coach
+            st1, st2, st3 = st.columns(3)
             
-            st.info("""
-                **Coach's Note:** 
-                - **Top Right:** Peak Performance (High Power + High Efficiency).
-                - **Bottom Right:** Speed Dominant (Fast but shallow jump).
-                - **Top Left:** Force Dominant (High jump but slow movement).
-            """)
+            with st1:
+                stiff = int(c_lat.get('CMJ Stiffness [N/m]', 0))
+                st.write("**Stiffness**")
+                st.write(f"{stiff} N/m")
             
+            with st2:
+                brake = int(c_lat.get('Eccentric Braking RFD [N/s]', 0))
+                st.write("**Braking Power**")
+                st.write(f"{brake} N/s")
+
+            with st3:
+                asym_cmj = c_lat.get('Concentric Mean Force % (Asym) (%)', 0)
+                st.write("**L/R Balance**")
+                st.write(f"{asym_cmj}%")
+
         else:
-            st.info("No CMJ records found for this selection.")
+            st.info("No CMJ records found for the selected season.")
