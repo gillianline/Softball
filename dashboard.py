@@ -107,12 +107,12 @@ if not ash_df.empty:
 
     with tab_ash:
         if not ash_filt.empty:
-            # 1. MANUAL ASYMMETRY & FORCE CALCULATION
-            # Pulling raw values from the latest test
+            # 1. MANUAL ASYMMETRY CALCULATION
+            # Pulling raw values from the latest test to ensure real-time accuracy
             l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
             r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
             
-            # Calculate Asymmetry manually to ensure accuracy
+            # Standard asymmetry formula: ((High - Low) / High) * 100
             if l_f > 0 and r_f > 0:
                 clean_asym = (abs(l_f - r_f) / max(l_f, r_f)) * 100
             else:
@@ -120,50 +120,73 @@ if not ash_df.empty:
 
             # 2. TOP METRIC ROW
             m1, m2, m3 = st.columns(3)
-            
-            # Left Peak Force
-            m1.metric("Left Peak Force", f"{l_f} N")
-            
-            # Right Peak Force
-            m2.metric("Right Peak Force", f"{r_f} N")
-            
-            # Calculated Asymmetry
-            # Colors turn red if asymmetry exceeds 10%
-            m3.metric(
-                "Asymmetry", 
-                f"{clean_asym:.1f}%", 
-                delta="High" if clean_asym > 10 else "Normal", 
-                delta_color="inverse"
-            )
+            with m1:
+                st.metric("Left Peak Force", f"{l_f} N")
+            with m2:
+                st.metric("Right Peak Force", f"{r_f} N")
+            with m3:
+                # Delta indicates if balance is within the normal 10% threshold
+                st.metric("Asymmetry", f"{clean_asym:.1f}%", 
+                          delta="High" if clean_asym > 10 else "Normal", 
+                          delta_color="inverse")
 
             st.divider()
 
-            # 3. VISUAL BALANCE BOX
-            # High-contrast summary box for quick review
-            asym_color = '#dc3545' if clean_asym > 10 else '#28a745'
+            # 3. PEAK FORCE TREND GRAPHS
+            st.subheader("Peak Force History: Left vs Right")
             
-            st.markdown(f"""
-                <div style="background-color:#F8F9FA; padding:20px; border-radius:15px; border:1px solid #E0E0E0; text-align:center;">
-                    <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
-                        <div>
-                            <p style="color:#4895DB; font-weight:800; margin:0; font-size:14px;">LEFT ARM</p>
-                            <h1 style="margin:0; font-size:48px;">{l_f}<span style="font-size:20px;">N</span></h1>
-                        </div>
-                        <div style="border-left:1px solid #E0E0E0; height:60px; margin-top:10px;"></div>
-                        <div>
-                            <p style="color:#FF8200; font-weight:800; margin:0; font-size:14px;">RIGHT ARM</p>
-                            <h1 style="margin:0; font-size:48px;">{r_f}<span style="font-size:20px;">N</span></h1>
-                        </div>
-                    </div>
-                    <p style="margin:0; font-size:12px; color:grey; font-weight:700; letter-spacing:1px;">TOTAL ASYMMETRY</p>
-                    <h1 style="margin:0; color:{asym_color}; font-size:56px;">{clean_asym:.1f}%</h1>
-                </div>
-            """, unsafe_allow_html=True)
+            # Prepare data for plotting
+            hist_plot = ash_filt.copy()
+            hist_plot['Left'] = pd.to_numeric(hist_plot['Peak Vertical Force [N] (L)'], errors='coerce').fillna(0)
+            hist_plot['Right'] = pd.to_numeric(hist_plot['Peak Vertical Force [N] (R)'], errors='coerce').fillna(0)
+            
+            # Create a combined line chart for side-by-side comparison
+            fig_trend = px.line(
+                hist_plot, 
+                x='Date', 
+                y=['Left', 'Right'],
+                labels={'value': 'Force (N)', 'variable': 'Side'},
+                markers=True,
+                color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
+                template="plotly_white"
+            )
+            
+            fig_trend.update_layout(
+                height=400,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                margin=dict(t=10, b=10, l=10, r=10)
+            )
+            
+            st.plotly_chart(fig_trend, use_container_width=True)
 
-            # 4. DOMINANCE INDICATOR
-            if l_f != r_f:
-                dom_side = "Left" if l_f > r_f else "Right"
-                st.info(f"Dominant Side: **{dom_side}**")
+            # 4. BALANCE VISUALIZATION
+            c1, c2 = st.columns([1, 1])
+            
+            with c1:
+                st.subheader("Latest Force Distribution")
+                side_df = pd.DataFrame({
+                    'Side': ['Left (Lead)', 'Right (Trail)'], 
+                    'Force [N]': [l_f, r_f]
+                })
+                fig_bar = px.bar(
+                    side_df, x='Side', y='Force [N]', text='Force [N]', color='Side', 
+                    color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'}, 
+                    template="plotly_white"
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+            with c2:
+                st.subheader("Calculated Balance")
+                asym_color = '#dc3545' if clean_asym > 10 else '#28a745'
+                st.markdown(f"""
+                    <div style="background-color:#F8F9FA; padding:30px; border-radius:15px; border:1px solid #E0E0E0; text-align:center; margin-top:10px;">
+                        <p style="margin:0; font-size:14px; color:grey; font-weight:700; letter-spacing:1px;">TOTAL ASYMMETRY</p>
+                        <h1 style="margin:0; color:{asym_color}; font-size:64px;">{clean_asym:.1f}%</h1>
+                        <p style="margin-top:10px; font-weight:bold; color:#1D1D1F;">
+                            Dominant Side: {"Left" if l_f > r_f else "Right"}
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
 
         else:
             st.info("No ASH records found for the selected athlete.")
