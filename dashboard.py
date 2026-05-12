@@ -115,57 +115,49 @@ if not ash_df.empty:
         ath_cmj_data = c_sync[c_sync['Player Name'] == selected].sort_values(d_col_cmj)
         
         if not ath_cmj_data.empty:
-            base_val = float(ath_cmj_data.iloc[0][h_col])
-            
-            # --- BYPASSING PLOTLY VALIDATORS USING RAW DICT ---
-            chart_data = {
-                "data": [
-                    {
-                        "x": ath_cmj_data[d_col_cmj].dt.strftime('%Y-%m-%d').tolist(),
-                        "y": ath_cmj_data[h_col].tolist(),
-                        "name": "Height (cm)",
-                        "type": "scatter",
-                        "mode": "lines+markers",
-                        "line": {"color": "#4895DB", "width": 3}
-                    },
-                    {
-                        "x": ath_cmj_data[d_col_cmj].dt.strftime('%Y-%m-%d').tolist(),
-                        "y": ath_cmj_data[r_col].tolist(),
-                        "name": "RSI-mod",
-                        "type": "scatter",
-                        "mode": "lines+markers",
-                        "yaxis": "y2",
-                        "line": {"color": "#FF8200", "width": 2, "dash": "dot"}
-                    }
-                ],
-                "layout": {
-                    "template": "plotly_white",
-                    "xaxis": {"title": "Date", "showgrid": False},
-                    "yaxis": {"title": "Height (cm)", "titlefont": {"color": "#4895DB"}, "tickfont": {"color": "#4895DB"}},
-                    "yaxis2": {
-                        "title": "RSI-mod",
-                        "titlefont": {"color": "#FF8200"},
-                        "tickfont": {"color": "#FF8200"},
-                        "overlaying": "y",
-                        "side": "right",
-                        "showgrid": False
-                    },
-                    "legend": {"orientation": "h", "y": -0.3, "x": 0.5, "xanchor": "center"},
-                    "margin": {"l": 50, "r": 50, "t": 30, "b": 10},
-                    "shapes": [{
-                        "type": "line",
-                        "xref": "paper", "x0": 0, "x1": 1,
-                        "yref": "y", "y0": base_val, "y1": base_val,
-                        "line": {"color": "red", "width": 2, "dash": "dash"}
-                    }]
-                }
-            }
-            
-            # This bypasses all the go.Layout code that was crashing
-            st.plotly_chart(chart_data, use_container_width=True)
+            import altair as alt
 
-            # --- TABLE LOGIC REMAINS THE SAME ---
+            # 1. Base Chart (Shared X-Axis)
+            base = alt.Chart(ath_cmj_data).encode(
+                x=alt.X(f'{d_col_cmj}:T', title='Date')
+            )
+
+            # 2. Jump Height Line (Orange - Left Axis)
+            line_h = base.mark_line(color='#FF8200', size=3).encode(
+                y=alt.Y(f'{h_col}:Q', title='Jump Height (cm)', scale=alt.Scale(zero=False))
+            )
+            points_h = base.mark_point(color='#FF8200', size=60, filled=True).encode(
+                y=alt.Y(f'{h_col}:Q')
+            )
+
+            # 3. RSI Line (Blue - Right Axis)
+            line_r = base.mark_line(color='#4895DB', strokeDash=[5,5], size=2).encode(
+                y=alt.Y(f'{r_col}:Q', title='RSI-mod', scale=alt.Scale(zero=False))
+            )
+            points_r = base.mark_point(color='#4895DB', size=60).encode(
+                y=alt.Y(f'{r_col}:Q')
+            )
+
+            # 4. Combine with Dual Axis (resolve_scale makes it two axes)
+            final_chart = alt.layer(
+                (line_h + points_h), 
+                (line_r + points_r)
+            ).resolve_scale(
+                y='independent'
+            ).properties(
+                width='container',
+                height=400
+            ).configure_axisLeft(
+                titleColor='#FF8200', labelColor='#FF8200'
+            ).configure_axisRight(
+                titleColor='#4895DB', labelColor='#4895DB'
+            )
+
+            st.altair_chart(final_chart, use_container_width=True)
+
+            # --- TABLE LOGIC ---
             st.markdown("#### Jump History")
+            base_val = float(ath_cmj_data.iloc[0][h_col])
             combined_skills = pd.concat([swing_df, throw_df], ignore_index=True)
             comp_list = []
             for _, row in ath_cmj_data.iloc[1:].iterrows():
