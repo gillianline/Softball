@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go # Added for dual-axis support
+import plotly.graph_objects as go
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
@@ -12,21 +12,14 @@ st.markdown("""
     .stApp { background-color: #FFFFFF; color: #1D1D1F; }
     [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
     .athlete-header {
-        background-color: #F8F9FA;
-        padding: 20px;
-        border-radius: 15px;
-        border-left: 10px solid #FF8200;
-        margin-bottom: 25px;
+        background-color: #F8F9FA; padding: 20px; border-radius: 15px; border-left: 10px solid #FF8200; margin-bottom: 25px;
     }
-    .player-photo {
-        border-radius: 50%;
-        width: 150px;
-        height: 150px;
-        object-fit: cover;
-        border: 4px solid #4895DB;
-    }
+    .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
     .stTabs [role="tab"] { font-weight: 800; color: #4895DB; font-size: 18px; }
     .stTabs [aria-selected="true"] { color: #FF8200; border-bottom-color: #FF8200; }
+    .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 10px;}
+    .scout-table th { background-color: #4895DB; color: white; padding: 8px; border-bottom: 2px solid #FF8200; text-transform: uppercase; font-size: 12px; }
+    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
@@ -53,35 +46,31 @@ def load_all_data():
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
         cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
-        
-        for df in [ash_df, cmj_df, roster_df]:
-            df.columns = df.columns.str.strip()
+        swing_df = pd.read_csv(st.secrets["SWING_URL"])
+        throw_df = pd.read_csv(st.secrets["THROW_URL"])
         
         def sanitize(df):
-            for col in df.columns:
-                if any(word in col.lower() for word in ['force', 'rfd', 'height', 'power', 'velocity', 'impulse', 'rsi', 'stiffness']):
-                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
-            if 'Date' in df.columns:
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df.columns = df.columns.str.strip()
+            # Dynamic date detection
+            d_col = next((c for c in ['Date', 'Test Date', 'date'] if c in df.columns), None)
+            if d_col:
+                df[d_col] = pd.to_datetime(df[d_col], errors='coerce')
             return df
 
-        ash_df = sanitize(ash_df)
-        cmj_df = sanitize(cmj_df)
-        
-        return ash_df, cmj_df, roster_df
+        return sanitize(ash_df), sanitize(cmj_df), sanitize(roster_df), sanitize(swing_df), sanitize(throw_df)
     except Exception as e:
         st.error(f"Sync Error: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-ash_df, cmj_df, roster_df = load_all_data()
+ash_df, cmj_df, roster_df, swing_df, throw_df = load_all_data()
 
 # --- UI LOGIC ---
-if not ash_df.empty and not cmj_df.empty:
-    athlete_list = sorted(list(set(ash_df['Player Name'].unique()) | set(cmj_df['Player Name'].unique())))
+if not ash_df.empty:
+    athlete_list = sorted(ash_df['Player Name'].unique())
     selected = st.selectbox("Search Athlete", athlete_list)
     
-    photo_url = roster_df[roster_df['Player Name'] == selected]['Picture'].values
-    photo = photo_url[0] if len(photo_url) > 0 else "https://www.w3schools.com/howto/img_avatar.png"
+    pic_row = roster_df[roster_df['Player Name'] == selected]
+    photo = pic_row['Picture'].values[0] if not pic_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
 
     st.markdown(f"""
         <div class="athlete-header">
@@ -89,100 +78,80 @@ if not ash_df.empty and not cmj_df.empty:
                 <img src="{photo}" class="player-photo">
                 <div style="margin-left: 30px;">
                     <h1 style="margin:0;">{selected}</h1>
-                    <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">PERFORMANCE MASTER DASHBOARD</p>
+                    <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">SOFTBALL PERFORMANCE HUB</p>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST (Force/RFD)", "🚀 CMJ TEST (Jump/Power)"])
+    tab_ash, tab_cmj = st.tabs(["⚡ ASH PROFILE", "🚀 CMJ RECOVERY"])
 
     with tab_ash:
-        p_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+        d_col_ash = next((c for c in ['Date', 'Test Date', 'date'] if c in ash_df.columns), 'Date')
+        p_ash = ash_df[ash_df['Player Name'] == selected].sort_values(d_col_ash)
         if not p_ash.empty:
-            latest_ash = p_ash.iloc[-1]
+            latest = p_ash.iloc[-1]
+            # Safe numeric conversion for Asym
+            try:
+                asym = float(str(latest.get('Peak Vertical Force [N] (Asym)(%)', 0)).replace('%', '').strip())
+            except:
+                asym = 0.0
+
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Peak Force", f"{int(latest_ash['Peak Vertical Force [N]'])} N")
-            m2.metric("RFD (200ms)", f"{int(latest_ash['RFD - 200ms [N/s]'])} N/s")
-            m3.metric("Force Asym", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
-            m4.metric("Time to Peak", f"{latest_ash.get('Start Time to Peak Force [s]', 0)}s")
-            
-            st.plotly_chart(px.line(p_ash, x='Date', y='Peak Vertical Force [N]', title="Force History", markers=True, color_discrete_sequence=["#FF8200"]), use_container_width=True)
-        else:
-            st.warning("No ASH data found for this athlete.")
+            m1.metric("Peak Force", f"{int(latest.get('Peak Vertical Force [N]', 0))} N")
+            m2.metric("RFD (200ms)", f"{int(latest.get('RFD - 200ms [N/s]', 0))} N/s")
+            m3.metric("Force Asym", f"{asym}%", delta="- Risk" if asym > 10 else None, delta_color="inverse")
+            m4.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
+            st.plotly_chart(px.line(p_ash, x=d_col_ash, y='Peak Vertical Force [N]', markers=True, color_discrete_sequence=["#FF8200"], template="plotly_white"), use_container_width=True)
 
     with tab_cmj:
-        p_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
-        if not p_cmj.empty:
-            latest_cmj = p_cmj.iloc[-1]
-            c1, c2, c3, c4 = st.columns(4)
+        st.markdown("### CMJ Baseline vs. Post-Match Recovery")
+        c_sync = cmj_df.rename(columns={'Athlete': 'Player Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
+        
+        d_col_cmj = next((c for c in ['Test Date', 'Date', 'date'] if c in c_sync.columns), 'Date')
+        h_col = next((c for c in ['Jump Height (Imp-Mom) [cm]', 'Jump Height'] if c in c_sync.columns), 'Jump Height')
+        r_col = next((c for c in ['RSI-modified [m/s]', 'RSI-modified (Imp-Mom) [m/s]', 'RSI'] if c in c_sync.columns), 'RSI')
+        
+        ath_cmj_data = c_sync[c_sync['Player Name'] == selected].sort_values(d_col_cmj)
+        
+        if not ath_cmj_data.empty:
+            base_row = ath_cmj_data.iloc[0] 
             
-            # Helper Variables for column names
-            h_col = 'Jump Height (Imp-Mom) [cm]'
-            rsi_col = 'RSI-modified (Imp-Mom) [m/s]'
-
-            c1.metric("Jump Height", f"{latest_cmj[h_col]} cm")
-            c2.metric("RSI-Modified", f"{latest_cmj[rsi_col]}")
-            c3.metric("Peak Power", f"{int(latest_cmj['Peak Power [W]'])} W")
-            c4.metric("Stiffness", f"{int(latest_cmj['CMJ Stiffness [N/m]'])} N/m")
-
-            # --- DUAL AXIS CHART: Jump Height vs RSI ---
-            st.subheader("Performance Trend: Jump Height & Explosiveness")
-            
-            fig = go.Figure()
-
-            # Add Jump Height (Left Axis)
-            fig.add_trace(go.Scatter(
-                x=p_cmj['Date'], 
-                y=p_cmj[h_col],
-                name="Jump Height (cm)",
-                mode='lines+markers',
-                line=dict(color='#FF8200', width=3)
-            ))
-
-            # Add RSI (Right Axis)
-            fig.add_trace(go.Scatter(
-                x=p_cmj['Date'], 
-                y=p_cmj[rsi_col],
-                name="RSI-Modified",
-                mode='lines+markers',
-                line=dict(color='#4895DB', width=3, dash='dot'),
-                yaxis="y2" # This links it to the secondary axis
-            ))
-
-            # Update layout to support secondary axis
-            fig.update_layout(
-                template="plotly_white",
-                xaxis=dict(title="Date", showgrid=False),
-                yaxis=dict(
-                    title="Jump Height (cm)",
-                    titlefont=dict(color="#FF8200"),
-                    tickfont=dict(color="#FF8200")
-                ),
-                yaxis2=dict(
-                    title="RSI-Modified",
-                    titlefont=dict(color="#4895DB"),
-                    tickfont=dict(color="#4895DB"),
-                    anchor="x",
-                    overlaying="y",
-                    side="right",
-                    showgrid=False
-                ),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=20, r=20, t=50, b=20)
+            # --- DUAL AXIS STABLE CONSTRUCTOR ---
+            fig = go.Figure(
+                data=[
+                    go.Scatter(x=ath_cmj_data[d_col_cmj], y=ath_cmj_data[h_col], name="Height (cm)", mode='lines+markers', line=dict(color='#4895DB', width=3)),
+                    go.Scatter(x=ath_cmj_data[d_col_cmj], y=ath_cmj_data[r_col], name="RSI-mod", mode='lines+markers', line=dict(color='#FF8200', width=2, dash='dot'), yaxis="y2")
+                ],
+                layout=go.Layout(
+                    template="plotly_white",
+                    xaxis=dict(title="Date", showgrid=False),
+                    yaxis=dict(title="Height (cm)", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB")),
+                    yaxis2=dict(title="RSI-mod", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200"), overlaying="y", side="right", showgrid=False),
+                    legend=dict(orientation="h", y=-0.3, x=0.5, xanchor="center"),
+                    margin=dict(l=50, r=50, t=30, b=10)
+                )
             )
-
+            fig.add_hline(y=base_row[h_col], line_dash="dash", line_color="red", annotation_text="Baseline")
             st.plotly_chart(fig, use_container_width=True)
 
-            # --- Braking Strategy Section ---
-            st.subheader("Braking Strategy")
-            
-            # Impulse Comparison
-            impulse_data = pd.DataFrame({
-                'Metric': ['P1 Concentric', 'P2 Concentric'],
-                'Value': [latest_cmj['P1 Concentric Impulse [N s]'], latest_cmj['P2 Concentric Impulse [N s]']]
-            })
-            st.plotly_chart(px.bar(impulse_data, x='Metric', y='Value', color='Metric', title="Concentric Impulse Phases", color_discrete_sequence=["#4895DB", "#FF8200"]), use_container_width=True)
-            
-        else:
-            st.warning("No CMJ data found for this athlete.")
+            # History Table Logic
+            st.markdown("#### Jump History")
+            combined_skills = pd.concat([swing_df, throw_df], ignore_index=True)
+            comp_list = []
+            for _, row in ath_cmj_data.iloc[1:].iterrows():
+                j_date = pd.to_datetime(row[d_col_cmj])
+                try:
+                    prev_m = combined_skills[(combined_skills['Player Name'] == selected) & (pd.to_datetime(combined_skills['Date']) < j_date) & (combined_skills['Session Type'].str.contains('Game|Match', case=False, na=False))]
+                    pm_row = prev_m.sort_values('Date', ascending=False).iloc[0]
+                    m_info = f"{pm_row['Session Type']} ({pd.to_datetime(pm_row['Date']).strftime('%m/%d')})"
+                except: m_info = "N/A"
+                
+                diff = float(row[h_col]) - float(base_row[h_col])
+                comp_list.append({"Date": j_date.strftime('%m/%d/%Y'), "Match": m_info, "Height": f"{row[h_col]:.1f} cm", "Diff": diff, "RSI": f"{row[r_col]:.2f}"})
+
+            html = """<table class="scout-table"><tr><th>Date</th><th>Prev Match</th><th>Height</th><th>Vs Baseline</th><th>RSI</th></tr>"""
+            for i in comp_list:
+                clr = "#28a745" if i['Diff'] >= 0 else "#dc3545"
+                html += f"<tr><td>{i['Date']}</td><td>{i['Match']}</td><td>{i['Height']}</td><td style='color:{clr}; font-weight:bold;'>{i['Diff']:+.1f} cm</td><td>{i['RSI']}</td></tr>"
+            st.markdown(html + "</table>", unsafe_allow_html=True)
