@@ -152,7 +152,17 @@ if not ash_df.empty:
                 st.subheader("Bilateral Profile")
                 l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
                 r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
-                raw_asym = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
+                
+                # --- SAFE ASYM CALCULATION ---
+                raw_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
+                try:
+                    # Strip % and convert to float so abs() works
+                    clean_asym = float(str(raw_val).replace('%', '').strip())
+                except:
+                    clean_asym = 0.0
+                
+                asym_color = '#dc3545' if abs(clean_asym) > 10 else '#28a745'
+
                 st.markdown(f"""
                     <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0;">
                         <div style="display:flex; justify-content:space-between;">
@@ -161,27 +171,26 @@ if not ash_df.empty:
                         </div>
                         <div style="text-align:center; border-top:1px solid #E0E0E0; padding-top:10px; margin-top:10px;">
                             <p style="margin:0; font-size:11px; color:grey; font-weight:700;">ASYMMETRY</p>
-                            <h3 style="margin:0; color:{'#dc3545' if abs(raw_asym) > 10 else '#28a745'}">{raw_asym}%</h3>
+                            <h3 style="margin:0; color:{asym_color}">{clean_asym:.1f}%</h3>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
                 st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
-            # --- ROBUST GAME LOOKUP ---
+            # --- ROBUST GAME LOOKUP (Athlete Specific) ---
             game_dates = set()
             
-            # Helper to find game dates in other dataframes
-            def find_game_days(df, session_col):
+            def find_athlete_games(df, athlete_name, session_col):
                 if df is not None and not df.empty and session_col in df.columns:
-                    # Convert to standard date and filter for 'Game'
-                    games = df[df[session_col].astype(str).str.contains('Game', case=False, na=False)]
+                    # Filter for the specific athlete AND session type 'Game'
+                    games = df[(df['Player Name'] == athlete_name) & 
+                               (df[session_col].astype(str).str.contains('Game', case=False, na=False))]
                     return set(pd.to_datetime(games['Date']).dt.date)
                 return set()
 
-            # Check both Swing and Throw (ensure these variables exist in your script)
             try:
-                game_dates.update(find_game_days(swing_df, 'Session Type'))
-                game_dates.update(find_game_days(throw_df, 'Session Type'))
+                game_dates.update(find_athlete_games(swing_df, selected, 'Session Type'))
+                game_dates.update(find_athlete_games(throw_df, selected, 'Session Type'))
             except NameError:
                 st.warning("Swing or Throw data not loaded; Game status unavailable.")
 
@@ -194,12 +203,10 @@ if not ash_df.empty:
                 'Peak Vertical Force [N] (Asym)(%)'
             ]].copy()
 
-            # Compare ASH date to the Master Game Date list
             ash_history['Game?'] = ash_history['Date'].dt.date.apply(
                 lambda x: "✔️ Yes" if x in game_dates else "—"
             )
             
-            # Final Formatting
             ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
             ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
 
