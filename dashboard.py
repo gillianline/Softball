@@ -83,6 +83,12 @@ def load_all_data():
 ash_df, cmj_df = load_all_data()
 
 # --- 5. DASHBOARD UI ---
+def quick_metric(col, label, best, current, unit):
+    diff = ((current - best) / best * 100) if best != 0 else 0
+    color = "red-text" if diff < -10 else "green-text"
+    col.metric(label, f"{int(best)}{unit}")
+    col.markdown(f'<p class="metric-sub {color}">Latest: {current:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
+
 if not ash_df.empty:
     f_col1, f_col2 = st.columns(2)
     with f_col1:
@@ -119,66 +125,50 @@ if not ash_df.empty:
 
     tab_ash, tab_cmj = st.tabs(["ASH TEST", "CMJ READINESS"])
 
-    # --- HELPER FUNCTION (Move this to the top) ---
-    def quick_metric(col, label, best, current, unit):
-        diff = ((current - best) / best * 100) if best != 0 else 0
-        # Logic: Red if more than 10% below best
-        color = "red" if diff < -10 else "green"
-        col.metric(label, f"{int(best)}{unit}")
-        col.markdown(f'<p class="metric-sub {color}">Latest: {current:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
-
     with tab_ash:
+        if not ash_filt.empty:
+            # ASH Metrics
+            best_f = ash_filt['Peak Vertical Force [N]'].max()
+            best_r = ash_filt['RFD - 200ms [N/s]'].max()
+            
+            m1, m2, m3 = st.columns(3)
+            quick_metric(m1, "Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
+            quick_metric(m2, "Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
+            m3.metric("Latest Asymmetry", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
+
+            st.divider()
+            
+            # ASH Chart
+            fig_ash = px.line(ash_filt, x='Date', y='Peak Vertical Force [N]', markers=True, 
+                             template="plotly_white", color_discrete_sequence=["#FF8200"])
+            fig_ash.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=12, title="")
+            st.plotly_chart(fig_ash, use_container_width=True)
+        else:
+            st.info("No ASH records found.")
+
+    with tab_cmj:
         if not cmj_filt.empty:
             c_lat = cmj_filt.iloc[-1]
-            
-            # 1. Calculate Bests for the selected range
             b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
             b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
 
-            # 2. Metric Display
             cm1, cm2, cm3 = st.columns(3)
+            quick_metric(cm1, "Best Jump Height", b_h, c_lat['Jump Height (Imp-Mom) [cm]'], " cm")
             
-            # Jump Height Metric
-            quick_metric(cm1, "Best Jump Height", b_h, c_lat['Jump Height (Imp-Mom) [cm]'], "cm")
-            
-            # RSI Metric (Forced to 2 decimal places)
-            rsi_current = c_lat['RSI-modified (Imp-Mom) [m/s]']
-            rsi_diff = ((rsi_current - b_rsi) / b_rsi * 100) if b_rsi != 0 else 0
-            rsi_color = "red" if rsi_diff < -10 else "green"
-            
+            # RSI Logic with 2 Decimals
+            rsi_curr = c_lat['RSI-modified (Imp-Mom) [m/s]']
+            rsi_diff = ((rsi_curr - b_rsi) / b_rsi * 100) if b_rsi != 0 else 0
+            rsi_col = "red-text" if rsi_diff < -10 else "green-text"
             cm2.metric("Best RSI-m", f"{b_rsi:.2f}")
-            cm2.markdown(f'<p class="metric-sub {rsi_color}">Latest: {rsi_current:.2f} ({rsi_diff:+.1f}%)</p>', unsafe_allow_html=True)
+            cm2.markdown(f'<p class="metric-sub {rsi_col}">Latest: {rsi_curr:.2f} ({rsi_diff:+.1f}%)</p>', unsafe_allow_html=True)
             
-            # Body Weight Metric
             cm3.metric("Current Weight", f"{c_lat.get('BW [KG]', 0):.1f}kg")
 
             st.write("")
-            
-            # 3. CLEAN TREND GRAPH (Fixed for All-Time view)
-            fig_cmj = px.line(
-                cmj_filt, 
-                x='Date', 
-                y='Jump Height (Imp-Mom) [cm]', 
-                markers=True, 
-                template="plotly_white", 
-                color_discrete_sequence=["#4895DB"]
-            )
-            
-            # Formatting the axis to prevent "All Time" date overlapping
-            fig_cmj.update_xaxes(
-                tickformat="%b %d, %y", # Format as 'Jan 01, 26'
-                tickangle=-45, 
-                nticks=12,            # Limits the number of labels to keep it clean
-                title=""
-            )
-            
-            fig_cmj.update_layout(
-                height=400, 
-                yaxis_title="Jump Height (cm)",
-                margin=dict(t=10, b=10, l=10, r=10)
-            )
-            
+            fig_cmj = px.line(cmj_filt, x='Date', y='Jump Height (Imp-Mom) [cm]', markers=True,
+                             template="plotly_white", color_discrete_sequence=["#4895DB"])
+            fig_cmj.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=12, title="")
+            fig_cmj.update_layout(height=400, yaxis_title="Jump Height (cm)", margin=dict(t=10, b=10, l=10, r=10))
             st.plotly_chart(fig_cmj, use_container_width=True)
-            
         else:
-            st.info("No CMJ records found for the selected season.")
+            st.info("No CMJ records found.")
