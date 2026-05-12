@@ -122,7 +122,26 @@ if not ash_df.empty:
 
     with tab_ash:
         if not ash_filt.empty:
-            # 1. CALCULATE BASELINES & BESTS
+            # 1. PROFILE PICTURE & HEADER
+            col_pic, col_name = st.columns([1, 4])
+            with col_pic:
+                # Look for the 'Photo' column from your roster merge
+                image_url = latest_ash.get('Photo', "https://via.placeholder.com/150")
+                st.image(image_url, width=120)
+            with col_name:
+                st.title(f"{selected}")
+                st.subheader("ASH (Athletic Shoulder) Performance Profile")
+
+            # 2. FIX ASYMMETRY GLOBALLY
+            # This cleans the asym value so it works for both the metrics and the boxes
+            raw_asym_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
+            try:
+                # Strip % and convert to float
+                clean_asym = float(str(raw_asym_val).replace('%', '').strip())
+            except:
+                clean_asym = 0.0
+
+            # 3. CALCULATE BASELINES & BESTS
             ash_filt['Peak Vertical Force [N]'] = pd.to_numeric(ash_filt['Peak Vertical Force [N]'], errors='coerce').fillna(0)
             best_f = ash_filt['Peak Vertical Force [N]'].max()
             best_r = ash_filt['RFD - 200ms [N/s]'].max()
@@ -136,23 +155,21 @@ if not ash_df.empty:
                 st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
                 st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
 
-            # 2. TOP METRIC ROW
+            # 4. TOP METRIC ROW
             m1, m2, m3, m4 = st.columns(4)
-            with m1: colored_metric(f"{label} Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
-            with m2: colored_metric(f"{label} Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
+            with m1: colored_metric("Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
+            with m2: colored_metric("Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
             with m3: 
-                raw_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
-                try: clean_asym = float(str(raw_val).replace('%', '').strip())
-                except: clean_asym = 0.0
-                st.metric("Latest Asymmetry", f"{clean_asym:.1f}%")
-            with m4: colored_metric(f"{label} Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
+                # Display the fixed asymmetry with a delta based on 10% threshold
+                st.metric("Asymmetry", f"{clean_asym:.1f}%", delta="High" if abs(clean_asym) > 10 else "Normal", delta_color="inverse")
+            with m4: colored_metric("Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
 
             st.divider()
             
-            # 3. BILATERAL PROFILE (The Bars and Boxes)
+            # 5. BILATERAL PROFILE (Left vs Right)
             c1, c2 = st.columns([2, 1])
             with c1:
-                st.subheader("Left vs Right Force Profile")
+                st.subheader("Force Distribution")
                 l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
                 r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
                 side_df = pd.DataFrame({'Side': ['Left (Lead)', 'Right (Trail)'], 'Force [N]': [l_f, r_f]})
@@ -161,24 +178,21 @@ if not ash_df.empty:
                 st.plotly_chart(fig, use_container_width=True)
             
             with c2:
-                st.subheader("Bilateral Profile")
+                st.subheader("Balance Details")
                 l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
                 r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
                 asym_color = '#dc3545' if abs(clean_asym) > 10 else '#28a745'
 
                 st.markdown(f"""
-                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0;">
-                        <div style="display:flex; justify-content:space-between;">
-                            <div style="text-align:center; width:45%;"><p style="color:#4895DB; font-weight:800; margin:0; font-size:12px;">LEFT</p><h2 style="margin:0;">{l_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{l_rfd} RFD</p></div>
-                            <div style="text-align:center; width:45%;"><p style="color:#FF8200; font-weight:800; margin:0; font-size:12px;">RIGHT</p><h2 style="margin:0;">{r_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{r_rfd} RFD</p></div>
+                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0; text-align:center;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                            <div style="width:45%;"><p style="color:#4895DB; font-weight:800; margin:0;">LEFT</p><h2>{l_f}N</h2><p style="color:grey; font-size:12px;">{l_rfd} RFD</p></div>
+                            <div style="width:45%;"><p style="color:#FF8200; font-weight:800; margin:0;">RIGHT</p><h2>{r_f}N</h2><p style="color:grey; font-size:12px;">{r_rfd} RFD</p></div>
                         </div>
-                        <div style="text-align:center; border-top:1px solid #E0E0E0; padding-top:10px; margin-top:10px;">
-                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">ASYMMETRY</p>
-                            <h3 style="margin:0; color:{asym_color}">{clean_asym:.1f}%</h3>
-                        </div>
+                        <p style="margin:0; font-size:11px; color:grey; font-weight:700;">CALCULATED ASYMMETRY</p>
+                        <h1 style="margin:0; color:{asym_color};">{clean_asym:.1f}%</h1>
                     </div>
                 """, unsafe_allow_html=True)
-                st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
 
             st.divider()
 
