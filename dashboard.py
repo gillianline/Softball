@@ -149,21 +149,38 @@ if not ash_df.empty:
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with c2:
-                    st.subheader("Balance Details")
-                    l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
-                    r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
-                    asym_color = '#dc3545' if abs(clean_asym) > 10 else '#28a745'
-                    st.markdown(f"""
-                        <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0; text-align:center;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                                <div style="width:45%;"><p style="color:#4895DB; font-weight:800; margin:0;">LEFT</p><h2>{l_f}N</h2><p style="color:grey; font-size:12px;">{l_rfd} RFD</p></div>
-                                <div style="width:45%;"><p style="color:#FF8200; font-weight:800; margin:0;">RIGHT</p><h2>{r_f}N</h2><p style="color:grey; font-size:12px;">{r_rfd} RFD</p></div>
-                            </div>
-                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">CALCULATED ASYMMETRY</p>
-                            <h1 style="margin:0; color:{asym_color};">{clean_asym:.1f}%</h1>
-                        </div>
-                    """, unsafe_allow_html=True)
+                st.subheader("Balance Details")
+                l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
+                r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
+                l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
+                r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
 
+                # --- MANUAL CALCULATION (Fixes the 0.0% issue) ---
+                if l_f > 0 and r_f > 0:
+                    # Standard asymmetry formula: ((High - Low) / High) * 100
+                    diff = abs(l_f - r_f)
+                    high_val = max(l_f, r_f)
+                    clean_asym = (diff / high_val) * 100
+                else:
+                    clean_asym = 0.0
+                
+                asym_color = '#dc3545' if clean_asym > 10 else '#28a745'
+
+                st.markdown(f"""
+                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0; text-align:center;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                            <div style="width:45%;"><p style="color:#4895DB; font-weight:800; margin:0;">LEFT</p><h2>{l_f}N</h2><p style="color:grey; font-size:12px;">{l_rfd} RFD</p></div>
+                            <div style="width:45%;"><p style="color:#FF8200; font-weight:800; margin:0;">RIGHT</p><h2>{r_f}N</h2><p style="color:grey; font-size:12px;">{r_rfd} RFD</p></div>
+                        </div>
+                        <p style="margin:0; font-size:11px; color:grey; font-weight:700;">CALCULATED ASYMMETRY</p>
+                        <h1 style="margin:0; color:{asym_color};">{clean_asym:.1f}%</h1>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Dynamic Dominance Note
+                dominance = "Left" if l_f > r_f else "Right"
+                st.info(f"Dominance: **{dominance}** ({clean_asym:.1f}%)")
+                
                 st.divider()
 
                 # 5. MATCH CONTEXT TABLE
