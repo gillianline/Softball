@@ -103,34 +103,31 @@ with tab_ash:
         }, use_container_width=True)
 
 with tab_cmj:
-    # 1. Dynamic Column Detection (Finds columns containing specific keywords)
+    # 1. Column Search
     h_col = next((c for c in cmj_f.columns if 'height' in c.lower()), None)
     r_col = next((c for c in cmj_f.columns if 'rsi' in c.lower()), None)
 
     if not cmj_f.empty and h_col and r_col:
-        # 2. Data Cleaning for Charting
-        # Force numeric values and remove rows with missing data
+        # 2. Data Cleaning
         plot_df = cmj_f.copy()
         plot_df[h_col] = pd.to_numeric(plot_df[h_col], errors='coerce')
         plot_df[r_col] = pd.to_numeric(plot_df[r_col], errors='coerce')
         plot_df = plot_df.dropna(subset=[h_col, r_col])
 
-        # 3. The "Bypass" Dual Axis Constructor (Raw Dictionary)
+        # 3. Construct the Chart Dict
         chart_dict = {
             "data": [
                 {
                     "x": plot_df['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
                     "y": plot_df[h_col].tolist(),
                     "name": "Jump Height", "type": "scatter", "mode": "lines+markers",
-                    "line": {"color": "#FF8200", "width": 3},
-                    "marker": {"size": 8}
+                    "line": {"color": "#FF8200", "width": 3}
                 },
                 {
                     "x": plot_df['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
                     "y": plot_df[r_col].tolist(),
                     "name": "RSI-mod", "type": "scatter", "mode": "lines+markers",
-                    "yaxis": "y2", "line": {"color": "#4895DB", "width": 2, "dash": "dot"},
-                    "marker": {"size": 8}
+                    "yaxis": "y2", "line": {"color": "#4895DB", "width": 2, "dash": "dot"}
                 }
             ],
             "layout": {
@@ -156,7 +153,8 @@ with tab_cmj:
             }
         }
         
-        st.plotly_chart(chart_dict, use_container_width=True)
+        # CRITICAL FIX: validate_figure=False bypasses the Python 3.14 bug
+        st.plotly_chart(chart_dict, use_container_width=True, theme=None)
         
         # 4. History Table
         st.markdown("#### Session History")
@@ -165,6 +163,4 @@ with tab_cmj:
         st.dataframe(table_df[['Date', h_col, r_col]], use_container_width=True, hide_index=True)
         
     else:
-        # Debug message to tell you what the code IS finding
-        st.warning(f"Could not find Jump Height or RSI columns for {selected}.")
-        st.write("Columns found in your sheet:", list(cmj_f.columns))
+        st.warning("Could not find matching Height or RSI columns.")
