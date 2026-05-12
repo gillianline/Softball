@@ -86,6 +86,33 @@ if not ash_df.empty:
 
     tab_ash, tab_cmj = st.tabs(["⚡ ASH PROFILE", "🚀 CMJ RECOVERY"])
 
+# --- YEAR FILTER ---
+# Get all unique years across all data sources
+all_dates = pd.concat([
+    ash_df['Date'], 
+    cmj_df['Date'], 
+    swing_df['Date'], 
+    throw_df['Date']
+])
+unique_years = sorted(all_dates.dt.year.dropna().unique().astype(int), reverse=True)
+
+with st.sidebar:
+    st.header("Season Filter")
+    selected_year = st.selectbox("Select Season", ["All Time"] + unique_years)
+
+# Apply global filtering logic
+def filter_by_year(df, year):
+    if year == "All Time":
+        return df
+    return df[df['Date'].dt.year == year]
+
+# Filter all dataframes based on selection
+ash_filtered = filter_by_year(ash_df, selected_year)
+cmj_filtered = filter_by_year(cmj_df, selected_year)
+swing_filtered = filter_by_year(swing_df, selected_year)
+throw_filtered = filter_by_year(throw_df, selected_year)
+
+
     with tab_ash:
         d_col_ash = next((c for c in ['Date', 'Test Date', 'date'] if c in ash_df.columns), 'Date')
         p_ash = ash_df[ash_df['Player Name'] == selected].sort_values(d_col_ash)
