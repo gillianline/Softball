@@ -123,30 +123,39 @@ if not df.empty:
             st.plotly_chart(fig_side, use_container_width=True)
 
         with c2:
-            st.subheader("Bilateral Breakdown")
+            st.subheader("Bilateral Profile")
             
-            # Pull raw metrics for the table
+            # Pull metrics
             l_rfd = int(p_latest.get('RFD - 200ms [N/s] (L)', 0))
             r_rfd = int(p_latest.get('RFD - 200ms [N/s] (R)', 0))
             raw_asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
             
-            # Create a clean breakdown for the coach
-            breakdown = pd.DataFrame({
-                "Metric": ["Peak Force", "Avg RFD", "Asymmetry"],
-                "Left": [f"{l_force} N", f"{l_rfd} N/s", ""],
-                "Right": [f"{r_force} N", f"{r_rfd} N/s", ""],
-                "Total/Diff": ["-", "-", f"{raw_asym}%"]
-            })
-            
-            st.table(breakdown)
-            
-            # Contextual Insight
-            if abs(raw_asym) > 10:
-                st.warning(f"Significant Asymmetry Detected: {raw_asym}%")
-            else:
-                st.success(f"Optimal Symmetry Profile")
-                
-            st.info(f"Dominant Side: {'Right (Trail)' if r_force > l_force else 'Left (Lead)'}")
+            # --- CUSTOM L/R BREAKDOWN CARD ---
+            st.markdown(f"""
+                <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <div style="text-align:center; width:45%;">
+                            <p style="color:#4895DB; font-weight:800; margin:0; font-size:12px;">LEFT</p>
+                            <h2 style="margin:0;">{l_force}<span style="font-size:14px;">N</span></h2>
+                            <p style="color:grey; font-size:11px; margin:0;">{l_rfd} N/s RFD</p>
+                        </div>
+                        <div style="border-left:1px solid #E0E0E0; height:50px; margin-top:10px;"></div>
+                        <div style="text-align:center; width:45%;">
+                            <p style="color:#FF8200; font-weight:800; margin:0; font-size:12px;">RIGHT</p>
+                            <h2 style="margin:0;">{r_force}<span style="font-size:14px;">N</span></h2>
+                            <p style="color:grey; font-size:11px; margin:0;">{r_rfd} N/s RFD</p>
+                        </div>
+                    </div>
+                    <div style="text-align:center; border-top:1px solid #E0E0E0; padding-top:10px; margin-top:5px;">
+                        <p style="margin:0; font-size:11px; color:grey; font-weight:700;">TOTAL ASYMMETRY</p>
+                        <h3 style="margin:0; color:{'#dc3545' if abs(raw_asym) > 10 else '#28a745'}">{raw_asym}%</h3>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Dominant Side Indicator
+            st.write("")
+            st.info(f"Dominance: **{'Right' if r_force > l_force else 'Left'}**")
             
         # Trend
         st.subheader(f"Force Trend Timeline ({season_label})")
