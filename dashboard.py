@@ -192,52 +192,72 @@ with tab_ash:
         
     else:
         st.warning("No ASH data found for this selection.")
-# --- TAB 2: CMJ (VOLLEYBALL DUAL-AXIS LOGIC) ---
+# --- TAB 2: CMJ RECOVERY ---
 with tab_cmj:
-    h_col = 'Jump Height (Imp-Mom) [cm]'
-    r_col = 'RSI-modified [m/s]'
+    # 1. Find columns containing 'height' and 'rsi'
+    h_col = next((c for c in cmj_f.columns if 'height' in c.lower()), None)
+    r_col = next((c for c in cmj_f.columns if 'rsi' in c.lower()), None)
 
-    if not cmj_f.empty:
-        # BYPASS DICTIONARY: Prevents Python 3.14 validation crash for dual-axis
-        dual_axis_dict = {
+    # 2. Check if both columns were found
+    if not cmj_f.empty and h_col and r_col:
+        # Construct the chart using the found column names
+        softball_dual_axis = {
             "data": [
                 {
-                    "x": cmj_f['Test Date'].dt.strftime('%Y-%m-%d').tolist(),
+                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
                     "y": cmj_f[h_col].tolist(),
-                    "name": "Jump Height (cm)", "type": "scatter", "mode": "lines+markers",
-                    "line": {"color": "#FF8200", "width": 3}
+                    "name": "Jump Height (cm)", 
+                    "type": "scatter", 
+                    "mode": "lines+markers",
+                    "line": {"color": "#FF8200", "width": 3},
+                    "marker": {"size": 8}
                 },
                 {
-                    "x": cmj_f['Test Date'].dt.strftime('%Y-%m-%d').tolist(),
+                    "x": cmj_f['Parsed_Date'].dt.strftime('%Y-%m-%d').tolist(),
                     "y": cmj_f[r_col].tolist(),
-                    "name": "RSI-mod", "type": "scatter", "mode": "lines+markers",
-                    "yaxis": "y2", "line": {"color": "#4895DB", "width": 2, "dash": "dot"}
+                    "name": "RSI-mod", 
+                    "type": "scatter", 
+                    "mode": "lines+markers",
+                    "yaxis": "y2", 
+                    "line": {"color": "#4895DB", "width": 2, "dash": "dot"},
+                    "marker": {"size": 8}
                 }
             ],
             "layout": {
                 "template": "plotly_white",
                 "height": 450,
                 "legend": {"orientation": "h", "y": 1.15, "x": 0.5, "xanchor": "center"},
-                "xaxis": {"showgrid": False, "title": "Date"},
+                "xaxis": {"showgrid": False, "title": "Session Date"},
                 "yaxis": {
-                    "title": "Jump Height (cm)", "titlefont": {"color": "#FF8200"}, "tickfont": {"color": "#FF8200"},
+                    "title": "Jump Height (cm)", 
+                    "titlefont": {"color": "#FF8200"}, 
+                    "tickfont": {"color": "#FF8200"},
                     "showgrid": True
                 },
                 "yaxis2": {
-                    "title": "RSI-mod", "titlefont": {"color": "#4895DB"}, "tickfont": {"color": "#4895DB"}, 
-                    "overlaying": "y", "side": "right", "showgrid": False
+                    "title": "RSI-mod", 
+                    "titlefont": {"color": "#4895DB"}, 
+                    "tickfont": {"color": "#4895DB"}, 
+                    "overlaying": "y", 
+                    "side": "right", 
+                    "showgrid": False
                 },
                 "margin": {"l": 50, "r": 50, "t": 60, "b": 40}
             }
         }
-        
-        st.plotly_chart(dual_axis_dict, use_container_width=True, theme=None, config=LOCKED_CONFIG)
+
+        st.plotly_chart(softball_dual_axis, use_container_width=True, theme=None, config=LOCKED_CONFIG)
         
         # Session History Table
         st.markdown("#### 📋 Session History")
         st.dataframe(
-            cmj_f[['Test Date', h_col, r_col]].rename(columns={'Test Date': 'Date'}), 
+            cmj_f[['Parsed_Date', h_col, r_col]].rename(columns={'Parsed_Date': 'Date'}), 
             hide_index=True, use_container_width=True
         )
     else:
-        st.info("No CMJ sessions found for this selection.")
+        # If it failed to find columns, this will help you debug
+        st.warning("⚠️ Could not find specific Jump Height or RSI columns.")
+        if not cmj_f.empty:
+            st.write("Columns found in your CMJ sheet:", list(cmj_f.columns))
+        else:
+            st.info("The CMJ dataset for this athlete is currently empty.")
