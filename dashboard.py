@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
@@ -15,9 +16,6 @@ st.markdown("""
     .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
     .stTabs [role="tab"] { font-weight: 800; color: #4895DB; font-size: 18px; }
     .stTabs [aria-selected="true"] { color: #FF8200; border-bottom-color: #FF8200; }
-    .scout-table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 10px;}
-    .scout-table th { background-color: #4895DB; color: white; padding: 8px; border-bottom: 2px solid #FF8200; text-transform: uppercase; font-size: 12px; }
-    .scout-table td { padding: 8px; border-bottom: 1px solid #F5F5F7; font-size: 12px; }
     #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
@@ -34,14 +32,12 @@ def load_data():
         cmj = pd.read_csv(st.secrets["CMJ_URL"])
         roster = pd.read_csv(st.secrets["ROSTER_URL"])
         
-        # Immediate Header and Data Cleaning
         for df in [ash, cmj, roster]:
             df.columns = df.columns.str.strip()
-            # Standardize names to uppercase and strip whitespace
+            # Clean names and dates
             n_col = find_col(df, ['Player Name', 'Athlete', 'Name', 'Player'])
             if n_col:
                 df[n_col] = df[n_col].astype(str).str.strip().str.upper()
-            # Standardize Dates
             d_col = find_col(df, ['Date', 'Test Date', 'date'])
             if d_col:
                 df['Parsed_Date'] = pd.to_datetime(df[d_col], errors='coerce').dt.tz_localize(None)
@@ -54,27 +50,29 @@ def load_data():
 ash_df, cmj_df, roster_df = load_data()
 
 # --- MAIN PAGE FILTERS ---
+st.title("🥎 Performance Hub")
 f1, f2 = st.columns(2)
 
 with f1:
     n_col_main = find_col(ash_df, ['Player Name', 'Athlete', 'Name', 'Player'])
+    # Only show athletes that actually have data
     athlete_list = sorted(ash_df[n_col_main].unique()) if n_col_main else []
     selected = st.selectbox("Search Athlete", athlete_list)
 
 with f2:
-    all_years = sorted(ash_df['Parsed_Date'].dt.year.dropna().unique().astype(int), reverse=True)
-    sel_year = st.selectbox("Select Season", ["All Time"] + all_years)
+    years = sorted(ash_df['Parsed_Date'].dt.year.dropna().unique().astype(int), reverse=True)
+    sel_year = st.selectbox("Select Season", ["All Time"] + years)
 
 # --- GLOBAL FILTERING ---
-def filter_season(df, athlete, year):
+def get_filtered_data(df, athlete, year):
     n_col = find_col(df, ['Player Name', 'Athlete', 'Name', 'Player'])
     temp = df[df[n_col] == athlete].copy()
     if year != "All Time":
         temp = temp[temp['Parsed_Date'].dt.year == year]
-    return temp.sort_values('Parsed_Date')
+    return temp.sort_values('Parsed_Date').dropna(subset=['Parsed_Date'])
 
-ash_f = filter_season(ash_df, selected, sel_year)
-cmj_f = filter_season(cmj_df, selected, sel_year)
+ash_f = get_filtered_data(ash_df, selected, sel_year)
+cmj_f = get_filtered_data(cmj_df, selected, sel_year)
 
 # --- HEADER ---
 r_name = find_col(roster_df, ['Player Name', 'Athlete', 'Name', 'Player'])
@@ -87,7 +85,7 @@ st.markdown(f"""
             <img src="{photo}" class="player-photo">
             <div style="margin-left: 30px;">
                 <h1 style="margin:0;">{selected}</h1>
-                <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">SOFTBALL PERFORMANCE DASHBOARD</p>
+                <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">SOFTBALL PERFORMANCE | {sel_year}</p>
             </div>
         </div>
     </div>
@@ -95,7 +93,7 @@ st.markdown(f"""
 
 tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
 
-# --- TAB 1: ASH PROFILE ---
+# --- TAB 1: ASH ---
 with tab_ash:
     if not ash_f.empty:
         latest = ash_f.iloc[-1]
@@ -103,36 +101,63 @@ with tab_ash:
         m1.metric("Peak Force", f"{int(latest.get('Peak Vertical Force [N]', 0))} N")
         m2.metric("RFD (200ms)", f"{int(latest.get('RFD - 200ms [N/s]', 0))} N/s")
         
-        # Using Streamlit Native Chart (Crash-proof, formatting-proof)
-        chart_data = ash_f.set_index('Parsed_Date')[['Peak Vertical Force [N]']]
-        st.line_chart(chart_data, color="#FF8200")
+        # Plotly Trace - Explicit and Robust
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=ash_f['Parsed_Date'], 
+            y=ash_f['Peak Vertical Force [N]'],
+            mode='lines+markers',
+            line=dict(color='#FF8200', width=4),
+            marker=dict(size=8)
+        ))
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            height=350,
+            template="plotly_white",
+            xaxis=dict(showgrid=False, title="Date"),
+            yaxis=dict(title="Force (N)")
+        )
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("No ASH data found for selection.")
+        st.warning("No ASH data found.")
 
-# --- TAB 2: CMJ RECOVERY ---
+# --- TAB 2: CMJ ---
 with tab_cmj:
     h_col = find_col(cmj_f, ['Jump Height (Imp-Mom) [cm]', 'Jump Height'])
     r_col = find_col(cmj_f, ['RSI-modified [m/s]', 'RSI-modified (Imp-Mom) [m/s]', 'RSI'])
     
     if not cmj_f.empty and h_col and r_col:
-        st.markdown("#### Jump Height & RSI Trends")
+        # Dual-Axis Recovery Plot
+        fig_cmj = go.Figure()
         
-        # Dual axis is what keeps crashing/failing in 3.14. 
-        # For maximum stability, we show them as two synced charts or a combined normalized chart.
-        # Here we use two charts stacked to ensure they ALWAYS render.
+        fig_cmj.add_trace(go.Scatter(
+            x=cmj_f['Parsed_Date'], y=cmj_f[h_col],
+            name="Jump Height (cm)", mode='lines+markers',
+            line=dict(color='#FF8200', width=3)
+        ))
         
-        c_data = cmj_f.set_index('Parsed_Date')[[h_col, r_col]]
+        fig_cmj.add_trace(go.Scatter(
+            x=cmj_f['Parsed_Date'], y=cmj_f[r_col],
+            name="RSI-mod", mode='lines+markers',
+            line=dict(color='#4895DB', width=2, dash='dot'),
+            yaxis="y2"
+        ))
         
-        st.write("Jump Height (cm)")
-        st.line_chart(c_data[[h_col]], color="#FF8200")
+        fig_cmj.update_layout(
+            height=400,
+            template="plotly_white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            yaxis=dict(title="Height (cm)", titlefont=dict(color="#FF8200"), tickfont=dict(color="#FF8200")),
+            yaxis2=dict(title="RSI", titlefont=dict(color="#4895DB"), tickfont=dict(color="#4895DB"), anchor="x", overlaying="y", side="right"),
+            margin=dict(l=50, r=50, t=50, b=20)
+        )
         
-        st.write("RSI Modified")
-        st.line_chart(c_data[[r_col]], color="#4895DB")
+        st.plotly_chart(fig_cmj, use_container_width=True)
         
-        # History Table
-        st.markdown("#### History Table")
-        table_df = cmj_f[['Parsed_Date', h_col, r_col]].copy()
-        table_df['Date'] = table_df['Parsed_Date'].dt.strftime('%m/%d/%Y')
-        st.dataframe(table_df[['Date', h_col, r_col]], use_container_width=True, hide_index=True)
+        # History List
+        st.markdown("#### Season Sessions")
+        history = cmj_f[['Parsed_Date', h_col, r_col]].copy()
+        history['Display Date'] = history['Parsed_Date'].dt.strftime('%m/%d/%Y')
+        st.dataframe(history[['Display Date', h_col, r_col]], use_container_width=True, hide_index=True)
     else:
-        st.warning("No CMJ data found for selection.")
+        st.warning("No CMJ data found.")
