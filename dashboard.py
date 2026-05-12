@@ -157,25 +157,41 @@ st.markdown(f"""
 # This creates the navigation for your dashboard
 tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
 
-# --- TAB 1: ASH ---
+# --- TAB 1: ASH TEST ---
 with tab_ash:
     if not ash_f.empty:
+        # 1. Display Metrics
         latest = ash_f.iloc[-1]
-        m1, m2, m3 = st.columns(3)
+        m1, m2 = st.columns(2)
+        
+        # Use .get() to avoid KeyErrors if a metric is missing
         m1.metric("Peak Force", f"{int(latest.get('Peak Vertical Force [N]', 0))} N")
         m2.metric("RFD (200ms)", f"{int(latest.get('RFD - 200ms [N/s]', 0))} N/s")
-        m3.metric("Time to Peak", f"{latest.get('Start Time to Peak Force [s]', 0)}s")
         
-        # Single Axis Chart
+        # 2. ASH Trend Chart
+        # We use 'Parsed_Date' because the robust_clean function created it
         fig_ash = go.Figure(data=[
-            go.Scatter(x=ash_f['Date'], y=ash_f['Peak Vertical Force [N]'], 
-                       mode='lines+markers', line=dict(color="#FF8200", width=3))
+            go.Scatter(
+                x=ash_f['Parsed_Date'], 
+                y=ash_f['Peak Vertical Force [N]'], 
+                mode='lines+markers', 
+                line=dict(color="#FF8200", width=3),
+                marker=dict(size=8)
+            )
         ])
-        fig_ash.update_layout(template="plotly_white", margin=dict(t=20, b=20, l=20, r=20), height=350)
+        
+        fig_ash.update_layout(
+            template="plotly_white",
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=350,
+            xaxis=dict(title="Session Date", showgrid=False),
+            yaxis=dict(title="Force (N)", showgrid=True)
+        )
+        
         st.plotly_chart(fig_ash, use_container_width=True, config=LOCKED_CONFIG)
+        
     else:
-        st.warning("No ASH data found.")
-
+        st.warning("No ASH data found for this selection.")
 # --- TAB 2: CMJ (VOLLEYBALL DUAL-AXIS LOGIC) ---
 with tab_cmj:
     h_col = 'Jump Height (Imp-Mom) [cm]'
