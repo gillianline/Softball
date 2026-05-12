@@ -175,26 +175,80 @@ if not ash_df.empty:
     with tab_cmj:
         if not cmj_filt.empty:
             c_lat = cmj_filt.iloc[-1]
-            b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
-            b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
-
-            cm1, cm2, cm3 = st.columns(3)
-            quick_metric(cm1, "Best Jump Height", b_h, c_lat['Jump Height (Imp-Mom) [cm]'], " cm")
             
-            # RSI Logic with 2 Decimals
-            rsi_curr = c_lat['RSI-modified (Imp-Mom) [m/s]']
-            rsi_diff = ((rsi_curr - b_rsi) / b_rsi * 100) if b_rsi != 0 else 0
-            rsi_col = "red-text" if rsi_diff < -10 else "green-text"
-            cm2.metric("Best RSI-m", f"{b_rsi:.2f}")
-            cm2.markdown(f'<p class="metric-sub {rsi_col}">Latest: {rsi_curr:.2f} ({rsi_diff:+.1f}%)</p>', unsafe_allow_html=True)
+            # 1. READINESS LOGIC
+            # We compare current Jump Height to their rolling average to determine "Freshness"
+            avg_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].mean()
+            curr_h = c_lat['Jump Height (Imp-Mom) [cm]']
+            readiness_score = ((curr_h - avg_h) / avg_h) * 100
             
-            cm3.metric("Current Weight", f"{c_lat.get('BW [KG]', 0):.1f}kg")
+            # Status determination
+            if readiness_score < -10:
+                status, status_col = "🔴 FATIGUED", "#dc3545"
+            elif readiness_score < -5:
+                status, status_col = "🟡 MONITOR", "#FF8200"
+            else:
+                status, status_col = "🟢 READY", "#28a745"
 
+            # 2. TOP LEVEL STATUS
+            st.markdown(f"""
+                <div style="background-color:{status_col}22; padding:15px; border-radius:10px; border:2px solid {status_col}; text-align:center;">
+                    <h2 style="margin:0; color:{status_col};">{status}</h2>
+                    <p style="margin:0; color:grey; font-weight:700;">{readiness_score:+.1f}% vs. Season Average</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
             st.write("")
-            fig_cmj = px.line(cmj_filt, x='Date', y='Jump Height (Imp-Mom) [cm]', markers=True,
-                             template="plotly_white", color_discrete_sequence=["#4895DB"])
-            fig_cmj.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=12, title="")
-            fig_cmj.update_layout(height=400, yaxis_title="Jump Height (cm)", margin=dict(t=10, b=10, l=10, r=10))
-            st.plotly_chart(fig_cmj, use_container_width=True)
+
+            # 3. THE "WHY" METRICS (Efficiency vs. Power)
+            cm1, cm2, cm3 = st.columns(3)
+            
+            # Explosive Strategy (RSI-m)
+            rsi_val = c_lat['RSI-modified (Imp-Mom) [m/s]']
+            cm1.metric("Explosive Efficiency (RSI-m)", f"{rsi_val:.2f}")
+            cm1.caption("How fast they move relative to how high they jump.")
+
+            # Raw Output (Peak Power)
+            p_power = int(c_lat.get('Peak Power [W]', 0))
+            cm2.metric("Raw Power Output", f"{p_power} W")
+            cm2.caption("The total 'engine' output during the jump.")
+
+            # Strategy (Takeoff Velocity)
+            v_velo = c_lat.get('Vertical Velocity at Takeoff [m/s]', 0)
+            cm3.metric("Takeoff Velocity", f"{v_velo:.2f} m/s")
+            cm3.caption("Speed at the moment of leaving the ground.")
+
+            st.divider()
+
+            # 4. VISUAL STORY: STRETCH-SHORTENING CYCLE
+            st.subheader("Jump Strategy: Strategy vs. Output")
+            
+            # Creating a scatter plot to see where they sit today vs history
+            fig_strategy = px.scatter(
+                cmj_filt, 
+                x='RSI-modified (Imp-Mom) [m/s]', 
+                y='Jump Height (Imp-Mom) [cm]',
+                color_discrete_sequence=["#BDBDBD"],
+                template="plotly_white",
+                title="Efficiency (RSI) vs. Performance (Height)"
+            )
+            # Highlight the LATEST point in Orange
+            fig_strategy.add_scatter(
+                x=[rsi_val], y=[curr_h], 
+                mode='markers', 
+                marker=dict(size=15, color='#FF8200', line=dict(width=2, color='Black')),
+                name="Latest Test"
+            )
+            
+            fig_strategy.update_layout(showlegend=False, height=400)
+            st.plotly_chart(fig_strategy, use_container_width=True)
+            
+            st.info("""
+                **Coach's Note:** 
+                - **Top Right:** Peak Performance (High Power + High Efficiency).
+                - **Bottom Right:** Speed Dominant (Fast but shallow jump).
+                - **Top Left:** Force Dominant (High jump but slow movement).
+            """)
+            
         else:
-            st.info("No CMJ records found.")
+            st.info("No CMJ records found for this selection.")
