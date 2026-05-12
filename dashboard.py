@@ -115,8 +115,21 @@ ash_f = filter_data_robust(ash_df, selected, sel_year)
 cmj_f = filter_data_robust(cmj_df, selected, sel_year)
 
 # --- HEADER ---
-pic_row = roster_df[roster_df['Player Name'] == selected]
-photo = pic_row['Picture'].values[0] if not pic_row.empty else "https://www.w3schools.com/howto/img_avatar.png"
+# 1. Find the name column in the roster dynamically
+r_name_col = next((c for c in ['Player Name', 'Athlete', 'Name', 'Player'] if c in roster_df.columns), None)
+
+if r_name_col:
+    # 2. Filter roster for the selected athlete
+    pic_row = roster_df[roster_df[r_name_col] == selected]
+    
+    # 3. Handle the photo URL safely
+    if not pic_row.empty and 'Picture' in pic_row.columns:
+        photo = pic_row['Picture'].values[0]
+    else:
+        photo = "https://www.w3schools.com/howto/img_avatar.png" # Default avatar
+else:
+    # If no name column is found at all in the roster
+    photo = "https://www.w3schools.com/howto/img_avatar.png"
 
 st.markdown(f"""
     <div class="athlete-header">
@@ -129,8 +142,6 @@ st.markdown(f"""
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-tab_ash, tab_cmj = st.tabs(["⚡ ASH TEST", "🚀 CMJ RECOVERY"])
 
 # --- TAB 1: ASH ---
 with tab_ash:
