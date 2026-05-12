@@ -223,64 +223,92 @@ if not ash_df.empty:
             # 1. IDENTIFY LATEST VS BEST FOR SELECTED YEAR
             c_lat = cmj_filt.iloc[-1]
             
-            # Season Bests for the selected range
-            b_h = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
-            b_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
-            b_pow = cmj_filt['Peak Power [W]'].max()
-
-            # Current Values
-            curr_h = c_lat['Jump Height (Imp-Mom) [cm]']
-            curr_rsi = c_lat['RSI-modified (Imp-Mom) [m/s]']
-            curr_pow = c_lat.get('Peak Power [W]', 0)
-
-            # 2. THE COMPARISON ROW
-            # Highlights the Season Best and compares the Latest directly
-            m1, m2, m3 = st.columns(3)
+            # Season Bests/Baselines for the selected metrics
+            metrics_list = [
+                'Jump Height (Imp-Mom) [cm]',
+                'Peak Power [W]',
+                'Force at Zero Velocity [N]',
+                'Eccentric Braking RFD [N/s]',
+                'RSI-modified (Imp-Mom) [m/s]',
+                'Concentric Peak Velocity [m/s]'
+            ]
             
-            with m1:
-                h_diff = ((curr_h - b_h) / b_h * 100) if b_h != 0 else 0
-                st.metric(f"{label} Best Height", f"{b_h:.1f} cm", delta=f"{h_diff:+.1f}%")
-                st.markdown(f'<p style="color:grey; font-weight:700; font-size:14px; margin-top:-15px;">Latest: {curr_h:.1f} cm</p>', unsafe_allow_html=True)
+            # Ensure all target columns are numeric
+            for m in metrics_list:
+                cmj_filt[m] = pd.to_numeric(cmj_filt[m], errors='coerce').fillna(0)
 
-            with m2:
-                rsi_diff = ((curr_rsi - b_rsi) / b_rsi * 100) if b_rsi != 0 else 0
-                st.metric(f"{label} Best RSI-m", f"{b_rsi:.2f}", delta=f"{rsi_diff:+.1f}%")
-                st.markdown(f'<p style="color:grey; font-weight:700; font-size:14px; margin-top:-15px;">Latest: {curr_rsi:.2f}</p>', unsafe_allow_html=True)
+            # 2. TOP METRIC GRID (6 Metrics)
+            st.subheader(f"CMJ Performance Summary: {label}")
+            m_row1 = st.columns(3)
+            m_row2 = st.columns(3)
+            
+            # Helper to display CMJ metrics consistently
+            def cmj_metric(col, label_text, col_name, unit, precision=".1f"):
+                best_val = cmj_filt[col_name].max()
+                curr_val = c_lat[col_name]
+                diff = ((curr_val - best_val) / best_val * 100) if best_val != 0 else 0
+                
+                col.metric(label_text, f"{best_val:{precision}}{unit}")
+                color = "red-text" if diff < -10 else "green-text"
+                col.markdown(f'<p class="metric-sub {color}">Latest: {curr_val:{precision}}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
 
-            with m3:
-                pow_diff = ((curr_pow - b_pow) / b_pow * 100) if b_pow != 0 else 0
-                st.metric(f"{label} Best Power", f"{int(b_pow)} W", delta=f"{pow_diff:+.1f}%")
-                st.markdown(f'<p style="color:grey; font-weight:700; font-size:14px; margin-top:-15px;">Latest: {int(curr_pow)} W</p>', unsafe_allow_html=True)
+            # Row 1
+            cmj_metric(m_row1[0], "Best Jump Height", 'Jump Height (Imp-Mom) [cm]', " cm")
+            cmj_metric(m_row1[1], "Best Peak Power", 'Peak Power [W]', " W", precision=".0f")
+            cmj_metric(m_row1[2], "Best RSI-m", 'RSI-modified (Imp-Mom) [m/s]', "")
+
+            # Row 2
+            cmj_metric(m_row2[0], "Force @ Zero Velocity", 'Force at Zero Velocity [N]', " N", precision=".0f")
+            cmj_metric(m_row2[1], "Ecc. Braking RFD", 'Eccentric Braking RFD [N/s]', " N/s", precision=".0f")
+            cmj_metric(m_row2[2], "Conc. Peak Velocity", 'Concentric Peak Velocity [m/s]', " m/s", precision=".2f")
 
             st.divider()
 
-            # 3. PERFORMANCE TREND (CLEANED UP)
-            st.subheader(f"Jump Height History")
+            # 3. MULTI-METRIC TREND GRAPH
+            st.subheader("Performance Trends")
+            
+            # Select which metric to view on the graph
+            graph_metric = st.selectbox("Select Metric to View Trend", metrics_list)
             
             fig_cmj = px.line(
                 cmj_filt, 
                 x='Date', 
-                y='Jump Height (Imp-Mom) [cm]', 
+                y=graph_metric, 
                 markers=True, 
                 template="plotly_white", 
-                color_discrete_sequence=["#4895DB"]
-            )
-            
-            # Formatting to handle the "All Time" timeline correctly
-            fig_cmj.update_xaxes(
-                tickformat="%b %d, %y", 
-                tickangle=-45, 
-                nticks=10,
-                title=""
+                color_discrete_sequence=["#FF8200"]
             )
             
             fig_cmj.update_layout(
-                height=400, 
-                yaxis_title="Jump Height (cm)",
+                height=450,
+                yaxis_title=graph_metric,
+                xaxis_title="",
                 margin=dict(t=10, b=10, l=10, r=10)
             )
             
             st.plotly_chart(fig_cmj, use_container_width=True)
+
+            # 4. DETAILED CMJ HISTORY TABLE
+            st.subheader("CMJ Test Log")
+            cmj_display = cmj_filt[['Date'] + metrics_list].copy()
+            
+            # Calculate Season Averages for Baselines
+            baselines = {m: cmj_filt[m].mean() for m in metrics_list}
+            
+            # Format Date
+            cmj_display['Date'] = cmj_display['Date'].dt.strftime('%m/%d/%Y')
+            
+            st.table(
+                cmj_display.sort_values('Date', ascending=False)
+                .style.format({
+                    'Jump Height (Imp-Mom) [cm]': '{:.1f}cm',
+                    'Peak Power [W]': '{:.0f}W',
+                    'Force at Zero Velocity [N]': '{:.0f}N',
+                    'Eccentric Braking RFD [N/s]': '{:.0f}N/s',
+                    'RSI-modified (Imp-Mom) [m/s]': '{:.2f}',
+                    'Concentric Peak Velocity [m/s]': '{:.2f}m/s'
+                })
+            )
 
         else:
             st.info(f"No CMJ records found for {selected} in {selected_year}.")
