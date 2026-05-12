@@ -107,7 +107,8 @@ if not ash_df.empty:
 
     with tab_ash:
         if not ash_filt.empty:
-            # 1. MANUAL ASYMMETRY CALCULATION (Global for the tab)
+            # 1. MANUAL ASYMMETRY CALCULATION
+            # Pulling raw values to calculate manually and bypass potential sheet errors
             l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
             r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
             
@@ -146,7 +147,7 @@ if not ash_df.empty:
 
             st.divider()
             
-            # 4. BILATERAL PROFILE & BALANCE DETAILS
+            # 4. BILATERAL PROFILE (Left vs Right Distribution)
             c1, c2 = st.columns([2, 1])
             with c1:
                 st.subheader("Left vs Right Force Profile")
@@ -181,7 +182,27 @@ if not ash_df.empty:
 
             st.divider()
 
-            # 5. MATCH CONTEXT LOOKUP & TABLE
+            # 5. PEAK FORCE LINE GRAPH (Side-by-Side History)
+            st.subheader("Peak Force History: Left vs Right")
+            hist_plot = ash_filt.copy()
+            hist_plot['Left'] = pd.to_numeric(hist_plot['Peak Vertical Force [N] (L)'], errors='coerce').fillna(0)
+            hist_plot['Right'] = pd.to_numeric(hist_plot['Peak Vertical Force [N] (R)'], errors='coerce').fillna(0)
+            
+            fig_trend = px.line(
+                hist_plot, 
+                x='Date', 
+                y=['Left', 'Right'],
+                labels={'value': 'Force (N)', 'variable': 'Side'},
+                markers=True,
+                color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
+                template="plotly_white"
+            )
+            fig_trend.update_layout(height=400, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_trend, use_container_width=True)
+
+            st.divider()
+
+            # 6. MATCH CONTEXT LOOKUP & TABLE
             st.subheader("ASH History & Match Context")
             match_map = {}
             try:
