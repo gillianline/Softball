@@ -58,29 +58,24 @@ def load_all_data():
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
         cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
+        # ADD THESE TWO LINES:
+        swing_df = pd.read_csv(st.secrets["SWING_URL"])
+        throw_df = pd.read_csv(st.secrets["THROW_URL"])
         
-        for df in [ash_df, cmj_df, roster_df]:
+        for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
             df.columns = df.columns.str.strip()
             if 'Date' in df.columns:
                 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-
-        ash_metrics = ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']
-        cmj_metrics = ['Jump Height (Imp-Mom) [cm]', 'RSI-modified (Imp-Mom) [m/s]', 'Peak Power [W]']
         
-        for df, metrics in [(ash_df, ash_metrics), (cmj_df, cmj_metrics)]:
-            for col in df.columns:
-                if any(m in col for m in metrics) or 'Asym' in col:
-                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+        # ... (keep your existing merge logic for pictures) ...
         
-        ash_df = ash_df.merge(roster_df[['Player Name', 'Picture']], on='Player Name', how='left')
-        cmj_df = cmj_df.merge(roster_df[['Player Name', 'Picture']], on='Player Name', how='left')
-        
-        return ash_df, cmj_df
+        return ash_df, cmj_df, swing_df, throw_df # RETURN ALL FOUR
     except Exception as e:
         st.error(f"Data Sync Error: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-ash_df, cmj_df = load_all_data()
+# Update the assignment line to match:
+ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
 # --- 5. DASHBOARD UI ---
 def quick_metric(col, label, best, current, unit):
