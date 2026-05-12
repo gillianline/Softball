@@ -203,28 +203,40 @@ if not ash_df.empty:
                 'Peak Vertical Force [N] (Asym)(%)'
             ]].copy()
 
-            # --- THE FIX: Use .str.strip() instead of .strip() ---
-            for col in ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']:
-                ash_history[col] = pd.to_numeric(ash_history[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
+            # --- GENTLE NUMERIC CLEANING ---
+            # Instead of regex, we just convert and let 'coerce' handle the rest
+            cols_to_fix = [
+                'Peak Vertical Force [N]', 
+                'RFD - 200ms [N/s]', 
+                'Start Time to Peak Force [s]', 
+                'Peak Vertical Force [N] (Asym)(%)'
+            ]
             
-            # Use .str.replace and .str.strip correctly here:
-            asym_col_name = 'Peak Vertical Force [N] (Asym)(%)'
-            ash_history[asym_col_name] = pd.to_numeric(
-                ash_history[asym_col_name].astype(str).str.replace('%', '').str.strip(), 
-                errors='coerce'
-            ).fillna(0)
+            for col in cols_to_fix:
+                # Convert to string, remove %, then to numeric
+                ash_history[col] = pd.to_numeric(
+                    ash_history[col].astype(str).str.replace('%', '').str.strip(), 
+                    errors='coerce'
+                )
 
-            # Compare ASH date to the Master Game Date list
+            # --- GAME LOOKUP ---
+            # Check if any games exist at all to debug the dashes
+            if not game_dates:
+                st.caption("⚠️ No game dates found in Swing/Throw sheets for this athlete.")
+
             ash_history['Game?'] = ash_history['Date'].dt.date.apply(
                 lambda x: "✔️ Yes" if x in game_dates else "—"
             )
             
-            # Final Formatting
+            # Final Formatting for display
             ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%y')
+            
+            # Rename columns for the UI
             ash_history.columns = ['Date', 'Force (N)', 'RFD (N/s)', 'Time (s)', 'Asym %', 'Game?']
 
+            # Display with style
             st.table(ash_history.sort_values('Date', ascending=False).style.format({
-                'Force (N)': '{:.0f}',
+                'Force (N)': '{:.1f}', # Changed to .1f to see if data is actually there
                 'RFD (N/s)': '{:.0f}',
                 'Time (s)': '{:.3f}',
                 'Asym %': '{:.1f}%'
