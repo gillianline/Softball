@@ -113,7 +113,8 @@ if not ash_df.empty:
         h_col = next((c for c in ['Jump Height (Imp-Mom) [cm]', 'Jump Height'] if c in c_sync.columns), 'Jump Height')
         r_col = next((c for c in ['RSI-modified [m/s]', 'RSI-modified (Imp-Mom) [m/s]', 'RSI'] if c in c_sync.columns), 'RSI')
         
-        # 2. Force Filter and Type Conversion (Crucial for Altair)
+        # 2. Data Preparation for Altair (Python 3.14 Crash-Proof)
+        # We use 'chart_df' consistently here to prevent NameErrors
         chart_df = c_sync[c_sync['Player Name'] == selected].copy()
         chart_df[d_col_cmj] = pd.to_datetime(chart_df[d_col_cmj])
         chart_df[h_col] = pd.to_numeric(chart_df[h_col], errors='coerce')
@@ -129,26 +130,26 @@ if not ash_df.empty:
             )
 
             # Left Axis: Jump Height (Orange)
-            line_h = base.mark_line(color='#FF8200', strokeWidth=3).encode(
+            line_h = base.mark_line(color='#FF8200', size=3).encode(
                 y=alt.Y(f'{h_col}:Q', 
                         axis=alt.Axis(title='Jump Height (cm)', titleColor='#FF8200', labelColor='#FF8200'),
                         scale=alt.Scale(zero=False))
             )
-            points_h = base.mark_point(color='#FF8200', filled=True, size=50).encode(
+            points_h = base.mark_point(color='#FF8200', filled=True, size=60).encode(
                 y=alt.Y(f'{h_col}:Q')
             )
 
             # Right Axis: RSI (Blue)
-            line_r = base.mark_line(color='#4895DB', strokeDash=[5,5], strokeWidth=2).encode(
+            line_r = base.mark_line(color='#4895DB', strokeDash=[5,5], size=2).encode(
                 y=alt.Y(f'{r_col}:Q', 
                         axis=alt.Axis(title='RSI-mod', titleColor='#4895DB', labelColor='#4895DB'),
                         scale=alt.Scale(zero=False))
             )
-            points_r = base.mark_point(color='#4895DB', size=50).encode(
+            points_r = base.mark_point(color='#4895DB', size=60).encode(
                 y=alt.Y(f'{r_col}:Q')
             )
 
-            # Combine and Force Rendering
+            # Layering and Independent Scales
             final_chart = alt.layer(
                 (line_h + points_h), 
                 (line_r + points_r)
@@ -156,37 +157,52 @@ if not ash_df.empty:
                 y='independent'
             ).properties(
                 width='container',
-                height=400,
-                title=f"Performance Trend: {selected}"
-            ).configure_view(
-                strokeOpacity=0
+                height=400
+            ).configure_axis(
+                grid=False
             )
 
             st.altair_chart(final_chart, use_container_width=True)
-            
-            # --- BASELINE & TABLE ---
-            base_val = float(chart_df.iloc[0][h_col])
-            st.markdown(f"**Baseline Jump Height:** {base_val:.1f} cm (Red line logic bypassed for stability)")
-            
 
-            # --- TABLE LOGIC ---
-            st.markdown("#### Jump History")
-            base_val = float(ath_cmj_data.iloc[0][h_col])
+            # 3. Table Logic (Synchronized Variable Names)
+            st.markdown("#### Jump History & Match Context")
+            
+            # Use chart_df here to fix the NameError
+            base_val = float(chart_df.iloc[0][h_col])
+            
+            # Combine skills sheets for game searching (Assumes swing_df and throw_df are loaded)
             combined_skills = pd.concat([swing_df, throw_df], ignore_index=True)
+            combined_skills['Date'] = pd.to_datetime(combined_skills['Date'], errors='coerce')
+            
             comp_list = []
-            for _, row in ath_cmj_data.iloc[1:].iterrows():
+            # Loop through all but the first entry (the baseline)
+            for _, row in chart_df.iloc[1:].iterrows():
                 j_date = pd.to_datetime(row[d_col_cmj])
                 try:
-                    prev_m = combined_skills[(combined_skills['Player Name'] == selected) & (pd.to_datetime(combined_skills['Date']) < j_date) & (combined_skills['Session Type'].str.contains('Game|Match', case=False, na=False))]
+                    prev_m = combined_skills[
+                        (combined_skills['Player Name'] == selected) & 
+                        (combined_skills['Date'] < j_date) & 
+                        (combined_skills['Session Type'].str.contains('Game|Match', case=False, na=False))
+                    ]
                     pm_row = prev_m.sort_values('Date', ascending=False).iloc[0]
-                    m_info = f"{pm_row['Session Type']} ({pd.to_datetime(pm_row['Date']).strftime('%m/%d')})"
-                except: m_info = "N/A"
+                    m_info = f"{pm_row['Session Type']} ({pm_row['Date'].strftime('%m/%d')})"
+                except:
+                    m_info = "N/A"
                 
                 diff = float(row[h_col]) - base_val
-                comp_list.append({"Date": j_date.strftime('%m/%d/%Y'), "Match": m_info, "Height": f"{row[h_col]:.1f} cm", "Diff": diff, "RSI": f"{row[r_col]:.2f}"})
+                comp_list.append({
+                    "Date": j_date.strftime('%m/%d/%Y'), 
+                    "Match": m_info, 
+                    "Height": f"{row[h_col]:.1f} cm", 
+                    "Diff": diff, 
+                    "RSI": f"{row[r_col]:.2f}"
+                })
 
+            # Render styled HTML Table
             html = """<table class="scout-table"><tr><th>Date</th><th>Prev Match</th><th>Height</th><th>Vs Baseline</th><th>RSI</th></tr>"""
             for i in comp_list:
                 clr = "#28a745" if i['Diff'] >= 0 else "#dc3545"
                 html += f"<tr><td>{i['Date']}</td><td>{i['Match']}</td><td>{i['Height']}</td><td style='color:{clr}; font-weight:bold;'>{i['Diff']:+.1f} cm</td><td>{i['RSI']}</td></tr>"
             st.markdown(html + "</table>", unsafe_allow_html=True)
+        else:
+            st.warning(f"No CMJ data found for {selected}.")
