@@ -122,62 +122,78 @@ if not ash_df.empty:
 
     with tab_ash:
         if not ash_filt.empty:
-            best_f, best_r = ash_filt['Peak Vertical Force [N]'].max(), ash_filt['RFD - 200ms [N/s]'].max()
-            best_t = ash_filt['Start Time to Peak Force [s]'].min()
+            # 1. CALCULATE BASELINES (Season Averages)
+            base_f = ash_filt['Peak Vertical Force [N]'].mean()
+            base_r = ash_filt['RFD - 200ms [N/s]'].mean()
 
-            def colored_metric(label, best_val, current_val, unit, is_time=False):
-                diff = ((current_val - best_val) / best_val * 100) if best_val != 0 else 0
-                is_bad = diff > 10 if is_time else diff < -10
-                color = "red-text" if is_bad else "green-text"
-                st.metric(label, f"{int(best_val) if not is_time else best_val}{unit}")
-                st.markdown(f'<p class="metric-sub {color}">Latest: {current_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
+            # 2. MATCH CONTEXT LOOKUP
+            # This creates a dictionary of Dates -> Match Names from Throw/Swing data
+            match_map = {}
+            try:
+                # Combine Swing and Throw data to find Game entries
+                all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
+                # Filter for this athlete and anything labeled 'Game'
+                athlete_games = all_sessions[
+                    (all_sessions['Player Name'] == selected) & 
+                    (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
+                ]
+                
+                # Create a map of the Date to the Game Name (assuming a 'Notes' or 'Opponent' column exists)
+                # If you don't have an Opponent column, it will just say 'Game'
+                for _, row in athlete_games.iterrows():
+                    d = row['Date'].date()
+                    label = row.get('Opponent', 'Match') # Change 'Opponent' to your actual column name
+                    match_map[d] = f"{label} ({row['Date'].strftime('%m/%d')})"
+            except:
+                pass
 
-            m1, m2, m3, m4 = st.columns(4)
-            with m1: colored_metric(f"{label} Best Force", best_f, latest_ash['Peak Vertical Force [N]'], " N")
-            with m2: colored_metric(f"{label} Best RFD", best_r, latest_ash['RFD - 200ms [N/s]'], " N/s")
-            with m3: st.metric("Latest Asymmetry", f"{latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)}%")
-            with m4: colored_metric(f"{label} Best Time", best_t, latest_ash['Start Time to Peak Force [s]'], "s", is_time=True)
+            # 3. BUILD THE ASH HISTORY & CONTEXT TABLE
+            ash_history = ash_filt[[
+                'Date', 
+                'Peak Vertical Force [N]', 
+                'RFD - 200ms [N/s]', 
+                'Start Time to Peak Force [s]'
+            ]].copy()
 
-            st.divider()
+            # Helper to find the most recent game before the test date
+            def get_prev_match(test_date):
+                test_date = test_date.date()
+                past_matches = [d for d in match_map.keys() if d < test_date]
+                if not past_matches:
+                    return "N/A"
+                latest_match_date = max(past_matches)
+                return match_map[latest_match_date]
+
+            ash_history['Previous Match'] = ash_history['Date'].apply(get_prev_match)
             
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.subheader("Left vs Right Force Profile")
-                l_f, r_f = latest_ash.get('Peak Vertical Force [N] (L)', 0), latest_ash.get('Peak Vertical Force [N] (R)', 0)
-                side_df = pd.DataFrame({'Side': ['Left (Lead)', 'Right (Trail)'], 'Force [N]': [l_f, r_f]})
-                fig = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]', color='Side', 
-                             color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'}, template="plotly_white")
-                st.plotly_chart(fig, use_container_width=True)
-            with c2:
-                st.subheader("Bilateral Profile")
-                l_rfd = int(latest_ash.get('RFD - 200ms [N/s] (L)', 0))
-                r_rfd = int(latest_ash.get('RFD - 200ms [N/s] (R)', 0))
-                
-                # --- SAFE ASYM CALCULATION ---
-                raw_val = latest_ash.get('Peak Vertical Force [N] (Asym)(%)', 0)
-                try:
-                    # Strip % and convert to float so abs() works
-                    clean_asym = float(str(raw_val).replace('%', '').strip())
-                except:
-                    clean_asym = 0.0
-                
-                asym_color = '#dc3545' if abs(clean_asym) > 10 else '#28a745'
+            # Calculate Variance from Baseline
+            ash_history['Vs. Baseline'] = ash_history['Peak Vertical Force [N]'] - base_f
+            
+            # Formatting for the UI
+            ash_history['Date'] = ash_history['Date'].dt.strftime('%m/%d/%Y')
+            
+            # Reorder and Rename to match your Volleyball style
+            ash_history = ash_history[[
+                'Date', 'Previous Match', 'Peak Vertical Force [N]', 'Vs. Baseline', 'RFD - 200ms [N/s]'
+            ]]
+            ash_history.columns = ['Test Date', 'Previous Match', 'Peak Force', 'Vs. Baseline', 'RFD']
 
-                st.markdown(f"""
-                    <div style="background-color:#F8F9FA; padding:15px; border-radius:10px; border:1px solid #E0E0E0;">
-                        <div style="display:flex; justify-content:space-between;">
-                            <div style="text-align:center; width:45%;"><p style="color:#4895DB; font-weight:800; margin:0; font-size:12px;">LEFT</p><h2 style="margin:0;">{l_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{l_rfd} RFD</p></div>
-                            <div style="text-align:center; width:45%;"><p style="color:#FF8200; font-weight:800; margin:0; font-size:12px;">RIGHT</p><h2 style="margin:0;">{r_f}<span style="font-size:14px;">N</span></h2><p style="color:grey; font-size:11px; margin:0;">{r_rfd} RFD</p></div>
-                        </div>
-                        <div style="text-align:center; border-top:1px solid #E0E0E0; padding-top:10px; margin-top:10px;">
-                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">ASYMMETRY</p>
-                            <h3 style="margin:0; color:{asym_color}">{clean_asym:.1f}%</h3>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                st.info(f"Dominance: **{'Right' if r_f > l_f else 'Left'}**")
+            st.subheader("ASH History & Match Context")
+            
+            # Apply color to the 'Vs. Baseline' column
+            def color_variance(val):
+                color = 'green' if val > 0 else 'red'
+                return f'color: {color}; font-weight: bold'
 
+            st.table(ash_history.sort_values('Test Date', ascending=False).style.format({
+                'Peak Force': '{:.0f} N',
+                'Vs. Baseline': '{:+.1f} N',
+                'RFD': '{:.0f} N/s'
+            }).applymap(color_variance, subset=['Vs. Baseline']))
 
+        else:
+            st.info("No ASH data found to build history table.")
+            
             
             
     with tab_cmj:
