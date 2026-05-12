@@ -108,70 +108,80 @@ if not ash_df.empty:
         st.markdown("### CMJ Baseline vs. Post-Match Recovery")
         c_sync = cmj_df.rename(columns={'Athlete': 'Player Name'}) if 'Athlete' in cmj_df.columns else cmj_df.copy()
         
-        # 1. Detection
+        # 1. Detect Columns
         d_col_cmj = next((c for c in ['Test Date', 'Date', 'date'] if c in c_sync.columns), 'Date')
         h_col = next((c for c in ['Jump Height (Imp-Mom) [cm]', 'Jump Height'] if c in c_sync.columns), 'Jump Height')
         r_col = next((c for c in ['RSI-modified [m/s]', 'RSI-modified (Imp-Mom) [m/s]', 'RSI'] if c in c_sync.columns), 'RSI')
         
-        # 2. Preparation: Force numeric and remove Timezones (Fixes "No Lines")
+        # 2. Clean & Prepare Data
         chart_df = c_sync[c_sync['Player Name'] == selected].copy()
         chart_df[d_col_cmj] = pd.to_datetime(chart_df[d_col_cmj], errors='coerce').dt.tz_localize(None)
         chart_df[h_col] = pd.to_numeric(chart_df[h_col], errors='coerce')
         chart_df[r_col] = pd.to_numeric(chart_df[r_col], errors='coerce')
-        
-        # Remove empty rows and sort
         chart_df = chart_df.dropna(subset=[d_col_cmj, h_col, r_col]).sort_values(d_col_cmj)
         
         if not chart_df.empty:
             import altair as alt
 
-            # Shared X-Axis (Ensure it is treated as a continuous temporal scale)
+            # --- DUAL AXIS GRAPH ---
             base = alt.Chart(chart_df).encode(
                 alt.X(f'{d_col_cmj}:T', axis=alt.Axis(title='Date', format='%m/%d'))
             )
 
-            # Left Axis: Jump Height (Orange)
-            # mark_line(interpolate='linear') ensures the points connect
             line_h = base.mark_line(color='#FF8200', size=3, interpolate='linear').encode(
-                y=alt.Y(f'{h_col}:Q', 
-                        title='Jump Height (cm)',
-                        scale=alt.Scale(zero=False))
+                y=alt.Y(f'{h_col}:Q', title='Jump Height (cm)', scale=alt.Scale(zero=False))
             )
-            points_h = base.mark_point(color='#FF8200', filled=True, size=60).encode(
-                y=alt.Y(f'{h_col}:Q')
-            )
+            points_h = base.mark_point(color='#FF8200', filled=True, size=60).encode(y=alt.Y(f'{h_col}:Q'))
 
-            # Right Axis: RSI (Blue)
             line_r = base.mark_line(color='#4895DB', strokeDash=[5,5], size=2, interpolate='linear').encode(
-                y=alt.Y(f'{r_col}:Q', 
-                        title='RSI-mod',
-                        scale=alt.Scale(zero=False))
+                y=alt.Y(f'{r_col}:Q', title='RSI-mod', scale=alt.Scale(zero=False))
             )
-            points_r = base.mark_point(color='#4895DB', size=60).encode(
-                y=alt.Y(f'{r_col}:Q')
-            )
+            points_r = base.mark_point(color='#4895DB', size=60).encode(y=alt.Y(f'{r_col}:Q'))
 
-            # Combine
-            final_chart = alt.layer(
-                (line_h + points_h), 
-                (line_r + points_r)
-            ).resolve_scale(
-                y='independent'
-            ).properties(
-                width='container',
-                height=400
-            ).configure_axisLeft(
-                titleColor='#FF8200', labelColor='#FF8200'
-            ).configure_axisRight(
-                titleColor='#4895DB', labelColor='#4895DB'
+            st.altair_chart(
+                alt.layer((line_h + points_h), (line_r + points_r))
+                .resolve_scale(y='independent')
+                .properties(width='container', height=400)
+                .configure_axisLeft(titleColor='#FF8200', labelColor='#FF8200')
+                .configure_axisRight(titleColor='#4895DB', labelColor='#4895DB'),
+                use_container_width=True
             )
 
-            st.altair_chart(final_chart, use_container_width=True)
-
-            # 3. Table Logic
+            # --- TABLE LOGIC (Fixing NameError) ---
+            st.markdown("#### Jump History & Match Context")
+            
+            # Initialize comp_list BEFORE the loop
+            comp_list = []
             base_val = float(chart_df.iloc[0][h_col])
+            
+            # Combine skill sheets for match context
+            combined_skills = pd.concat([swing_df, throw_df], ignore_index=True)
+            combined_skills['Date'] = pd.to_datetime(combined_skills['Date'], errors='coerce')
+            
+            # Loop through records (skipping baseline at index 0)
+            for _, row in chart_df.iloc[1:].iterrows():
+                j_date = pd.to_datetime(row[d_col_cmj])
+                try:
+                    prev_m = combined_skills[
+                        (combined_skills['Player Name'] == selected) & 
+                        (combined_skills['Date'] < j_date) & 
+                        (combined_skills['Session Type'].str.contains('Game|Match', case=False, na=False))
+                    ]
+                    pm_row = prev_m.sort_values('Date', ascending=False).iloc[0]
+                    m_info = f"{pm_row['Session Type']} ({pm_row['Date'].strftime('%m/%d')})"
+                except:
+                    m_info = "N/A"
+                
+                diff = float(row[h_col]) - base_val
+                comp_list.append({
+                    "Date": j_date.strftime('%m/%d/%Y'), 
+                    "Match": m_info, 
+                    "Height": f"{row[h_col]:.1f} cm", 
+                    "Diff": diff, 
+                    "RSI": f"{row[r_col]:.2f}"
+                })
 
-            # Render styled HTML Table
+            # Render Table (Now comp_list is guaranteed to exist)
             html = """<table class="scout-table"><tr><th>Date</th><th>Prev Match</th><th>Height</th><th>Vs Baseline</th><th>RSI</th></tr>"""
             for i in comp_list:
                 clr = "#28a745" if i['Diff'] >= 0 else "#dc3545"
