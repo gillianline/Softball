@@ -43,21 +43,18 @@ if not st.session_state.auth:
                 st.rerun()
     st.stop()
 
-# --- DATA LOADING (ASH + ROSTER) ---
+# --- DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_performance_data():
     try:
         ash_df = pd.read_csv(st.secrets["ASH_URL"])
         roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
-        
         ash_df.columns = ash_df.columns.str.strip()
         roster_df.columns = roster_df.columns.str.strip()
-        
         num_cols = ['Peak Vertical Force [N]', 'RFD - 200ms [N/s]', 'Start Time to Peak Force [s]']
         for col in ash_df.columns:
             if any(m in col for m in num_cols) or 'Asym' in col:
                 ash_df[col] = pd.to_numeric(ash_df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True), errors='coerce').fillna(0)
-        
         df = ash_df.merge(roster_df[['Player Name', 'Picture']], on='Player Name', how='left')
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df
@@ -67,13 +64,10 @@ def load_performance_data():
 
 df = load_performance_data()
 
-# --- DASHBOARD UI ---
 if not df.empty:
     filt_col1, filt_col2 = st.columns(2)
-    
     with filt_col1:
-        athlete_list = sorted(df['Player Name'].unique())
-        selected = st.selectbox("Search Athlete", athlete_list)
+        selected = st.selectbox("Search Athlete", sorted(df['Player Name'].unique()))
     
     p_athlete_data = df[df['Player Name'] == selected].sort_values('Date')
     
@@ -88,7 +82,19 @@ if not df.empty:
 
     if not p_filtered.empty:
         p_latest = p_filtered.iloc[-1]
-        latest_date_str = p_latest['Date'].strftime('%m/%d/%Y') if pd.notnull(p_latest['Date']) else 'N/A'
+        latest_date_str = p_latest['Date'].strftime('%m/%d/%Y')
+
+        # --- CALCULATE BESTS (ALL TIME) ---
+        # Note: For Time to Peak, "Best" is the minimum value.
+        best_force = p_athlete_data['Peak Vertical Force [N]'].max()
+        best_rfd = p_athlete_data['RFD - 200ms [N/s]'].max()
+        best_time = p_athlete_data['Start Time to Peak Force [s]'].min()
+
+        # Calculation function for % of best
+        def get_pct(current, best):
+            if best == 0: return "0%"
+            diff = ((current - best) / best) * 100
+            return f"{diff:+.1f}% of Best"
 
         # Athlete Header Card
         st.markdown(f"""
@@ -98,21 +104,46 @@ if not df.empty:
                     <div style="margin-left: 30px;">
                         <h1 style="margin:0;">{selected}</h1>
                         <p style="color:#4895DB; font-weight:700; font-size:18px; margin:0;">ASH TEST PROFILE</p>
-                        <p style="color:#FF8200; font-weight:800; margin:0;">LATEST TEST METRICS: {latest_date_str}</p>
+                        <p style="color:#FF8200; font-weight:800; margin:0;">LATEST TEST: {latest_date_str}</p>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # Metric Row - Clearly labeled as Latest Test
+        # Metric Row - Recent vs All-Time Best
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Latest Peak Force", f"{int(p_latest['Peak Vertical Force [N]'])} N")
-        m2.metric("Latest RFD (200ms)", f"{int(p_latest['RFD - 200ms [N/s]'])} N/s")
         
+        # Peak Force
+        m1.metric(
+            label="Latest Peak Force", 
+            value=f"{int(p_latest['Peak Vertical Force [N]'])} N",
+            delta=get_pct(p_latest['Peak Vertical Force [N]'], best_force)
+        )
+        
+        # RFD
+        m2.metric(
+            label="Latest RFD (200ms)", 
+            value=f"{int(p_latest['RFD - 200ms [N/s]'])} N/s",
+            delta=get_pct(p_latest['RFD - 200ms [N/s]'], best_rfd)
+        )
+        
+        # Asymmetry (Static comparison as it's a balance metric)
         asym = p_latest.get('Peak Vertical Force [N] (Asym)(%)', 0)
-        m3.metric("Latest Asymmetry", f"{asym}%", delta="- Injury Risk" if asym > 10 else None, delta_color="inverse")
+        m3.metric(
+            label="Latest Asymmetry", 
+            value=f"{asym}%", 
+            delta="- High Risk" if asym > 10 else "Optimal", 
+            delta_color="inverse" if asym > 10 else "normal"
+        )
         
-        m4.metric("Latest Time to Peak", f"{p_latest.get('Start Time to Peak Force [s]', 0)}s")
+        # Time to Peak
+        # Delta is "inverse" here because a negative % (faster) is better.
+        m4.metric(
+            label="Latest Time to Peak", 
+            value=f"{p_latest.get('Start Time to Peak Force [s]', 0)}s",
+            delta=get_pct(p_latest.get('Start Time to Peak Force [s]', 0), best_time),
+            delta_color="inverse" 
+        )
 
         st.divider()
 
@@ -120,19 +151,11 @@ if not df.empty:
         col_left, col_right = st.columns(2)
 
         with col_left:
-            st.subheader(f"Force Trend: {selected_year}")
+            st.subheader(f"Peak Force Trend ({selected_year})")
             if len(p_filtered) > 1:
                 fig_trend = px.line(p_filtered, x='Date', y='Peak Vertical Force [N]', 
                                     markers=True, template="plotly_white", color_discrete_sequence=["#FF8200"])
-                
-                # FIXED: Clean Date Formatting and Spacing
-                fig_trend.update_xaxes(
-                    tickformat="%b %d, %y",
-                    tickangle=-45,
-                    nticks=10, # Limits the number of labels to prevent crowding
-                    showgrid=False
-                )
-                fig_trend.update_layout(margin=dict(t=10, b=10, l=10, r=10))
+                fig_trend.update_xaxes(tickformat="%b %d, %y", tickangle=-45, nticks=10)
                 st.plotly_chart(fig_trend, use_container_width=True)
             else:
                 st.info("Additional data points needed for trend analysis.")
@@ -141,12 +164,7 @@ if not df.empty:
             st.subheader(f"Latest L/R Split ({latest_date_str})")
             l_force = p_latest.get('Peak Vertical Force [N] (L)', 0)
             r_force = p_latest.get('Peak Vertical Force [N] (R)', 0)
-            
-            side_df = pd.DataFrame({
-                'Side': ['Left', 'Right'],
-                'Force [N]': [l_force, r_force]
-            })
-            
+            side_df = pd.DataFrame({'Side': ['Left', 'Right'], 'Force [N]': [l_force, r_force]})
             fig_side = px.bar(side_df, x='Side', y='Force [N]', 
                               color='Side', color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'},
                               template="plotly_white")
