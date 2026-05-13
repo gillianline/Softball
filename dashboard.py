@@ -223,6 +223,7 @@ if not ash_df.empty:
             
             
             
+            
     with tab_cmj:
         if not cmj_filt.empty:
             # 1. PREP DATA & KPI LIST
