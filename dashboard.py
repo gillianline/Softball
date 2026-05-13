@@ -397,41 +397,37 @@ if not ash_df.empty:
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-                # 5. MOVEMENT PROFILE TREND
-                st.subheader(f"Movement Profile Trend: {swing_cat}")
+                # 5. MOVEMENT PROFILE TREND: Multi-Line View
+                st.subheader(f"Movement Profile History: {swing_cat}")
                 
-                # CORRECTED: Use .fillna(0) for Series instead of 'or 0'
+                # Clean and prepare the metrics
                 p_swing['Forward'] = pd.to_numeric(p_swing['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
                 p_swing['Side'] = pd.to_numeric(p_swing['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
                 p_swing['Up'] = pd.to_numeric(p_swing['Swing Max Player Load Up % (median)'], errors='coerce').fillna(0)
 
-                # Melt the data for the stacked area chart
-                trend_melt = p_swing.melt(
-                    id_vars=['Date'], 
-                    value_vars=['Forward', 'Side', 'Up'],
-                    var_name='Dimension', 
-                    value_name='Percentage'
-                )
-
-                fig_area = px.area(
-                    trend_melt, 
-                    x="Date", 
-                    y="Percentage", 
-                    color="Dimension",
+                # Create the line chart
+                fig_lines = px.line(
+                    p_swing, 
+                    x='Date', 
+                    y=['Forward', 'Side', 'Up'],
+                    markers=True,
+                    labels={'value': 'Percentage of Load', 'variable': 'Dimension'},
                     color_discrete_map={
                         'Forward': '#4895DB', 
                         'Side': '#FF8200', 
                         'Up': '#28a745'
                     },
-                    template="plotly_white",
-                    groupnorm='percent' 
+                    template="plotly_white"
                 )
 
-                fig_area.update_layout(
+                fig_lines.update_layout(
                     height=400,
-                    margin=dict(t=10, b=10, l=10, r=10),
+                    xaxis_title="",
+                    yaxis=dict(range=[0, 100], ticksuffix="%"),
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    yaxis_title="Percent of Total Load"
+                    hovermode="x unified"
                 )
                 
-                st.plotly_chart(fig_area, use_container_width=True)
+                st.plotly_chart(fig_lines, use_container_width=True)
+                
+                st.info("**Coaching Tip:** Use this to track 'stability.' You want to see these lines stay relatively flat. If the **Green (Up)** line starts trending upward, the hitter may be losing their posture through the zone.")
