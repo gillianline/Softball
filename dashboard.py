@@ -180,12 +180,12 @@ if not ash_df.empty:
 
             st.divider()
 
-            # 6. UPDATED TABLE: Filtered by Test Presence
-            st.subheader("Test History & Match Baselines")
+            # 4. FILTERED TABLE: Only show tests within 3 days of a match
+            st.subheader("Test History (In-Season / Match Proximity)")
+            
             match_map = {}
             try:
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
-                # Updated to look for 'Name' and 'Activity' as per your new setup
                 athlete_games = all_sessions[
                     (all_sessions['Name'] == selected) & 
                     (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
@@ -194,29 +194,44 @@ if not ash_df.empty:
                     match_map[row['Date'].date()] = f"{row.get('Activity', 'Game')} ({row['Date'].strftime('%m/%d')})"
             except: pass
 
-            # Ensure we only include dates where an ASH test actually occurred
             ash_hist_df = ash_filt[['Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']].copy()
             
-            def get_prev_match(test_date):
+            # Logic to find previous match and calculate proximity
+            def get_match_context(test_date):
                 t_date = test_date.date()
                 past_matches = [d for d in match_map.keys() if d < t_date]
-                return match_map[max(past_matches)] if past_matches else "N/A"
+                
+                if not past_matches:
+                    return "N/A", 999 # Return high number for days if no match found
+                
+                nearest_match_date = max(past_matches)
+                days_since = (t_date - nearest_match_date).days
+                return match_map[nearest_match_date], days_since
 
-            ash_hist_df['Previous Match'] = ash_hist_df['Date'].apply(get_prev_match)
-            
-            # Variance from arm-specific baselines
-            ash_hist_df['L vs Base'] = ash_hist_df['Peak Vertical Force [N] (L)'] - base_f_l
-            ash_hist_df['R vs Base'] = ash_hist_df['Peak Vertical Force [N] (R)'] - base_f_r
-            
-            ash_display = ash_hist_df[['Date', 'Previous Match', 'Peak Vertical Force [N] (L)', 'L vs Base', 'Peak Vertical Force [N] (R)', 'R vs Base']].copy()
-            ash_display['Date'] = ash_display['Date'].dt.strftime('%m/%d/%Y')
-            ash_display.columns = ['Test Date', 'Previous Match', 'Force (L)', '+/- Base (L)', 'Force (R)', '+/- Base (R)']
-
-            st.table(
-                ash_display.sort_values('Test Date', ascending=False)
-                .style.format({'Force (L)': '{:.0f}N', '+/- Base (L)': '{:+.1f}N', 'Force (R)': '{:.0f}N', '+/- Base (R)': '{:+.1f}N'})
-                .map(lambda x: f'color: {"#28a745" if x > 0 else "#dc3545"}; font-weight: bold', subset=['+/- Base (L)', '+/- Base (R)'])
+            # Apply logic
+            ash_hist_df[['Prev Match', 'Days Since']] = ash_hist_df['Date'].apply(
+                lambda x: pd.Series(get_match_context(x))
             )
+
+            # FILTER: Only keep tests where a match happened within the last 3 days
+            # Adjust the '3' to whatever window you prefer
+            ash_table_filt = ash_hist_df[ash_hist_df['Days Since'] <= 3].copy()
+
+            if not ash_table_filt.empty:
+                ash_table_filt['L vs Base'] = ash_table_filt['Peak Vertical Force [N] (L)'] - base_f_l
+                ash_table_filt['R vs Base'] = ash_table_filt['Peak Vertical Force [N] (R)'] - base_f_r
+                
+                ash_display = ash_table_filt[['Date', 'Prev Match', 'Peak Vertical Force [N] (L)', 'L vs Base', 'Peak Vertical Force [N] (R)', 'R vs Base']].copy()
+                ash_display['Date'] = ash_display['Date'].dt.strftime('%m/%d/%Y')
+                ash_display.columns = ['Test Date', 'Previous Match', 'Force (L)', '+/- Base (L)', 'Force (R)', '+/- Base (R)']
+
+                st.table(
+                    ash_display.sort_values('Test Date', ascending=False)
+                    .style.format({'Force (L)': '{:.0f}N', '+/- Base (L)': '{:+.1f}N', 'Force (R)': '{:.0f}N', '+/- Base (R)': '{:+.1f}N'})
+                    .map(lambda x: f'color: {"#28a745" if x > 0 else "#dc3545"}; font-weight: bold', subset=['+/- Base (L)', '+/- Base (R)'])
+                )
+            else:
+                st.info("No ASH tests found within proximity of a match.")
 
         else:
             st.info("No ASH records found for this selection.")
