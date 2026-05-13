@@ -143,7 +143,7 @@ if not ash_df.empty:
 
             st.divider()
             
-            # 4. BILATERAL PROFILE & BALANCE BOX
+            # 4. BILATERAL PROFILE (Left vs Right Distribution)
             c1, c2 = st.columns([2, 1])
             with c1:
                 st.subheader("Left vs Right Force Profile")
@@ -180,23 +180,21 @@ if not ash_df.empty:
 
             st.divider()
 
-            # 6. UPDATED TABLE: Using "Activity" or "Session Type" for Match Context
-            st.subheader("Detailed Test History & Baselines")
+            # 6. UPDATED TABLE: Filtered by Test Presence
+            st.subheader("Test History & Match Baselines")
             match_map = {}
             try:
-                # Combine Swing and Throw data
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
-                # Filter for the selected athlete and look for 'Game' in Session Type or Activity
+                # Updated to look for 'Name' and 'Activity' as per your new setup
                 athlete_games = all_sessions[
                     (all_sessions['Name'] == selected) & 
                     (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
                 ]
                 for _, row in athlete_games.iterrows():
-                    # Map the date to the Activity name (e.g., "Match v. Kentucky")
                     match_map[row['Date'].date()] = f"{row.get('Activity', 'Game')} ({row['Date'].strftime('%m/%d')})"
-            except: 
-                pass
+            except: pass
 
+            # Ensure we only include dates where an ASH test actually occurred
             ash_hist_df = ash_filt[['Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']].copy()
             
             def get_prev_match(test_date):
@@ -221,7 +219,7 @@ if not ash_df.empty:
             )
 
         else:
-            st.info("No ASH records found.")
+            st.info("No ASH records found for this selection.")
             
             
             
