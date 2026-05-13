@@ -397,29 +397,43 @@ if not ash_df.empty:
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-                # 5. MOVEMENT PROFILE
-                st.subheader("Latest Session Profile")
-                fwd = pd.to_numeric(latest_swing.get('Swing Max Player Load Fwd % (median)'), errors='coerce') or 0
-                side = pd.to_numeric(latest_swing.get('Swing Max Player Load Side % (median)'), errors='coerce') or 0
-                up = pd.to_numeric(latest_swing.get('Swing Max Player Load Up % (median)'), errors='coerce') or 0
-
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    fig_pie = px.pie(
-                        values=[fwd, side, up], 
-                        names=['Forward', 'Side', 'Up'],
-                        color_discrete_map={'Forward': '#4895DB', 'Side': '#FF8200', 'Up': '#28a745'},
-                        hole=0.4
-                    )
-                    st.plotly_chart(fig_pie, use_container_width=True)
+                # 5. MOVEMENT PROFILE TREND (Replacing the Pie Chart)
+                st.subheader(f"Movement Profile Trend: {swing_cat}")
                 
-                with c2:
-                    st.markdown(f"""
-                        <div style="background-color:#F8F9FA; padding:20px; border-radius:15px; border:1px solid #E0E0E0;">
-                            <h4 style="color:#4895DB; margin:0;">Linear: {fwd:.1f}%</h4>
-                            <h4 style="color:#FF8200; margin:0;">Rotational: {side:.1f}%</h4>
-                            <h4 style="color:#28a745; margin:0;">Vertical: {up:.1f}%</h4>
-                        </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info(f"No {swing_cat.lower()} records found for {selected} in {swing_year}.")
+                # Prepare data for the area chart
+                p_swing['Forward'] = pd.to_numeric(p_swing.get('Swing Max Player Load Fwd % (median)'), errors='coerce') or 0
+                p_swing['Side'] = pd.to_numeric(p_swing.get('Swing Max Player Load Side % (median)'), errors='coerce') or 0
+                p_swing['Up'] = pd.to_numeric(p_swing.get('Swing Max Player Load Up % (median)'), errors='coerce') or 0
+
+                # Melt the data so Plotly can read it for a stacked chart
+                trend_melt = p_swing.melt(
+                    id_vars=['Date'], 
+                    value_vars=['Forward', 'Side', 'Up'],
+                    var_name='Dimension', 
+                    value_name='Percentage'
+                )
+
+                fig_area = px.area(
+                    trend_melt, 
+                    x="Date", 
+                    y="Percentage", 
+                    color="Dimension",
+                    color_discrete_map={
+                        'Forward': '#4895DB', 
+                        'Side': '#FF8200', 
+                        'Up': '#28a745'
+                    },
+                    template="plotly_white",
+                    groupnorm='percent' # Forces it to stay exactly 0-100%
+                )
+
+                fig_area.update_layout(
+                    height=400,
+                    margin=dict(t=10, b=10, l=10, r=10),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    yaxis_title="Percent of Total Load"
+                )
+                
+                st.plotly_chart(fig_area, use_container_width=True)
+                
+                st.info("**Coaching Note:** Look for consistency in the bands. Large shifts in the 'Up' (green) or 'Side' (orange) bands can indicate mechanical changes or fatigue-related swing compensations.")
