@@ -326,14 +326,13 @@ if not ash_df.empty:
             if not p_swing.empty:
                 latest_swing = p_swing.iloc[-1]
                 
-                # 2. TOP METRICS WITH SAFE RETRIEVAL
+                # 2. TOP METRICS WITH SAFE NUMERIC CONVERSION
                 m1, m2, m3, m4 = st.columns(4)
                 
-                # Extracting values with .get() to prevent crashes
-                s_count = latest_swing.get('Swing Count', 0)
-                s_load = latest_swing.get('Sum Swing Max Player Load', 0)
-                s_b3_pl = latest_swing.get('Swing Max PL Band 3 Count', 0)
-                s_b3_rot = latest_swing.get('Swing Max Rotation Band 3 Count', 0)
+                # Convert specific values to numeric, turning errors into 0
+                s_count = pd.to_numeric(latest_swing.get('Swing Count'), errors='coerce') or 0
+                s_load = pd.to_numeric(latest_swing.get('Sum Swing Max Player Load'), errors='coerce') or 0
+                s_b3_rot = pd.to_numeric(latest_swing.get('Swing Max Rotation Band 3 Count'), errors='coerce') or 0
 
                 # Total Volume
                 m1.metric("Total Swings", f"{int(s_count)}")
@@ -344,8 +343,8 @@ if not ash_df.empty:
                 # High Intensity Rotation (Speed)
                 m3.metric("Max Rotation (B3)", f"{int(s_b3_rot)}")
                 
-                # Calculated Efficiency
-                intensity = s_load / s_count if s_count > 0 else 0
+                # Calculated Efficiency - Now safe from TypeError
+                intensity = float(s_load) / float(s_count) if s_count > 0 else 0
                 m4.metric("Load per Swing", f"{intensity:.2f}")
 
                 st.divider()
