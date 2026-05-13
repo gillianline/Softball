@@ -318,41 +318,63 @@ if not ash_df.empty:
 
     with tab_swing:
         if not swing_df.empty:
-            # 1. CLEAN & FILTER DATA
-            swing_df.columns = swing_df.columns.str.strip()
+            # 1. INTERNAL TAB FILTERS
+            # Placing filters in a row at the top of the tab
+            f1, f2 = st.columns([1, 2])
             
-            # Filter by Athlete Name
-            p_swing = swing_df[swing_df['Name'] == selected].copy()
+            with f1:
+                # Year filter specific to this tab
+                swing_year = st.selectbox("Season", options=[2026, 2025, 2024], key="swing_year_select")
             
-            # Convert Date to datetime and filter by the selected year
-            p_swing['Date'] = pd.to_datetime(p_swing['Date'])
-            p_swing = p_swing[p_swing['Date'].dt.year == selected_year].sort_values('Date')
+            with f2:
+                # Category filter using segmented control for a modern look
+                swing_cat = st.segmented_control(
+                    "Session Type",
+                    options=["All", "Games", "Practices"],
+                    default="All",
+                    key="swing_cat_select"
+                )
+
+            # 2. DATA PROCESSING
+            df_s = swing_df.copy()
+            df_s.columns = df_s.columns.str.strip()
+            df_s['Date'] = pd.to_datetime(df_s['Date'])
             
+            # Apply Athlete Filter
+            p_swing = df_s[df_s['Name'] == selected].copy()
+            
+            # Apply Year Filter
+            p_swing = p_swing[p_swing['Date'].dt.year == swing_year]
+            
+            # Apply Category Filter
+            if swing_cat == "Games":
+                p_swing = p_swing[p_swing['Session Type'].str.contains('Game', case=False, na=False)]
+            elif swing_cat == "Practices":
+                p_swing = p_swing[p_swing['Session Type'].str.contains('Practice|Session', case=False, na=False)]
+
             if not p_swing.empty:
+                p_swing = p_swing.sort_values('Date')
                 latest_swing = p_swing.iloc[-1]
                 
-                # 2. TOP METRICS WITH SAFE NUMERIC CONVERSION
+                # 3. TOP METRICS (Numeric Safe)
                 m1, m2, m3, m4 = st.columns(4)
                 
-                # Force numeric types to avoid TypeErrors
                 s_count = pd.to_numeric(latest_swing.get('Swing Count'), errors='coerce') or 0
                 s_load = pd.to_numeric(latest_swing.get('Sum Swing Max Player Load'), errors='coerce') or 0
-                s_b3_rot = pd.to_numeric(latest_swing.get('Swing Max Rotation Band 3 Count'), errors='coerce') or 0
-
-                m1.metric("Total Swings", f"{int(s_count)}")
-                m2.metric("Total Player Load", f"{float(s_load):.1f}")
-                m3.metric("Max Rotation (B3)", f"{int(s_b3_rot)}")
+                s_rot = pd.to_numeric(latest_swing.get('Swing Max Rotation Band 3 Count'), errors='coerce') or 0
                 
-                # Calculate intensity per swing
+                m1.metric("Volume", f"{int(s_count)} Swings")
+                m2.metric("Total Load", f"{float(s_load):.1f}")
+                m3.metric("B3 Rotation", f"{int(s_rot)}")
+                
                 intensity = float(s_load) / float(s_count) if s_count > 0 else 0
-                m4.metric("Load per Swing", f"{intensity:.2f}")
+                m4.metric("Intensity", f"{intensity:.2f} Load/Sw")
 
                 st.divider()
 
-                # 3. VOLUME & INTENSITY TREND
-                st.subheader(f"Swing Volume vs. Intensity ({selected_year})")
+                # 4. TREND GRAPH
+                st.subheader(f"{swing_cat} Intensity Trend: {swing_year}")
                 
-                # Ensure trend data is numeric
                 p_swing['Sum Swing Max Player Load'] = pd.to_numeric(p_swing['Sum Swing Max Player Load'], errors='coerce').fillna(0)
                 
                 fig_trend = px.bar(
@@ -363,35 +385,29 @@ if not ash_df.empty:
                 
                 fig_trend.add_scatter(
                     x=p_swing['Date'], y=p_swing['Sum Swing Max Player Load'], 
-                    name="Total Load", mode='lines+markers', yaxis="y2",
+                    name="Intensity (Load)", mode='lines+markers', yaxis="y2",
                     line=dict(color="#FF8200", width=3)
                 )
 
                 fig_trend.update_layout(
                     height=400,
-                    yaxis2=dict(title="Total Player Load", overlaying="y", side="right"),
+                    yaxis2=dict(title="Load", overlaying="y", side="right"),
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    yaxis=dict(range=[0, p_swing['Swing Count'].max() * 1.2] if not p_swing.empty else [0, 100])
+                    yaxis=dict(range=[0, p_swing['Swing Count'].max() * 1.2])
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-                # 4. MOVEMENT PROFILE
-                st.subheader("Latest Session Movement Profile")
-                
-                # Retrieve your directional metrics
+                # 5. MOVEMENT PROFILE
+                st.subheader("Latest Session Profile")
                 fwd = pd.to_numeric(latest_swing.get('Swing Max Player Load Fwd % (median)'), errors='coerce') or 0
                 side = pd.to_numeric(latest_swing.get('Swing Max Player Load Side % (median)'), errors='coerce') or 0
                 up = pd.to_numeric(latest_swing.get('Swing Max Player Load Up % (median)'), errors='coerce') or 0
 
-                profile_df = pd.DataFrame({
-                    'Dimension': ['Forward', 'Side', 'Up'],
-                    'Value': [fwd, side, up]
-                })
-
                 c1, c2 = st.columns([1, 1])
                 with c1:
                     fig_pie = px.pie(
-                        profile_df, values='Value', names='Dimension',
+                        values=[fwd, side, up], 
+                        names=['Forward', 'Side', 'Up'],
                         color_discrete_map={'Forward': '#4895DB', 'Side': '#FF8200', 'Up': '#28a745'},
                         hole=0.4
                     )
@@ -400,14 +416,10 @@ if not ash_df.empty:
                 with c2:
                     st.markdown(f"""
                         <div style="background-color:#F8F9FA; padding:20px; border-radius:15px; border:1px solid #E0E0E0;">
-                            <p style="color:grey; font-weight:700; margin-bottom:5px;">MOVEMENT BREAKDOWN</p>
-                            <h4 style="color:#4895DB; margin:0;">Forward (Linear): {fwd:.1f}%</h4>
-                            <h4 style="color:#FF8200; margin:0;">Side (Rotational): {side:.1f}%</h4>
-                            <h4 style="color:#28a745; margin:0;">Up (Vertical): {up:.1f}%</h4>
+                            <h4 style="color:#4895DB; margin:0;">Linear: {fwd:.1f}%</h4>
+                            <h4 style="color:#FF8200; margin:0;">Rotational: {side:.1f}%</h4>
+                            <h4 style="color:#28a745; margin:0;">Vertical: {up:.1f}%</h4>
                         </div>
                     """, unsafe_allow_html=True)
-
             else:
-                st.info(f"No swing records found for {selected} in {selected_year}.")
-        else:
-            st.warning("Swing dataset is empty.")
+                st.info(f"No {swing_cat.lower()} records found for {selected} in {swing_year}.")
