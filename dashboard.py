@@ -180,28 +180,27 @@ if not ash_df.empty:
 
             st.divider()
 
-           # 3. FILTERED & SORTED TABLE: Tests within 3 days of a match
+           # 3. FILTERED & SORTED TABLE: Most Recent to Oldest
             st.subheader("Test History (Match Proximity)")
             
             match_map = {}
             try:
-                # Combining data and filtering for 'Game' sessions for the selected athlete
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
+                # Filtering based on your new data structure
                 athlete_games = all_sessions[
                     (all_sessions['Name'] == selected) & 
                     (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
                 ]
                 for _, row in athlete_games.iterrows():
-                    match_map[row['Date'].date()] = f"{row.get('Activity', 'Game')} ({row['Date'].strftime('%m/%d')})"
+                    # FIX: Removed the date formatting from the Activity string
+                    match_map[row['Date'].date()] = f"{row.get('Activity', 'Game')}"
             except: 
                 pass
 
-            # Create the history dataframe from ash_filt
             ash_hist_df = ash_filt[['Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']].copy()
             
             def get_match_context(test_date):
                 t_date = test_date.date()
-                # Finds matches that occurred ON or BEFORE the test date
                 past_matches = [d for d in match_map.keys() if d <= t_date]
                 
                 if not past_matches:
@@ -211,24 +210,20 @@ if not ash_df.empty:
                 days_since = (t_date - nearest_match_date).days
                 return match_map[nearest_match_date], days_since
 
-            # Extract match name and day proximity
             ash_hist_df[['Prev Match', 'Days Since']] = ash_hist_df['Date'].apply(
                 lambda x: pd.Series(get_match_context(x))
             )
 
-            # --- THE FILTERS ---
-            # 1. Only show tests within 3 days of a match
+            # Filter for 3-day proximity and sort most recent to oldest
             ash_table_filt = ash_hist_df[ash_hist_df['Days Since'] <= 3].copy()
             
             if not ash_table_filt.empty:
-                # 2. Sort by Date: Most Recent to Oldest
+                # Ensure descending order
                 ash_table_filt = ash_table_filt.sort_values('Date', ascending=False)
                 
-                # Calculate variance from baselines
                 ash_table_filt['L vs Base'] = ash_table_filt['Peak Vertical Force [N] (L)'] - base_f_l
                 ash_table_filt['R vs Base'] = ash_table_filt['Peak Vertical Force [N] (R)'] - base_f_r
                 
-                # Prep final display
                 ash_display = ash_table_filt[['Date', 'Prev Match', 'Peak Vertical Force [N] (L)', 'L vs Base', 'Peak Vertical Force [N] (R)', 'R vs Base']].copy()
                 ash_display['Date'] = ash_display['Date'].dt.strftime('%m/%d/%Y')
                 ash_display.columns = ['Test Date', 'Previous Match', 'Force (L)', '+/- Base (L)', 'Force (R)', '+/- Base (R)']
@@ -245,7 +240,6 @@ if not ash_df.empty:
                 )
             else:
                 st.info("No ASH tests found within 3 days of a match.")
-            
             
             
             
