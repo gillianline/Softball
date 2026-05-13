@@ -397,15 +397,15 @@ if not ash_df.empty:
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-                # 5. MOVEMENT PROFILE TREND (Replacing the Pie Chart)
+                # 5. MOVEMENT PROFILE TREND
                 st.subheader(f"Movement Profile Trend: {swing_cat}")
                 
-                # Prepare data for the area chart
-                p_swing['Forward'] = pd.to_numeric(p_swing.get('Swing Max Player Load Fwd % (median)'), errors='coerce') or 0
-                p_swing['Side'] = pd.to_numeric(p_swing.get('Swing Max Player Load Side % (median)'), errors='coerce') or 0
-                p_swing['Up'] = pd.to_numeric(p_swing.get('Swing Max Player Load Up % (median)'), errors='coerce') or 0
+                # CORRECTED: Use .fillna(0) for Series instead of 'or 0'
+                p_swing['Forward'] = pd.to_numeric(p_swing['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
+                p_swing['Side'] = pd.to_numeric(p_swing['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
+                p_swing['Up'] = pd.to_numeric(p_swing['Swing Max Player Load Up % (median)'], errors='coerce').fillna(0)
 
-                # Melt the data so Plotly can read it for a stacked chart
+                # Melt the data for the stacked area chart
                 trend_melt = p_swing.melt(
                     id_vars=['Date'], 
                     value_vars=['Forward', 'Side', 'Up'],
@@ -424,7 +424,7 @@ if not ash_df.empty:
                         'Up': '#28a745'
                     },
                     template="plotly_white",
-                    groupnorm='percent' # Forces it to stay exactly 0-100%
+                    groupnorm='percent' 
                 )
 
                 fig_area.update_layout(
@@ -435,5 +435,3 @@ if not ash_df.empty:
                 )
                 
                 st.plotly_chart(fig_area, use_container_width=True)
-                
-                st.info("**Coaching Note:** Look for consistency in the bands. Large shifts in the 'Up' (green) or 'Side' (orange) bands can indicate mechanical changes or fatigue-related swing compensations.")
