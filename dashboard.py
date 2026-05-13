@@ -319,9 +319,14 @@ if not ash_df.empty:
     with tab_swing:
         if not swing_df.empty:
             # 1. CLEAN & FILTER DATA
-            # Strip potential hidden spaces from columns to match your list exactly
             swing_df.columns = swing_df.columns.str.strip()
-            p_swing = swing_df[swing_df['Name'] == selected].sort_values('Date')
+            
+            # Filter by Athlete Name
+            p_swing = swing_df[swing_df['Name'] == selected].copy()
+            
+            # Convert Date to datetime and filter by the selected year
+            p_swing['Date'] = pd.to_datetime(p_swing['Date'])
+            p_swing = p_swing[p_swing['Date'].dt.year == selected_year].sort_values('Date')
             
             if not p_swing.empty:
                 latest_swing = p_swing.iloc[-1]
@@ -329,37 +334,33 @@ if not ash_df.empty:
                 # 2. TOP METRICS WITH SAFE NUMERIC CONVERSION
                 m1, m2, m3, m4 = st.columns(4)
                 
-                # Convert specific values to numeric, turning errors into 0
+                # Force numeric types to avoid TypeErrors
                 s_count = pd.to_numeric(latest_swing.get('Swing Count'), errors='coerce') or 0
                 s_load = pd.to_numeric(latest_swing.get('Sum Swing Max Player Load'), errors='coerce') or 0
                 s_b3_rot = pd.to_numeric(latest_swing.get('Swing Max Rotation Band 3 Count'), errors='coerce') or 0
 
-                # Total Volume
                 m1.metric("Total Swings", f"{int(s_count)}")
-                
-                # Total Intensity (Workload)
                 m2.metric("Total Player Load", f"{float(s_load):.1f}")
-                
-                # High Intensity Rotation (Speed)
                 m3.metric("Max Rotation (B3)", f"{int(s_b3_rot)}")
                 
-                # Calculated Efficiency - Now safe from TypeError
+                # Calculate intensity per swing
                 intensity = float(s_load) / float(s_count) if s_count > 0 else 0
                 m4.metric("Load per Swing", f"{intensity:.2f}")
 
                 st.divider()
 
                 # 3. VOLUME & INTENSITY TREND
-                st.subheader("Daily Swing Volume vs. Total Load")
+                st.subheader(f"Swing Volume vs. Intensity ({selected_year})")
+                
+                # Ensure trend data is numeric
+                p_swing['Sum Swing Max Player Load'] = pd.to_numeric(p_swing['Sum Swing Max Player Load'], errors='coerce').fillna(0)
                 
                 fig_trend = px.bar(
                     p_swing, x='Date', y='Swing Count', 
-                    title="Daily Swing Volume",
                     color_discrete_sequence=["#4895DB"], 
                     template="plotly_white"
                 )
                 
-                # Overlay Player Load as a line to see if intensity matches volume
                 fig_trend.add_scatter(
                     x=p_swing['Date'], y=p_swing['Sum Swing Max Player Load'], 
                     name="Total Load", mode='lines+markers', yaxis="y2",
@@ -370,33 +371,28 @@ if not ash_df.empty:
                     height=400,
                     yaxis2=dict(title="Total Player Load", overlaying="y", side="right"),
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    yaxis=dict(range=[0, p_swing['Swing Count'].max() * 1.2]) # Starts at 0
+                    yaxis=dict(range=[0, p_swing['Swing Count'].max() * 1.2] if not p_swing.empty else [0, 100])
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-                # 4. SWING MOVEMENT PROFILE (DIRECTIONAL LOAD)
+                # 4. MOVEMENT PROFILE
                 st.subheader("Latest Session Movement Profile")
                 
-                # Using your Median % columns to show where the force is going
-                fwd = latest_swing.get('Swing Max Player Load Fwd % (median)', 0)
-                side = latest_swing.get('Swing Max Player Load Side % (median)', 0)
-                up = latest_swing.get('Swing Max Player Load Up % (median)', 0)
+                # Retrieve your directional metrics
+                fwd = pd.to_numeric(latest_swing.get('Swing Max Player Load Fwd % (median)'), errors='coerce') or 0
+                side = pd.to_numeric(latest_swing.get('Swing Max Player Load Side % (median)'), errors='coerce') or 0
+                up = pd.to_numeric(latest_swing.get('Swing Max Player Load Up % (median)'), errors='coerce') or 0
 
                 profile_df = pd.DataFrame({
-                    'Dimension': ['Forward (Linear)', 'Side (Rotational)', 'Up (Vertical)'],
+                    'Dimension': ['Forward', 'Side', 'Up'],
                     'Value': [fwd, side, up]
                 })
 
                 c1, c2 = st.columns([1, 1])
-                
                 with c1:
                     fig_pie = px.pie(
                         profile_df, values='Value', names='Dimension',
-                        color_discrete_map={
-                            'Forward (Linear)': '#4895DB', 
-                            'Side (Rotational)': '#FF8200', 
-                            'Up (Vertical)': '#28a745'
-                        },
+                        color_discrete_map={'Forward': '#4895DB', 'Side': '#FF8200', 'Up': '#28a745'},
                         hole=0.4
                     )
                     st.plotly_chart(fig_pie, use_container_width=True)
@@ -405,17 +401,13 @@ if not ash_df.empty:
                     st.markdown(f"""
                         <div style="background-color:#F8F9FA; padding:20px; border-radius:15px; border:1px solid #E0E0E0;">
                             <p style="color:grey; font-weight:700; margin-bottom:5px;">MOVEMENT BREAKDOWN</p>
-                            <h4 style="color:#4895DB; margin:0;">Linear: {fwd:.1f}%</h4>
-                            <h4 style="color:#FF8200; margin:0;">Rotational: {side:.1f}%</h4>
-                            <h4 style="color:#28a745; margin:0;">Vertical: {up:.1f}%</h4>
+                            <h4 style="color:#4895DB; margin:0;">Forward (Linear): {fwd:.1f}%</h4>
+                            <h4 style="color:#FF8200; margin:0;">Side (Rotational): {side:.1f}%</h4>
+                            <h4 style="color:#28a745; margin:0;">Up (Vertical): {up:.1f}%</h4>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    # Analysis Text
-                    main_dir = profile_df.loc[profile_df['Value'].idxmax(), 'Dimension']
-                    st.info(f"Primary Swing Plane: **{main_dir}**")
 
             else:
-                st.info(f"No swing records found for {selected}.")
+                st.info(f"No swing records found for {selected} in {selected_year}.")
         else:
-            st.warning("Swing data could not be loaded. Please check the file connection.")
+            st.warning("Swing dataset is empty.")
