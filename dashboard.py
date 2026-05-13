@@ -397,37 +397,47 @@ if not ash_df.empty:
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-                # 5. MOVEMENT PROFILE TREND: Multi-Line View
+                # 5. MOVEMENT PROFILE HISTORY: SIDE-BY-SIDE CIRCLES
                 st.subheader(f"Movement Profile History: {swing_cat}")
                 
-                # Clean and prepare the metrics
+                # Filter p_swing to ensure we have numeric data for the charts
                 p_swing['Forward'] = pd.to_numeric(p_swing['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
                 p_swing['Side'] = pd.to_numeric(p_swing['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
                 p_swing['Up'] = pd.to_numeric(p_swing['Swing Max Player Load Up % (median)'], errors='coerce').fillna(0)
 
-                # Create the line chart
-                fig_lines = px.line(
-                    p_swing, 
-                    x='Date', 
-                    y=['Forward', 'Side', 'Up'],
-                    markers=True,
-                    labels={'value': 'Percentage of Load', 'variable': 'Dimension'},
-                    color_discrete_map={
-                        'Forward': '#4895DB', 
-                        'Side': '#FF8200', 
-                        'Up': '#28a745'
-                    },
-                    template="plotly_white"
-                )
-
-                fig_lines.update_layout(
-                    height=400,
-                    xaxis_title="",
-                    yaxis=dict(range=[0, 100], ticksuffix="%"),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    hovermode="x unified"
-                )
+                # Create rows of 3 circles each
+                num_sessions = len(p_swing)
+                cols_per_row = 3
                 
-                st.plotly_chart(fig_lines, use_container_width=True)
-                
-                st.info("**Coaching Tip:** Use this to track 'stability.' You want to see these lines stay relatively flat. If the **Green (Up)** line starts trending upward, the hitter may be losing their posture through the zone.")
+                if num_sessions > 0:
+                    # Iterate through the filtered sessions (Most recent first)
+                    p_swing_reversed = p_swing.sort_values('Date', ascending=False)
+                    
+                    for i in range(0, num_sessions, cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for j in range(cols_per_row):
+                            if i + j < num_sessions:
+                                session = p_swing_reversed.iloc[i + j]
+                                s_date = session['Date'].strftime('%m/%d/%Y')
+                                s_type = session.get('Session Type', 'Practice')
+                                
+                                with cols[j]:
+                                    st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: -10px;'>{s_date}<br><small>{s_type}</small></p>", unsafe_allow_html=True)
+                                    
+                                    fig_mini = px.pie(
+                                        values=[session['Forward'], session['Side'], session['Up']],
+                                        names=['Fwd', 'Side', 'Up'],
+                                        color_discrete_map={'Fwd': '#4895DB', 'Side': '#FF8200', 'Up': '#28a745'},
+                                        hole=0.5
+                                    )
+                                    
+                                    fig_mini.update_layout(
+                                        showlegend=False,
+                                        height=200,
+                                        margin=dict(t=30, b=10, l=10, r=10),
+                                        annotations=[dict(text=f"{int(session['Swing Count'])}", x=0.5, y=0.5, font_size=12, showarrow=False)]
+                                    )
+                                    # Text in the middle of the hole shows the total swing count for that session
+                                    st.plotly_chart(fig_mini, use_container_width=True, key=f"swing_pie_{i+j}")
+                else:
+                    st.info("No sessions to display in this view.")
