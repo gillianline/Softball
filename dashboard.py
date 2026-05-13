@@ -120,7 +120,6 @@ if not ash_df.empty:
             ash_filt['Peak Vertical Force [N] (L)'] = pd.to_numeric(ash_filt['Peak Vertical Force [N] (L)'], errors='coerce').fillna(0)
             ash_filt['Peak Vertical Force [N] (R)'] = pd.to_numeric(ash_filt['Peak Vertical Force [N] (R)'], errors='coerce').fillna(0)
             
-            # Individual arm baselines (Averages)
             base_f_l = ash_filt['Peak Vertical Force [N] (L)'].mean()
             base_f_r = ash_filt['Peak Vertical Force [N] (R)'].mean()
             
@@ -144,7 +143,7 @@ if not ash_df.empty:
 
             st.divider()
             
-            # 4. BILATERAL PROFILE (Bar Chart & Balance Box)
+            # 4. BILATERAL PROFILE & BALANCE BOX
             c1, c2 = st.columns([2, 1])
             with c1:
                 st.subheader("Left vs Right Force Profile")
@@ -181,15 +180,22 @@ if not ash_df.empty:
 
             st.divider()
 
-            # 6. UPDATED TABLE: L/R Force & Baselines
+            # 6. UPDATED TABLE: Using "Activity" or "Session Type" for Match Context
             st.subheader("Detailed Test History & Baselines")
             match_map = {}
             try:
+                # Combine Swing and Throw data
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
-                athlete_games = all_sessions[(all_sessions['Player Name'] == selected) & (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))]
+                # Filter for the selected athlete and look for 'Game' in Session Type or Activity
+                athlete_games = all_sessions[
+                    (all_sessions['Name'] == selected) & 
+                    (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
+                ]
                 for _, row in athlete_games.iterrows():
-                    match_map[row['Date'].date()] = f"{row.get('Opponent', 'Game')} ({row['Date'].strftime('%m/%d')})"
-            except: pass
+                    # Map the date to the Activity name (e.g., "Match v. Kentucky")
+                    match_map[row['Date'].date()] = f"{row.get('Activity', 'Game')} ({row['Date'].strftime('%m/%d')})"
+            except: 
+                pass
 
             ash_hist_df = ash_filt[['Date', 'Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)']].copy()
             
@@ -216,6 +222,7 @@ if not ash_df.empty:
 
         else:
             st.info("No ASH records found.")
+            
             
             
     with tab_cmj:
