@@ -180,19 +180,18 @@ if not ash_df.empty:
 
             st.divider()
 
-           # 3. FILTERED & SORTED TABLE: Most Recent to Oldest
+           # 3. FILTERED & SORTED TABLE: No Index Column
             st.subheader("Test History (Match Proximity)")
             
             match_map = {}
             try:
                 all_sessions = pd.concat([swing_df, throw_df], ignore_index=True)
-                # Filtering based on your new data structure
                 athlete_games = all_sessions[
                     (all_sessions['Name'] == selected) & 
                     (all_sessions['Session Type'].astype(str).str.contains('Game', case=False, na=False))
                 ]
                 for _, row in athlete_games.iterrows():
-                    # FIX: Removed the date formatting from the Activity string
+                    # Simplified: Activity name only (no extra date)
                     match_map[row['Date'].date()] = f"{row.get('Activity', 'Game')}"
             except: 
                 pass
@@ -218,7 +217,6 @@ if not ash_df.empty:
             ash_table_filt = ash_hist_df[ash_hist_df['Days Since'] <= 3].copy()
             
             if not ash_table_filt.empty:
-                # Ensure descending order
                 ash_table_filt = ash_table_filt.sort_values('Date', ascending=False)
                 
                 ash_table_filt['L vs Base'] = ash_table_filt['Peak Vertical Force [N] (L)'] - base_f_l
@@ -228,7 +226,8 @@ if not ash_df.empty:
                 ash_display['Date'] = ash_display['Date'].dt.strftime('%m/%d/%Y')
                 ash_display.columns = ['Test Date', 'Previous Match', 'Force (L)', '+/- Base (L)', 'Force (R)', '+/- Base (R)']
 
-                st.table(
+                # USE DATAFRAME WITH HIDE_INDEX TO REMOVE THE EXTRA COLUMN
+                st.dataframe(
                     ash_display.style.format({
                         'Force (L)': '{:.0f}N', 
                         '+/- Base (L)': '{:+.1f}N', 
@@ -236,7 +235,9 @@ if not ash_df.empty:
                         '+/- Base (R)': '{:+.1f}N'
                     })
                     .map(lambda x: f'color: {"#28a745" if x > 0 else "#dc3545"}; font-weight: bold', 
-                         subset=['+/- Base (L)', '+/- Base (R)'])
+                         subset=['+/- Base (L)', '+/- Base (R)']),
+                    use_container_width=True,
+                    hide_index=True
                 )
             else:
                 st.info("No ASH tests found within 3 days of a match.")
