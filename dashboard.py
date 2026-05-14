@@ -146,7 +146,7 @@ if check_password():
                 </div>
                 """, unsafe_allow_html=True)
 
-            tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(['INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
+            tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
         st.subheader(f"Executive Summary: {selected}")
