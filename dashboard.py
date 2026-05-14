@@ -411,6 +411,7 @@ if not ash_df.empty:
                 
                 st.dataframe(
                     display_df.style.format({
+                        'Swing Count': '{:.0f}',
                         'Intensity': '{:.2f}',
                         'Forward': '{:.1f}%',
                         'Side': '{:.1f}%',
