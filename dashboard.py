@@ -586,12 +586,12 @@ if not ash_df.empty:
                 st.warning("Please select an end date to view report.")
 
             # --- COACHING GLOSSARY ---
-        with st.expander("ℹ️ What do these metrics mean?"):
+        with st.expander("What do these metrics mean?"):
             st.markdown("""
             ### Throwing Metric Definitions
     
             * **Total Volume**: The total number of throws recorded during the selected date range.
-            * **High Intent**: Any throw that reaches **Rotation Band 3**. This measures maximal torso rotation and arm speed—essentially, the throws where the athlete is "bringing it."
+            * **High Intent**: Any throw that reaches **Rotation Band 3**. This measures maximal torso rotation and arm speed."
             * **Avg Work Quality**: The percentage of total throws that were 'High Intent.' 
                 * *Example:* 10 High Intent throws out of 100 total throws = **10% Work Quality**.
     
