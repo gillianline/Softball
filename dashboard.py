@@ -332,7 +332,7 @@ if not ash_df.empty:
 
     with tab_swing:
         if not swing_df.empty:
-            # 1. FILTERS
+            # 1. DATE & CATEGORY FILTERS
             f1, f2 = st.columns([2, 1])
             with f1:
                 df_s_dates = pd.to_datetime(swing_df['Date'])
@@ -344,11 +344,18 @@ if not ash_df.empty:
             with f2:
                 s_cat = st.segmented_control("Type", options=["All", "Games", "Practices"], default="All", key="s_ct_date")
 
+            # 2. SAFETY CHECK & DATA PROCESSING
             if isinstance(selected_dates_s, tuple) and len(selected_dates_s) == 2:
                 start_s, end_s = selected_dates_s
+                
                 df_s = swing_df.copy()
+                df_s.columns = df_s.columns.str.strip()
                 df_s['Date'] = pd.to_datetime(df_s['Date'])
-                p_s = df_s[(df_s['Name'] == selected) & (df_s['Date'].dt.date >= start_s) & (df_s['Date'].dt.date <= end_s)].copy()
+                
+                # Filter Athlete, Date, and Category
+                p_s = df_s[(df_s['Name'] == selected) & 
+                           (df_s['Date'].dt.date >= start_s) & 
+                           (df_s['Date'].dt.date <= end_s)].copy()
 
                 if s_cat == "Games":
                     p_s = p_s[p_s['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
@@ -356,44 +363,34 @@ if not ash_df.empty:
                     p_s = p_s[p_s['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
 
                 if not p_s.empty:
-                    # NUMERIC CONVERSION
-                    p_s['Swings'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').fillna(0)
-                    p_s['Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
-                    p_s['Total_Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+                    # RENAME & CLEAN NUMERICS
+                    p_s['Total'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').fillna(0)
+                    p_s['Max Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
+                    p_s['Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
                     
-                    # New Metrics for Coaches
-                    p_s['Intensity'] = p_s['Total_Load'] / p_s['Swings'].replace(0, 1)
-                    p_s['Fwd_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
-                    p_s['Side_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
+                    # Calculated Metrics
+                    p_s['Intensity'] = p_s['Load'] / p_s['Total'].replace(0, 1)
+                    p_s['Rot_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
                     
                     p_s = p_s.sort_values('Date')
                     latest_s = p_s.iloc[-1]
 
-                    # 3. SUMMARY HEADER
-                    st.subheader(f"Swing Report: {start_s.strftime('%m/%d')} - {end_s.strftime('%m/%d')}")
-                    
-                    # 4. BIG NUMBER METRICS (Now with Intensity & Movement)
-                    c1, c2, c3, c4 = st.columns(4)
-                    with c1:
-                        st.metric("Total Swings", f"{int(p_s['Swings'].sum())}")
-                    with c2:
-                        st.metric("Max Intent", f"{int(p_s['Intent'].sum())}")
-                    with c3:
-                        # Avg Intensity (Load per Swing)
-                        avg_int = p_s['Intensity'].mean()
-                        st.metric("Avg Intensity", f"{avg_int:.2f}", help="Load per swing. Higher = more explosive sessions.")
-                    with c4:
-                        # Movement Bias (Linear vs Rotational)
-                        avg_side = p_s['Side_Pct'].mean()
-                        st.metric("Rotational %", f"{avg_side:.1f}%", help="Higher % means more rotation, lower % means more linear/forward movement.")
+                    # 3. BIG NUMBER METRICS
+                    st.subheader(f"Range Summary: {start_s.strftime('%m/%d')} - {end_s.strftime('%m/%d')}")
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Total Swings", f"{int(p_s['Total'].sum())}")
+                    m2.metric("Max Intent", f"{int(p_s['Max Intent'].sum())}")
+                    m3.metric("Avg Intensity", f"{p_s['Intensity'].mean():.2f}")
+                    m4.metric("Avg Rot %", f"{p_s['Rot_Pct'].mean():.1f}%")
 
                     st.divider()
 
-                    # 5. VOLUME TREND
+                    # 4. COLOR-CODED BAR GRAPH (Blue = Game, Orange = Practice)
                     p_s['Session'] = p_s['Session Type'].apply(lambda x: 'Game' if 'Game' in str(x) else 'Practice')
-                    fig_s = px.bar(p_s, x='Date', y='Swings', color='Session',
+                    
+                    fig_s = px.bar(p_s, x='Date', y='Total', color='Session',
                                  color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
-                                 text='Swings', template="plotly_white")
+                                 text='Total', template="plotly_white")
                     
                     fig_s.update_traces(texttemplate='%{text:.0f}', textposition='outside', cliponaxis=False)
                     fig_s.update_layout(height=350, yaxis_visible=False, xaxis_title="",
@@ -402,57 +399,45 @@ if not ash_df.empty:
                     
                     st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
 
-                    # 6. TABLE (With Centering, No Index, No Decimals on Counts)
+                    # 5. CENTERED HTML TABLE (Fixed Traceback Error)
                     st.subheader("Session Details")
                     hist_s = p_s.sort_values('Date', ascending=False).copy()
                     hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
                     
-                    display_s = hist_s[['Date', 'Session Type', 'Swings', 'Intent', 'Intensity', 'Side_Pct']].rename(columns={
-                        'Swings':'Total', 'Intent':'Max Intent', 'Intensity':'Load/Sw', 'Side_Pct':'Rot %'
-                    })
-                    
+                    # Building rows manually to ensure precise formatting
+                    rows_html = ""
+                    for _, row in hist_s.iterrows():
+                        rows_html += f"""
+                        <tr>
+                            <td>{row['Date']}</td>
+                            <td>{row['Session Type']}</td>
+                            <td>{int(row['Total'])}</td>
+                            <td>{int(row['Max Intent'])}</td>
+                            <td>{row['Intensity']:.2f}</td>
+                            <td>{row['Rot_Pct']:.1f}%</td>
+                        </tr>
+                        """
+
                     table_html = f"""
                     <style>
-                        .s-table {{ width:100%; border-collapse:collapse; text-align:center; font-family: sans-serif; }}
-                        .s-table th {{ background:#f8f9fa; padding:10px; border-bottom:2px solid #dee2e6; }}
-                        .s-table td {{ padding:10px; border-bottom:1px solid #eee; }}
+                        .s-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
+                        .s-table th {{ background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: center !important; }}
+                        .s-table td {{ padding: 12px; border-bottom: 1px solid #eee; text-align: center !important; }}
                     </style>
                     <table class="s-table">
-                        <thead><tr>{" ".join([f"<th>{c}</th>" for c in display_s.columns])}</tr></thead>
-                        <tbody>
-                            {" ".join([f"<tr>" + "".join([
-                                f"<td>{int(v) if k in ['Total', 'Max Intent'] else (f'{v:.2f}' if k == 'Load/Sw' else f'{v:.1f}%' if k == 'Rot %' else v)}</td>" 
-                                for k, v in zip(display_s.columns, row)
-                            ]) + "</tr>" for row in display_hist_vals])}
-                        </tbody>
-                    </table>
-                    """
-                    # Note: Using zip logic to ensure 'Total' and 'Max Intent' stay as integers
-                    # (Code shortened for brevity, but full row iteration logic is applied)
-                    
-                    # Refined HTML Row logic for clarity:
-                    rows_html = ""
-                    for _, row in display_s.iterrows():
-                        rows_html += "<tr>"
-                        rows_html += f"<td>{row['Date']}</td>"
-                        rows_html += f"<td>{row['Session Type']}</td>"
-                        rows_html += f"<td>{int(row['Total'])}</td>"
-                        rows_html += f"<td>{int(row['Max Intent'])}</td>"
-                        rows_html += f"<td>{row['Load/Sw']:.2f}</td>"
-                        rows_html += f"<td>{row['Rot %']:.1f}%</td>"
-                        rows_html += "</tr>"
-
-                    full_table = f"""
-                    <table class="s-table">
-                        <thead><tr><th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th>
+                            </tr>
+                        </thead>
                         <tbody>{rows_html}</tbody>
                     </table>
                     """
-                    st.markdown(full_table, unsafe_allow_html=True)
+                    st.markdown(table_html, unsafe_allow_html=True)
                 else:
-                    st.info("No swing data for these dates.")
+                    st.info("No data found for this range.")
             else:
-                st.warning("Please select an end date.")
+                st.warning("Please select both a start and end date.")
                 
 
     with tab_throwing:
