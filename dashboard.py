@@ -119,6 +119,7 @@ if check_password():
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
+    tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     # --- 4. DASHBOARD UI ---
     if not ash_df.empty:
@@ -160,7 +161,6 @@ if check_password():
                 </div>
                 """, unsafe_allow_html=True)
 
-            tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
 
         with tab_ash:
