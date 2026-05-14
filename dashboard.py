@@ -533,19 +533,26 @@ if not ash_df.empty:
                 fig_simple.update_layout(height=300, yaxis_visible=False, xaxis_title="")
                 st.plotly_chart(fig_simple, use_container_width=True)
 
-                # 6. TABLE (Centered and No Index)
+                # 6. TABLE (Centered, No Decimals, No Index)
                 st.subheader("Session Details")
+
                 hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
-                
+
                 display_hist = hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
                     'Throws': 'Total',
                     'Intent': 'High Intent'
                 })
-                
-                # We use dataframe to hide the index; the CSS above handles the centering
+
+                # Using column_config to force alignment and number formatting
                 st.dataframe(
                     display_hist,
                     hide_index=True,
-                    use_container_width=True
+                    use_container_width=True,
+                    column_config={
+                        "Date": st.column_config.TextColumn("Date", help="Session Date", width="small"),
+                        "Session Type": st.column_config.TextColumn("Session Type"),
+                        "Total": st.column_config.NumberColumn("Total", format="%d"),
+                        "High Intent": st.column_config.NumberColumn("High Intent", format="%d"),
+                    }
                 )
