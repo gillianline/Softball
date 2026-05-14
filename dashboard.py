@@ -520,37 +520,65 @@ if not ash_df.empty:
 
                 st.divider()
 
-                # 5. SIMPLE TREND (Color-Coded & Locked)
+                # 5. SIMPLE TREND (Color-Coded, Forced Labels, No Errors)
                 st.subheader("Daily Volume in Selected Range")
                 
-                # Logic to ensure the colors map correctly even if session names vary
-                # We look for the word "Game" to assign blue, else orange
-                p_t['BarColor'] = p_t['Session Type'].apply(
-                    lambda x: 'Game' if 'Game' in str(x) else 'Practice'
-                )
+                # PREVENT ERRORS: Only run if two dates are selected
+                if len(selected_dates) == 2:
+                    start_date, end_date = selected_dates
+                    
+                    # Apply Date Filter
+                    p_t_trend = p_t[(p_t['Date'].dt.date >= start_date) & (p_t['Date'].dt.date <= end_date)].copy()
+                    
+                    if not p_t_trend.empty:
+                        # Logic for Colors
+                        p_t_trend['Session'] = p_t_trend['Session Type'].apply(
+                            lambda x: 'Game' if 'Game' in str(x) else 'Practice'
+                        )
 
-                fig_simple = px.bar(
-                    p_t, x='Date', y='Throws',
-                    color='BarColor',
-                    color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
-                    text_auto='.0f',
-                    template="plotly_white"
-                )
+                        fig_simple = px.bar(
+                            p_t_trend, x='Date', y='Throws',
+                            color='Session',
+                            color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
+                            text='Throws', # Use raw values for labels
+                            template="plotly_white"
+                        )
 
-                fig_simple.update_layout(
-                    height=300, 
-                    yaxis_visible=False, 
-                    xaxis_title="",
-                    showlegend=False, # Keeps it clean for the coach
-                    hovermode=False    # Disables hover labels entirely
-                )
+                        fig_simple.update_traces(
+                            texttemplate='%{text}', 
+                            textposition='outside', # Force numbers outside the bar
+                            cliponaxis=False         # Ensure numbers don't get cut off at the top
+                        )
 
-                # The config={'displayModeBar': False} removes the "Edit Tools"
-                st.plotly_chart(
-                    fig_simple, 
-                    use_container_width=True, 
-                    config={'displayModeBar': False, 'staticPlot': True}
-                )
+                        fig_simple.update_layout(
+                            height=350, 
+                            yaxis_visible=False, 
+                            xaxis_title="",
+                            # Custom Legend at the Top
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1,
+                                title_text=""
+                            ),
+                            # Fix for sideways text: Force text to be horizontal
+                            uniformtext=dict(minsize=10, mode='hide'),
+                            xaxis=dict(tickformat="%m/%d")
+                        )
+
+                        st.plotly_chart(
+                            fig_simple, 
+                            use_container_width=True, 
+                            config={'displayModeBar': False, 'staticPlot': True}
+                        )
+                    else:
+                        st.info("No data for these dates.")
+                else:
+                    # This prevents the red error message while the user is still clicking
+                    st.warning("Please select both a start and end date.")
+                    
                 
                 # 6. TABLE (HTML Forced Centering & No Index)
                 st.subheader("Session Details")
