@@ -586,7 +586,7 @@ if not ash_df.empty:
                 st.warning("Please select an end date to view report.")
 
             # --- COACHING GLOSSARY ---
-`        with st.expander("ℹ️ What do these metrics mean?"):
+        with st.expander("ℹ️ What do these metrics mean?"):
             st.markdown("""
             ### Throwing Metric Definitions
     
