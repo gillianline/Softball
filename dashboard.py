@@ -149,132 +149,75 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        # 1. DATE SELECTION (Session Selection)
+        # 1. TIME WINDOW SELECTION
         st.markdown("<br>", unsafe_allow_html=True)
-        f_col1, f_col2 = st.columns(2)
-        with f_col1:
-            # We use this as the "Session Selection" like your screenshot
-            p_dates = st.date_input("Session Selection", 
-                value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
-                key="vball_style_date")
-        
+        p_dates = st.date_input("Analysis Window", 
+            value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
+            key="simple_profile_date")
+
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
             start_p, end_p = p_dates
             
-            # --- DATA FILTERING (Fixes the NameError) ---
+            # Filter Data
             p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
             p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)].copy()
             p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
             p_c = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
 
-            # --- CALCULATIONS ---
-            # Force Grade
-            f_max = ash_filt['Peak Vertical Force [N]'].max()
-            f_curr = p_ash['Peak Vertical Force [N]'].mean() if not p_ash.empty else 0
-            f_grade = (f_curr / f_max * 100) if f_max > 0 else 0
+            # --- 2. TOP LEVEL STATUS ---
+            st.markdown("### ATHLETE STATUS")
+            s1, s2, s3, s4 = st.columns(4)
             
-            # RSI Grade
-            rsi_max = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
-            rsi_curr = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
-            rsi_grade = (rsi_curr / rsi_max * 100) if rsi_max > 0 else 0
+            # Readiness Status
+            rsi = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
+            status = "PEAKING" if rsi > 0.45 else "STABLE" if rsi > 0.35 else "FATIGUED"
+            s1.metric("Readiness", status)
 
-            # Intent Grade
-            s_vol = p_s['Swing Count'].sum() if not p_s.empty else 0
+            # Load Status
+            total_reps = p_s.shape[0] + p_t.shape[0]
+            l_status = "HIGH" if total_reps > 15 else "MODERATE" if total_reps > 5 else "LOW"
+            s2.metric("Load", l_status)
+
+            # Asymmetry
+            l_avg = p_ash['Peak Vertical Force [N] (L)'].mean() if not p_ash.empty else 0
+            r_avg = p_ash['Peak Vertical Force [N] (R)'].mean() if not p_ash.empty else 0
+            asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
+            s3.metric("Asymmetry", f"{asym:.1f}%")
+
+            # High Intent
+            s_total = p_s['Swing Count'].sum() if not p_s.empty else 0
             s_intent = p_s['Swing Max Rotation Band 3 Count'].sum() if not p_s.empty else 0
-            s_grade = (s_intent / s_vol * 100) if s_vol > 0 else 0
-
-            # Aggregate Session Score (Gold Box)
-            session_score = (f_grade * 0.4) + (rsi_grade * 0.4) + (s_grade * 0.2)
-
-            # --- 2. THE VOLLEYBALL LAYOUT ---
-            # Column 1: Photo | Column 2: Table | Column 3: Score Box
-            row_col1, row_col2, row_col3 = st.columns([1, 2, 1])
-
-            with row_col1:
-                st.markdown(f"""
-                    <div style="text-align: center;">
-                        <img src="{img_url}" style="border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200;">
-                        <h2 style="margin-top: 15px; font-size: 32px;">{selected}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with row_col2:
-                # Summary Table (Metric, Today, 30D Max, Grade)
-                table_data = [
-                    {"Metric": "Peak Force (N)", "Today": f"{int(f_curr)}", "30D Max": f"{int(f_max)}", "Grade": f"{f_grade:.0f}"},
-                    {"Metric": "RSI-modified", "Today": f"{rsi_curr:.2f}", "30D Max": f"{rsi_max:.2f}", "Grade": f"{rsi_grade:.0f}"},
-                    {"Metric": "Swing Intent %", "Today": f"{s_grade:.1f}%", "30D Max": "30%", "Grade": f"{(s_grade/30*100):.0f}"},
-                ]
-                
-                # Manual HTML Table to match the screenshot styling
-                rows = "".join([f"""
-                    <tr>
-                        <td style="padding:10px; border-bottom:1px solid #eee;">{d['Metric']}</td>
-                        <td style="padding:10px; border-bottom:1px solid #eee; font-weight:bold; background-color:#fce4e4;">{d['Today']}</td>
-                        <td style="padding:10px; border-bottom:1px solid #eee;">{d['30D Max']}</td>
-                        <td style="padding:10px; border-bottom:1px solid #eee;">{d['Grade']}</td>
-                    </tr>""" for d in table_data])
-                
-                st.markdown(f"""
-                    <table style="width:100%; border-collapse: collapse; text-align: center; font-family: sans-serif;">
-                        <tr style="background-color:#4895DB; color:white;">
-                            <th style="padding:12px;">METRIC</th>
-                            <th style="padding:12px;">TODAY TOTAL</th>
-                            <th style="padding:12px;">SEASON MAX</th>
-                            <th style="padding:12px;">GRADE</th>
-                        </tr>
-                        {rows}
-                    </table>
-                    <p style="font-size:11px; color:grey; margin-top:10px;">* Red highlight and arrows indicate a significant change (> or < 10%) from the athlete's 30-day session average.</p>
-                """, unsafe_allow_html=True)
-
-            with row_col3:
-                # The Gold Session Score Box
-                st.markdown(f"""
-                    <div style="background-color:#CC9E40; padding:40px 10px; border-radius:20px; text-align:center; color:white; margin-top:20px;">
-                        <h1 style="font-size:70px; margin:0;">{session_score:.0f}</h1>
-                    </div>
-                    <p style="text-align:center; font-weight:bold; color:grey; margin-top:10px; text-transform:uppercase; letter-spacing:1px;">Session Score</p>
-                """, unsafe_allow_html=True)
+            intent_pct = (s_intent / s_total * 100) if s_total > 0 else 0
+            s4.metric("Intent Quality", f"{intent_pct:.1f}%")
 
             st.divider()
 
-            # --- 4. 7-DAY TREND (The "Clean Line") ---
+            # --- 3. 7-DAY TREND ---
             st.markdown("### 7-DAY VOLUME TREND")
             if not p_s.empty or not p_t.empty:
-                s_daily = p_s.groupby('Date')['Swing Count'].sum().reset_index()
-                t_daily = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
-                trend_data = pd.merge(s_daily, t_daily, on='Date', how='outer').fillna(0)
+                s_trend = p_s.groupby('Date')['Swing Count'].sum().reset_index()
+                t_trend = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
+                trend_df = pd.merge(s_trend, t_trend, on='Date', how='outer').fillna(0)
                 
-                fig_trend = px.line(trend_data, x='Date', y=['Swing Count', 'Total Throw Count'], 
+                fig_trend = px.line(trend_df, x='Date', y=['Swing Count', 'Total Throw Count'],
                                    color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
                                    template="plotly_white")
-                fig_trend.update_layout(height=250, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="", yaxis_title="Reps", legend=dict(orientation="h", y=1.2))
+                fig_trend.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="", legend=dict(orientation="h", y=1.2))
                 st.plotly_chart(fig_trend, use_container_width=True)
 
-            st.divider()
-
-            # --- 5. COACHING NOTES & RECENT ACTIVITY ---
-            n_col, a_col = st.columns(2)
-            
-            with n_col:
-                st.markdown("### COACHING NOTES")
-                st.markdown(f"""
-                * **RSI**: {'Trending upward' if rsi > prev_rsi else 'Slightly declining'}
-                * **Symmetry**: {asym_status} variance ({asym:.1f}%)
-                * **Volume**: {load_status} workload in this window
-                """)
-
-            with a_col:
-                st.markdown("### RECENT ACTIVITY")
+            # --- 4. RECENT ACTIVITY ---
+            st.markdown("### RECENT ACTIVITY")
+            c1, c2 = st.columns(2)
+            with c1:
                 st.markdown(f"""
                 * **Swings**: {int(p_s['Swing Count'].sum())}
                 * **Throws**: {int(p_t['Total Throw Count'].sum())}
+                """)
+            with c2:
+                st.markdown(f"""
                 * **ASH Sessions**: {len(p_ash)}
                 * **CMJ Sessions**: {len(p_c)}
                 """)
-            
-            st.divider()
                 
                 
         with tab_ash:
