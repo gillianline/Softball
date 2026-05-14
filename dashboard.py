@@ -103,7 +103,7 @@ if not ash_df.empty:
             </div>
             """, unsafe_allow_html=True)
 
-        tab_ash, tab_cmj, tab_swing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING"])
+        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_ash:
         if not ash_filt.empty:
@@ -422,3 +422,129 @@ if not ash_df.empty:
                 )
             else:
                 st.info(f"No records found for {selected} in {swing_year}.")
+
+    with tab_throwing:
+        if not throw_df.empty:
+            # 1. INTERNAL TAB FILTERS
+            f1, f2 = st.columns([1, 2])
+            with f1:
+                throw_year = st.selectbox("Season", options=[2026, 2025, 2024], key="throw_yr")
+            with f2:
+                throw_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="throw_ct")
+
+            # 2. DATA PROCESSING & NUMERIC CONVERSION
+            df_t = throw_df.copy()
+            df_t.columns = df_t.columns.str.strip()
+            df_t['Date'] = pd.to_datetime(df_t['Date'])
+            
+            p_throw = df_t[df_t['Name'] == selected].copy()
+            p_throw = p_throw[p_throw['Date'].dt.year == throw_year]
+            
+            if throw_cat == "Games":
+                p_throw = p_throw[p_throw['Session Type'].str.contains('Game', case=False, na=False)]
+            elif throw_cat == "Practices":
+                p_throw = p_throw[p_throw['Session Type'].str.contains('Practice|Session', case=False, na=False)]
+
+            if not p_throw.empty:
+                # Force numeric for all throwing metrics
+                p_throw['Throw Count'] = pd.to_numeric(p_throw['Total Throw Count'], errors='coerce').fillna(0)
+                p_throw['Throw Load'] = pd.to_numeric(p_throw['Total Throw Player Load'], errors='coerce').fillna(0)
+                p_throw['B3_Rot'] = pd.to_numeric(p_throw['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
+                p_throw['PL3_Count'] = pd.to_numeric(p_throw['Total Throw Count - Player Load 3'], errors='coerce').fillna(0)
+                
+                # Calculate Throw Intensity (Load per Throw)
+                p_throw['Intensity'] = p_throw['Throw Load'] / p_throw['Throw Count'].replace(0, 1)
+                
+                p_throw = p_throw.sort_values('Date')
+                latest = p_throw.iloc[-1]
+
+                # 3. TOP METRICS
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Total Throws", f"{int(latest['Throw Count'])}")
+                m2.metric("Total Load", f"{float(latest['Throw Load']):.1f}")
+                m3.metric("High Intent (B3)", f"{int(latest['B3_Rot'])}")
+                m4.metric("Load/Throw", f"{latest['Intensity']:.2f}")
+
+                st.divider()
+
+                # 4. TREND GRAPH: Volume vs. Intensity
+                st.subheader(f"Throwing Volume Trend: {throw_cat}")
+                fig_t_trend = px.bar(
+                    p_throw, x='Date', y='Throw Count',
+                    color_discrete_sequence=["#4895DB"],
+                    template="plotly_white"
+                )
+                
+                # Overlay High Intensity (PL3) as a trend line
+                fig_t_trend.add_scatter(
+                    x=p_throw['Date'], y=p_throw['PL3_Count'],
+                    name="High Load Throws (PL3)", mode='lines+markers', yaxis="y2",
+                    line=dict(color="#FF8200", width=3)
+                )
+
+                fig_t_trend.update_layout(
+                    height=400,
+                    yaxis2=dict(title="PL3 Throws", overlaying="y", side="right"),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    yaxis=dict(range=[0, p_throw['Throw Count'].max() * 1.2] if not p_throw.empty else [0, 50])
+                )
+                st.plotly_chart(fig_t_trend, use_container_width=True)
+
+                # 5. THROWING FINGERPRINT (RADAR)
+                # Comparing High Effort Throws across Load and Rotation Bands
+                st.subheader("Throwing Intensity Fingerprint")
+                
+                avg_b3 = p_throw['B3_Rot'].mean()
+                avg_pl3 = p_throw['PL3_Count'].mean()
+                avg_int = p_throw['Intensity'].mean()
+                
+                categories = ['Rotation B3', 'Player Load 3', 'Intensity (Avg)']
+                
+                import plotly.graph_objects as go
+                fig_radar_t = go.Figure()
+
+                # Season Baseline
+                fig_radar_t.add_trace(go.Scatterpolar(
+                    r=[avg_b3, avg_pl3, avg_int * 10], # Scaled intensity
+                    theta=categories,
+                    fill='toself',
+                    name='Season Average',
+                    line_color='rgba(150, 150, 150, 0.5)',
+                    fillcolor='rgba(200, 200, 200, 0.2)'
+                ))
+
+                # Latest Session
+                fig_radar_t.add_trace(go.Scatterpolar(
+                    r=[latest['B3_Rot'], latest['PL3_Count'], latest['Intensity'] * 10],
+                    theta=categories,
+                    fill='toself',
+                    name='Latest Session',
+                    line_color='#FF8200',
+                    fillcolor='rgba(255, 130, 0, 0.3)'
+                ))
+
+                fig_radar_t.update_layout(
+                    polar=dict(radialaxis=dict(visible=True)),
+                    showlegend=True,
+                    height=450
+                )
+                st.plotly_chart(fig_radar_t, use_container_width=True)
+
+                # 6. RECENT HISTORY TABLE
+                st.subheader("Recent Throwing Sessions")
+                t_history = p_throw.sort_values('Date', ascending=False).head(5).copy()
+                t_history['Date'] = t_history['Date'].dt.strftime('%m/%d')
+                
+                display_t = t_history[['Date', 'Session Type', 'Throw Count', 'Intensity', 'B3_Rot', 'PL3_Count']].copy()
+                st.dataframe(
+                    display_t.style.format({
+                        'Throw Count': '{:.0f}',
+                        'Intensity': '{:.2f}',
+                        'B3_Rot': '{:.0f}',
+                        'PL3_Count': '{:.0f}'
+                    }),
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info(f"No throwing records found for {selected} in {throw_year}.")
