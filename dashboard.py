@@ -520,21 +520,41 @@ if not ash_df.empty:
 
                 st.divider()
 
-                # 5. SIMPLE TREND (The Bars)
+                # 5. SIMPLE TREND (Color-Coded & Locked)
                 st.subheader("Daily Volume in Selected Range")
+                
+                # Logic to ensure the colors map correctly even if session names vary
+                # We look for the word "Game" to assign blue, else orange
+                p_t['BarColor'] = p_t['Session Type'].apply(
+                    lambda x: 'Game' if 'Game' in str(x) else 'Practice'
+                )
+
                 fig_simple = px.bar(
                     p_t, x='Date', y='Throws',
+                    color='BarColor',
+                    color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
                     text_auto='.0f',
-                    color_discrete_sequence=["#4895DB"],
                     template="plotly_white"
                 )
-                fig_simple.update_layout(height=300, yaxis_visible=False, xaxis_title="")
-                st.plotly_chart(fig_simple, use_container_width=True)
 
+                fig_simple.update_layout(
+                    height=300, 
+                    yaxis_visible=False, 
+                    xaxis_title="",
+                    showlegend=False, # Keeps it clean for the coach
+                    hovermode=False    # Disables hover labels entirely
+                )
+
+                # The config={'displayModeBar': False} removes the "Edit Tools"
+                st.plotly_chart(
+                    fig_simple, 
+                    use_container_width=True, 
+                    config={'displayModeBar': False, 'staticPlot': True}
+                )
+                
                 # 6. TABLE (HTML Forced Centering & No Index)
                 st.subheader("Session Details")
                 
-                # Prep the data
                 hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
                 
@@ -543,39 +563,17 @@ if not ash_df.empty:
                     'Intent': 'High Intent'
                 })
 
-                # Create the HTML Table string
                 table_html = f"""
                 <style>
-                    .coach-table {{
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-family: sans-serif;
-                    }}
-                    .coach-table th, .coach-table td {{
-                        text-align: center !important;
-                        padding: 12px;
-                        border-bottom: 1px solid #f0f2f6;
-                    }}
-                    .coach-table th {{
-                        background-color: #f8f9fa;
-                        color: #495057;
-                        font-weight: bold;
-                    }}
+                    .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
+                    .coach-table th, .coach-table td {{ text-align: center !important; padding: 12px; border-bottom: 1px solid #f0f2f6; }}
+                    .coach-table th {{ background-color: #f8f9fa; color: #495057; font-weight: bold; }}
                 </style>
                 <table class="coach-table">
-                    <thead>
-                        <tr>
-                            {" ".join([f"<th>{col}</th>" for col in display_hist.columns])}
-                        </tr>
-                    </thead>
+                    <thead><tr>{" ".join([f"<th>{col}</th>" for col in display_hist.columns])}</tr></thead>
                     <tbody>
-                        {" ".join([
-                            f"<tr>{' '.join([f'<td>{val}</td>' for val in row])}</tr>" 
-                            for row in display_hist.values
-                        ])}
+                        {" ".join([f"<tr>{' '.join([f'<td>{int(val) if isinstance(val, (int, float)) else val}</td>' for val in row])}</tr>" for row in display_hist.values])}
                     </tbody>
                 </table>
                 """
-                
-                # Display the HTML
                 st.markdown(table_html, unsafe_allow_html=True)
