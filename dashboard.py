@@ -371,12 +371,10 @@ if not ash_df.empty:
                     p_s = p_s[p_s['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
 
                 if not p_s.empty:
-                    # --- FIXING THE COLUMN NAMES HERE ---
+                    # Metric Processing
                     p_s['Total'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').fillna(0)
-                    # Ensure this name matches the HTML loop exactly
                     p_s['Max Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
                     p_s['Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
-                
                     p_s['Intensity'] = p_s['Load'] / p_s['Total'].replace(0, 1)
                     p_s['Rot_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
                 
@@ -411,52 +409,50 @@ if not ash_df.empty:
                 
                     st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
 
-                    # 5. CENTERED HTML TABLE (Complete Single-String Build)
+                    # 5. CENTERED HTML TABLE (Bulletproof Single-String)
                     st.subheader("Session Details")
-                
-                    # Sort and format the data
                     hist_s = p_s.sort_values('Date', ascending=False).copy()
                     hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
                 
-                    # Start building the HTML string
-                    table_html = """
+                    rows_list = []
+                    for _, row in hist_s.iterrows():
+                        rows_list.append(
+                            f"<tr>"
+                            f"<td>{row['Date']}</td>"
+                            f"<td>{row['Session Type']}</td>"
+                            f"<td>{int(row['Total'])}</td>"
+                            f"<td>{int(row['Max Intent'])}</td>"
+                            f"<td>{row['Intensity']:.2f}</td>"
+                            f"<td>{row['Rot_Pct']:.1f}%</td>"
+                            f"</tr>"
+                        )
+                    all_rows_html = "".join(rows_list)
+
+                    table_html = f"""
                     <style>
-                        .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; }
-                        .coach-table th { background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: center !important; }
-                        .coach-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: center !important; }
+                        .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; }}
+                        .coach-table th {{ background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; }}
+                        .coach-table td {{ padding: 12px; border-bottom: 1px solid #eee; }}
                     </style>
                     <table class="coach-table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Total</th>
-                                <th>Max Intent</th>
-                                <th>Load/Sw</th>
-                                <th>Rot %</th>
+                                <th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th>
                             </tr>
                         </thead>
                         <tbody>
+                            {all_rows_html}
+                        </tbody>
+                    </table>
                     """
-
-                    # Loop through data to add rows
-                    for _, row in hist_s.iterrows():
-                        table_html += f"""
-                            <tr>
-                                <td>{row['Date']}</td>
-                                <td>{row['Session Type']}</td>
-                                <td>{int(row['Total'])}</td>
-                                <td>{int(row['Max Intent'])}</td>
-                                <td>{row['Intensity']:.2f}</td>
-                                <td>{row['Rot_Pct']:.1f}%</td>
-                            </tr>
-                        """
-
-                    # Close the table tags
-                    table_html += "</tbody></table>"
-
-                    # Render it once
                     st.markdown(table_html, unsafe_allow_html=True)
+                else:
+                    st.info(f"No records found for {selected} in this range.")
+            else:
+                # Prevents NameErrors while picking dates
+                st.warning("Please select both a start and end date.")
+        else:
+            st.error("Swing data source is empty.")
 
     with tab_throwing:
         if not throw_df.empty:
