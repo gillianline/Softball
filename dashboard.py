@@ -28,10 +28,8 @@ def check_password():
 
 # --- MAIN APP EXECUTION ---
 if check_password():
-    
-    # --- 1. PAGE CONFIG ---
-    st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
+    # --- 3. BRANDING & GLOBAL STYLES ---
     st.markdown("""
         <style>
         /* Centers everything inside the dataframe cells */
@@ -43,10 +41,21 @@ if check_password():
         [data-testid="stTable"] td, [data-testid="stDataFrameDataLayer"] td {
             text-align: center !important;
         }
+        .stApp { background-color: #FFFFFF; color: #1D1D1F; }
+        [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
+        .athlete-header {
+            background-color: #F8F9FA; padding: 20px; border-radius: 15px;
+            border-left: 10px solid #FF8200; margin-bottom: 25px;
+        }
+        .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
+        .metric-sub { font-size: 14px; font-weight: 700; margin-top: -15px; margin-bottom: 10px; }
+        .red-text { color: #dc3545; }
+        .green-text { color: #28a745; }
+        #MainMenu, footer, header { visibility: hidden; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- BRANDING HEADER (CENTERED) ---
+    # BRANDING HEADER (CENTERED)
     st.markdown(
         """
         <div style="text-align: center;">
@@ -60,77 +69,50 @@ if check_password():
     )
     st.divider()
 
-    # --- 2. CUSTOM LADY VOL CSS ---
-    st.markdown("""
-        <style>
-        .stApp { background-color: #FFFFFF; color: #1D1D1F; }
-        [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
-        .athlete-header {
-            background-color: #F8F9FA; padding: 20px; border-radius: 15px;
-            border-left: 10px solid #FF8200; margin-bottom: 25px;
-        }
-        .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
-        .metric-sub { font-size: 14px; font-weight: 700; margin-top: -15px; margin-bottom: 10px; }
-        .red-text { color: #dc3545; }
-        .green-text { color: #28a745; }
-        #MainMenu, footer, header { visibility: hidden; }
-        </style>
-        """, unsafe_allow_html=True)
-
-
-    # --- 3. DATA LOADING & MERGING ---
+    # --- 4. DATA LOADING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
-            # 1. Load Raw Data
             ash_df = pd.read_csv(st.secrets["ASH_URL"])
             cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
             roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
             swing_df = pd.read_csv(st.secrets["SWING_URL"])
             throw_df = pd.read_csv(st.secrets["THROW_URL"])
-        
-            # 2. Clean Column Names
+            
             for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-            # 3. DYNAMIC PHOTO COLUMN FIX
-            # This finds whatever column you named the photos and renames it to 'Photo'
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
             if photo_col:
                 roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
             else:
-                # Fallback if no photo column exists at all
                 roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
 
-            # 4. MERGE (Ensuring 'Photo' and 'Player Name' exist)
             if 'Player Name' in roster_df.columns:
-                # Merge photo into performance dataframes
                 ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
                 cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
-        
+            
             return ash_df, cmj_df, swing_df, throw_df
-
         except Exception as e:
             st.error(f"Data Sync Error: {e}")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
-    # --- 4. DASHBOARD UI ---
+    # --- 5. DASHBOARD UI ---
     if not ash_df.empty:
-        # 1. TABS AT THE TOP
+        # 1. TABS AT THE TOP (Navigation)
         tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
-        # 2. SELECTION & FILTERS (Now underneath the tabs)
+        # 2. SELECTION & FILTERS (Persistent across tabs)
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
-    
+        
         p_ash_all = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
-    
+        
         with f_col2:
             years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
             selected_year = st.selectbox("Select Season", ["All Time"] + years)
@@ -145,7 +127,7 @@ if check_password():
             cmj_filt = cmj_df[(cmj_df['Player Name'] == selected) & (cmj_df['Date'].dt.year == selected_year)].sort_values('Date')
             label = str(selected_year)
 
-        # 4. ATHLETE PROFILE HEADER (Below selection, above charts)
+        # 4. ATHLETE PROFILE HEADER
         latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
 
         if latest_ash is not None:
