@@ -149,106 +149,119 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        # 1. DATE FILTERS (Anchored at the top of the tab)
-        st.markdown("### Training Block Analysis")
+        # 1. DATE FILTERS
+        st.markdown("### 🗓️ Training Window Analysis")
         p_dates = st.date_input(
             "Select Performance Window", 
             value=(ash_filt['Date'].max() - pd.Timedelta(days=14), ash_filt['Date'].max().date()),
-            key="prof_date_block"
+            key="prof_date_block_final"
         )
 
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
             start_p, end_p = p_dates
             
-            # Filter all datasets for the specific window
+            # Filter Datasets
             p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
             p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)].copy()
             p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
 
             st.divider()
 
-            # 2. THE "LADY VOL PERFORMANCE RADAR" (Bilateral Comparison)
-            c1, c2 = st.columns([2, 1])
-
-            with c1:
-                st.subheader("Bilateral Force Profile (Lead vs. Trail)")
-                if not p_ash.empty:
-                    # Rolling history of L vs R in this window
-                    fig_bilateral = px.line(p_ash, x='Date', 
-                                            y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
-                                            markers=True,
-                                            color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
-                                            template="plotly_white")
-                    fig_bilateral.update_layout(height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                    st.plotly_chart(fig_bilateral, use_container_width=True)
-                else:
-                    st.info("No ASH test data in this window.")
-
-            with c2:
-                st.subheader("Workload Balance")
-                s_vol = pd.to_numeric(p_s['Swing Count'], errors='coerce').sum()
-                t_vol = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').sum()
-                
-                if s_vol + t_vol > 0:
-                    fig_pie = px.pie(values=[s_vol, t_vol], names=["Swings", "Throws"],
-                                     hole=0.6, color_discrete_sequence=["#FF8200", "#4895DB"])
-                    fig_pie.update_layout(height=350, showlegend=False, 
-                                          annotations=[dict(text=f'Total Reps<br>{int(s_vol+t_vol)}', x=0.5, y=0.5, font_size=16, showarrow=False)])
-                    st.plotly_chart(fig_pie, use_container_width=True)
-                else:
-                    st.info("No volume data found.")
-
-            st.divider()
-
-            # 3. THE "PERFORMANCE SCORECARD" (Relative to Season Best)
-            st.subheader("Relative Performance Status")
-            k1, k2, k3, k4 = st.columns(4)
-
-            # Intensity Logic
+            # --- SECTION 1: THE PERFORMANCE SNAPSHOT ---
+            st.markdown("### Power & Explosiveness")
+            st.info("How much 'Gas' does the athlete have in the tank right now compared to their best?")
+            
+            c1, c2, c3 = st.columns(3)
+            
+            # A. Swing Intensity (Max Intent Efficiency)
             if not p_s.empty:
-                p_s['Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+                p_s['Max Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
                 p_s['Total'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').replace(0, 1)
-                curr_int = (p_s['Load'].sum() / p_s['Total'].sum())
-                season_best_int = (pd.to_numeric(swing_df['Sum Swing Max Player Load'], errors='coerce').max() / 1) # Approximation
+                intent_pct = (p_s['Max Intent'].sum() / p_s['Total'].sum()) * 100
                 
-                # Metric with Season-Best Context
-                k1.metric("Swing Intensity", f"{curr_int:.2f}", delta=f"{curr_int-2.0:.2f} vs Avg")
-                
+                c1.metric("Work Quality (Intent %)", f"{intent_pct:.1f}%", help="What % of their swings are reaching max rotation speeds?")
+                # Progress bar toward a 'Elite' 30% goal
+                st.write("Progress toward Elite Intent (30%):")
+                st.progress(min(intent_pct / 30, 1.0))
+
+            # B. ASH Force Maintenance
             if not p_ash.empty:
                 curr_force = p_ash['Peak Vertical Force [N]'].mean()
                 season_max = ash_filt['Peak Vertical Force [N]'].max()
-                diff_force = ((curr_force - season_max) / season_max) * 100
-                k2.metric("Force Maintenance", f"{int(curr_force)}N", delta=f"{diff_force:.1f}% from Max")
-
-            if not p_t.empty:
-                p_t['Intent'] = pd.to_numeric(p_t['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
-                quality = (p_t['Intent'].sum() / pd.to_numeric(p_t['Total Throw Count'], errors='coerce').sum()) * 100
-                k3.metric("Throwing Quality", f"{quality:.1f}%")
+                pct_of_max = (curr_force / season_max) * 100
                 
-            # CMJ Readiness Check
+                c2.metric("Force Maintenance", f"{pct_of_max:.1f}%", help="Current Avg Force vs. Season Best. 100% means they are at their strongest.")
+                st.write(f"Season Max: {int(season_max)}N")
+                st.progress(min(pct_of_max / 100, 1.0))
+
+            # C. Jump Readiness (RSI-m)
             c_win = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
             if not c_win.empty:
                 curr_rsi = c_win['RSI-modified (Imp-Mom) [m/s]'].mean()
-                k4.metric("Readiness (RSI-m)", f"{curr_rsi:.2f}")
+                c3.metric("CNS Readiness (RSI-m)", f"{curr_rsi:.2f}", help="Measures how fast the athlete's brain is talking to their muscles.")
+                # Logic to explain RSI
+                rsi_status = "Elite" if curr_rsi > 0.45 else "Good" if curr_rsi > 0.35 else "Fatigued"
+                st.write(f"Status: **{rsi_status}**")
 
             st.divider()
 
-            # 4. PLAYER TYPE CLASSIFICATION
-            st.subheader("Athlete Profile Summary")
+            # --- SECTION 2: BILATERAL BALANCE (HEALTH) ---
+            st.markdown("### ⚖️ Bilateral Symmetry (Lead vs. Trail)")
+            st.warning("Softball is a rotational sport. If the gap between Lead and Trail legs gets too wide, injury risk increases.")
             
-            # Simple Logic to categorize the athlete's week
-            if not p_ash.empty and not p_s.empty:
-                l_avg = p_ash['Peak Vertical Force [N] (L)'].mean()
-                r_avg = p_ash['Peak Vertical Force [N] (R)'].mean()
-                asym = abs(l_avg - r_avg) / max(l_avg, r_avg) * 100
-                
-                if asym > 12:
-                    st.error(f"**ASYMMETRY WARNING**: Player is currently showing {asym:.1f}% force variance. Monitor Lead-leg fatigue.")
-                elif curr_int > 2.2:
-                    st.success(f"**POWER PROFILE**: Player is maintaining elite swing intensity ({curr_int:.2f}) during this block.")
-                else:
-                    st.info("**STEADY STATE**: Player is maintaining consistent baseline volume and intensity.")
+            h_col1, h_col2 = st.columns([2, 1])
+            
+            with h_col1:
+                if not p_ash.empty:
+                    fig_bilat = px.line(p_ash, x='Date', y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
+                                       markers=True, color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
+                                       labels={'value': 'Force (N)', 'variable': 'Side'}, template="plotly_white")
+                    fig_bilat.update_layout(height=350, margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", y=1.1, x=1))
+                    st.plotly_chart(fig_bilat, use_container_width=True)
 
+            with h_col2:
+                if not p_ash.empty:
+                    l_avg = p_ash['Peak Vertical Force [N] (L)'].mean()
+                    r_avg = p_ash['Peak Vertical Force [N] (R)'].mean()
+                    asym = abs(l_avg - r_avg) / max(l_avg, r_avg) * 100
+                    
+                    asym_color = "red" if asym > 12 else "orange" if asym > 8 else "green"
+                    st.markdown(f"""
+                        <div style="background-color:#F8F9FA; padding:20px; border-radius:10px; border-top: 5px solid {asym_color}; text-align:center;">
+                            <p style="margin:0; font-size:14px; color:grey;">CURRENT ASYMMETRY</p>
+                            <h1 style="margin:0; color:{asym_color}; font-size:45px;">{asym:.1f}%</h1>
+                            <p style="margin:0; font-size:12px;">{ 'HIGH VARIANCE' if asym > 12 else 'WITHIN NORMAL LIMITS'}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+            st.divider()
+
+            # --- SECTION 3: TOTAL LOAD ---
+            st.markdown("### 📊 Workload Volume")
+            
+            v_col1, v_col2 = st.columns([1, 2])
+            with v_col1:
+                s_vol = pd.to_numeric(p_s['Swing Count'], errors='coerce').sum()
+                t_vol = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').sum()
+                fig_work = px.pie(values=[s_vol, t_vol], names=["Swings", "Throws"], hole=0.7, 
+                                  color_discrete_sequence=["#FF8200", "#4895DB"])
+                fig_work.update_layout(height=300, showlegend=False, annotations=[dict(text=f'{int(s_vol+t_vol)}<br>Total', x=0.5, y=0.5, font_size=20, showarrow=False)])
+                st.plotly_chart(fig_work, use_container_width=True)
+            
+            with v_col2:
+                # Combined Volume Trend
+                if not p_s.empty or not p_t.empty:
+                    # Merge swing and throw by date for a volume over time chart
+                    s_trend = p_s.groupby('Date')['Swing Count'].sum().reset_index()
+                    t_trend = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
+                    trend_merged = pd.merge(s_trend, t_trend, on='Date', how='outer').fillna(0)
+                    
+                    fig_vol = px.bar(trend_merged, x='Date', y=['Swing Count', 'Total Throw Count'], 
+                                     labels={'value': 'Reps', 'variable': 'Type'},
+                                     color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
+                                     template="plotly_white")
+                    fig_vol.update_layout(height=300, barmode='group', margin=dict(l=0, r=0, t=20, b=0))
+                    st.plotly_chart(fig_vol, use_container_width=True)
                 
         with tab_ash:
             if not ash_filt.empty:
