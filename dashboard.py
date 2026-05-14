@@ -149,109 +149,88 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        # 1. THE "TIME MACHINE" FILTER
-        st.markdown("### Performance Window")
-        p_dates = st.date_input(
-            "What timeframe are we analyzing?", 
-            value=(ash_filt['Date'].max() - pd.Timedelta(days=14), ash_filt['Date'].max().date()),
-            key="final_prof_date"
-        )
+        # 1. TIME WINDOW FILTER (Clean & Tight)
+        p_dates = st.date_input("Analysis Window", 
+            value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
+            key="scouting_report_date")
 
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
             start_p, end_p = p_dates
+            
+            # Data Filtering
             p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
             p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)].copy()
             p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
+            p_c = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
 
-            # --- SECTION 1: THE ENGINE (FORCE & POWER) ---
-            st.markdown("## The Engine")
-            st.caption("Tracking leg power and central nervous system readiness.")
+            # --- 2. CALCULATE AGGREGATE SCORE & STATUSES ---
+            # Defaults
+            rsi = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0.35
+            maint_pct = (p_ash['Peak Vertical Force [N]'].mean() / ash_filt['Peak Vertical Force [N]'].max() * 100) if not p_ash.empty else 90
+            asym = (abs(p_ash['Peak Vertical Force [N] (L)'].mean() - p_ash['Peak Vertical Force [N] (R)'].mean()) / p_ash['Peak Vertical Force [N] (L)'].mean() * 100) if not p_ash.empty else 5
             
-            c1, c2, c3 = st.columns(3)
+            # The "Performance Score" Formula
+            perf_score = (maint_pct * 0.4) + ((rsi / 0.5) * 40) + ((100 - asym) * 0.2)
             
-            # Maintenance Calculation
-            if not p_ash.empty:
-                curr_f = p_ash['Peak Vertical Force [N]'].mean()
-                season_max = ash_filt['Peak Vertical Force [N]'].max()
-                maint_pct = (curr_f / season_max) * 100
-                
-                # Color logic for maintenance
-                m_color = "normal" if maint_pct > 90 else "inverse"
-                c1.metric("Force Maintenance", f"{maint_pct:.1f}%", 
-                          delta=f"{int(curr_f - season_max)}N from Max", delta_color=m_color)
-            
-            # Readiness Calculation
-            c_win = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
-            if not c_win.empty:
-                rsi = c_win['RSI-modified (Imp-Mom) [m/s]'].mean()
-                status = "PEAKING" if rsi > 0.45 else "STABLE" if rsi > 0.35 else "FATIGUED"
-                c2.metric("CNS Readiness", f"{rsi:.2f}", delta=status, delta_color="off")
-
-            # Intent Calculation
-            if not p_s.empty:
-                int_pct = (p_s['Swing Max Rotation Band 3 Count'].sum() / p_s['Swing Count'].sum()) * 100
-                c3.metric("Game Intensity", f"{int_pct:.1f}%", delta="Intent Quality")
+            # Status Logic
+            readiness = "PEAKING" if rsi > 0.45 else "STABLE" if rsi > 0.35 else "FATIGUED"
+            load_val = p_s.shape[0] + p_t.shape[0]
+            load_status = "HIGH" if load_val > 10 else "MODERATE" if load_val > 4 else "LOW"
+            asym_status = "LOW" if asym < 10 else "MODERATE" if asym < 15 else "HIGH"
 
             st.divider()
 
-            # --- SECTION 2: THE CHASSIS (HEALTH & SYMMETRY) ---
-            st.markdown("## ⚖️ The Chassis")
-            st.caption("Lead Leg (Left) vs. Trail Leg (Right) Force Distribution.")
+            # --- 3. ATHLETE STATUS (The "Bottom Line") ---
+            st.markdown("### ATHLETE STATUS")
+            s1, s2, s3, s4, s5 = st.columns(5)
+            s1.metric("Readiness", readiness)
+            s2.metric("Load", load_status)
+            s3.metric("Asymmetry", asym_status)
+            s4.metric("Score", f"{perf_score:.0f}")
             
-            col_graph, col_stat = st.columns([2, 1])
-            
-            with col_graph:
-                if not p_ash.empty:
-                    # Lead vs Trail Line Chart
-                    fig_sides = px.line(p_ash, x='Date', y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
-                                       labels={'value': 'Force (N)', 'variable': 'Side'},
-                                       color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
-                                       template="plotly_white", markers=True)
-                    fig_sides.update_layout(height=300, margin=dict(t=0, b=0), legend=dict(orientation="h", y=1.1, x=1))
-                    st.plotly_chart(fig_sides, use_container_width=True)
-
-            with col_stat:
-                if not p_ash.empty:
-                    l_avg, r_avg = p_ash['Peak Vertical Force [N] (L)'].mean(), p_ash['Peak Vertical Force [N] (R)'].mean()
-                    asym = abs(l_avg - r_avg) / max(l_avg, r_avg) * 100
-                    # Gauges or Big Text for Asymmetry
-                    st.markdown(f"""
-                        <div style="text-align:center; padding:10px; border:2px solid #f0f2f6; border-radius:10px;">
-                            <p style="color:grey; font-size:12px; margin:0;">BI-LATERAL VARIANCE</p>
-                            <h1 style="color:{'#dc3545' if asym > 10 else '#28a745'}; font-size:50px; margin:0;">{asym:.1f}%</h1>
-                            <p style="font-weight:bold; margin:0;">{'REDUCE LOAD' if asym > 10 else 'CLEAR TO PLAY'}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
+            # Trend Arrow Logic (Comparing to previous 7 days)
+            prev_rsi = cmj_filt[cmj_filt['Date'].dt.date < start_p]['RSI-modified (Imp-Mom) [m/s]'].tail(3).mean()
+            rsi_trend = "↑" if rsi > prev_rsi else "↓"
+            s5.metric("CNS Trend", f"{rsi:.2f} {rsi_trend}")
 
             st.divider()
 
-            # --- SECTION 3: TOTAL VOLUME (LOAD) ---
-            st.markdown("## 📊 Workload Balance")
-            st.caption("Tracking total volume: Swings vs. Throws.")
-            
-            v1, v2 = st.columns([1, 2])
-            
-            with v1:
-                s_vol = p_s['Swing Count'].sum()
-                t_vol = p_t['Total Throw Count'].sum()
-                fig_pie = px.pie(values=[s_vol, t_vol], names=["Swings", "Throws"], hole=0.7,
-                                 color_discrete_sequence=["#FF8200", "#4895DB"])
-                fig_pie.update_layout(showlegend=False, height=250, margin=dict(t=0, b=0),
-                                      annotations=[dict(text=f"{int(s_vol+t_vol)}<br>Total", x=0.5, y=0.5, font_size=20, showarrow=False)])
-                st.plotly_chart(fig_pie, use_container_width=True)
-            
-            with v2:
-                # Grouping for a stacked bar chart of daily load
+            # --- 4. 7-DAY TREND (The "Clean Line") ---
+            st.markdown("### 7-DAY VOLUME TREND")
+            if not p_s.empty or not p_t.empty:
                 s_daily = p_s.groupby('Date')['Swing Count'].sum().reset_index()
                 t_daily = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
-                combined = pd.merge(s_daily, t_daily, on='Date', how='outer').fillna(0)
+                trend_data = pd.merge(s_daily, t_daily, on='Date', how='outer').fillna(0)
                 
-                fig_bar = px.bar(combined, x='Date', y=['Swing Count', 'Total Throw Count'],
-                                 labels={'value': 'Total Reps', 'variable': 'Type'},
-                                 color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
-                                 template="plotly_white")
-                fig_bar.update_layout(height=250, margin=dict(t=0, b=0), barmode='stack')
-                st.plotly_chart(fig_bar, use_container_width=True)
+                fig_trend = px.line(trend_data, x='Date', y=['Swing Count', 'Total Throw Count'], 
+                                   color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
+                                   template="plotly_white")
+                fig_trend.update_layout(height=250, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="", yaxis_title="Reps", legend=dict(orientation="h", y=1.2))
+                st.plotly_chart(fig_trend, use_container_width=True)
+
+            st.divider()
+
+            # --- 5. COACHING NOTES & RECENT ACTIVITY ---
+            n_col, a_col = st.columns(2)
+            
+            with n_col:
+                st.markdown("### COACHING NOTES")
+                st.markdown(f"""
+                * **RSI**: {'Trending upward' if rsi > prev_rsi else 'Slightly declining'}
+                * **Symmetry**: {asym_status} variance ({asym:.1f}%)
+                * **Volume**: {load_status} workload in this window
+                """)
+
+            with a_col:
+                st.markdown("### RECENT ACTIVITY")
+                st.markdown(f"""
+                * **Swings**: {int(p_s['Swing Count'].sum())}
+                * **Throws**: {int(p_t['Total Throw Count'].sum())}
+                * **ASH Sessions**: {len(p_ash)}
+                * **CMJ Sessions**: {len(p_c)}
+                """)
+            
+            st.divider()
                 
                 
         with tab_ash:
