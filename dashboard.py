@@ -423,7 +423,7 @@ if not ash_df.empty:
             else:
                 st.info(f"No records found for {selected} in {swing_year}.")
 
-   with tab_throwing:
+    with tab_throwing:
         if not throw_df.empty:
             # 1. FILTERS
             f1, f2 = st.columns([1, 2])
