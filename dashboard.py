@@ -21,7 +21,7 @@ def check_password():
         return False
     elif not st.session_state["password_correct"]:
         st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
-        st.error("😕 Password incorrect")
+        st.error("Password incorrect")
         return False
     else:
         return True
@@ -149,72 +149,83 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        st.subheader(f"Executive Summary: {selected}")
-        
-        # 1. TOP ROW: PHYSICAL OUTPUT (ASH & CMJ)
-        st.markdown("### 🏃 Physical Output")
-        p1, p2, p3, p4 = st.columns(4)
-        
-        # ASH Summary
-        if not ash_filt.empty:
-            best_f = ash_filt['Peak Vertical Force [N]'].max()
-            p1.metric("Max ASH Force", f"{int(best_f)}N")
+        # 1. DATE FILTER FOR PROFILE
+        st.markdown("### 🗓️ Profile View Settings")
+        profile_dates = st.date_input(
+            "Select Training Block", 
+            value=(ash_filt['Date'].max() - pd.Timedelta(days=14), ash_filt['Date'].max().date()),
+            key="profile_date_range"
+        )
+
+        if isinstance(profile_dates, tuple) and len(profile_dates) == 2:
+            start_p, end_p = profile_dates
             
-            l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
-            r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
-            clean_asym = (abs(l_f - r_f) / max(l_f, r_f) * 100) if max(l_f, r_f) > 0 else 0
-            p2.metric("Latest Asymmetry", f"{clean_asym:.1f}%")
+            # Filter all datasets for the profile view
+            p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
+            p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)]
+            p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)]
 
-        # CMJ Summary
-        if not cmj_filt.empty:
-            best_jump = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
-            best_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
-            p3.metric("Max Jump Height", f"{best_jump:.1f} cm")
-            p4.metric("Max RSI-m", f"{best_rsi:.2f}")
+            st.divider()
 
-        st.divider()
+            # 2. TOP ROW: VISUAL COMPARISONS
+            c1, c2 = st.columns(2)
 
-        # 2. MIDDLE ROW: SKILL OUTPUT (SWING & THROW)
-        st.markdown("### Skill Work (Season Totals)")
-        s1, s2, s3, s4 = st.columns(4)
+            with c1:
+                st.subheader("Bilateral ASH Force Comparison")
+                if not p_ash.empty:
+                    # L vs R Comparison using a Bar chart for the specific block
+                    l_avg = p_ash['Peak Vertical Force [N] (L)'].mean()
+                    r_avg = p_ash['Peak Vertical Force [N] (R)'].mean()
+                    
+                    fig_ash_comp = px.bar(
+                        x=["Left (Lead)", "Right (Trail)"], 
+                        y=[l_avg, r_avg],
+                        color=["Left", "Right"],
+                        color_discrete_map={"Left": "#4895DB", "Right": "#FF8200"},
+                        labels={'x': 'Side', 'y': 'Avg Force (N)'},
+                        template="plotly_white"
+                    )
+                    fig_ash_comp.update_layout(showlegend=False, height=350)
+                    st.plotly_chart(fig_ash_comp, use_container_width=True)
+                else:
+                    st.info("No ASH data for this date range.")
 
-        # Swing Summary
-        p_s_all = swing_df[swing_df['Name'] == selected].copy()
-        if not p_s_all.empty:
-            p_s_all['Total'] = pd.to_numeric(p_s_all['Swing Count'], errors='coerce').fillna(0)
-            p_s_all['Max Intent'] = pd.to_numeric(p_s_all['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
+            with c2:
+                st.subheader("Workload Distribution")
+                s_vol = pd.to_numeric(p_s['Swing Count'], errors='coerce').sum()
+                t_vol = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').sum()
+                
+                if s_vol + t_vol > 0:
+                    # Donut Chart for Hitting vs Throwing Volume
+                    fig_donut = px.pie(
+                        values=[s_vol, t_vol], 
+                        names=["Swings", "Throws"],
+                        hole=0.5,
+                        color_discrete_sequence=["#FF8200", "#4895DB"],
+                        template="plotly_white"
+                    )
+                    fig_donut.update_layout(height=350, legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5))
+                    st.plotly_chart(fig_donut, use_container_width=True)
+                else:
+                    st.info("No Skill Volume data for this date range.")
+
+            st.divider()
+
+            # 3. PERFORMANCE KPIS
+            st.subheader("Block Performance KPIs")
+            k1, k2, k3, k4 = st.columns(4)
             
-            s1.metric("Total Swings", int(p_s_all['Total'].sum()))
-            s2.metric("Max Intent Swings", int(p_s_all['Max Intent'].sum()))
-
-        # Throwing Summary
-        p_t_all = throw_df[throw_df['Name'] == selected].copy()
-        if not p_t_all.empty:
-            p_t_all['Throws'] = pd.to_numeric(p_t_all['Total Throw Count'], errors='coerce').fillna(0)
-            p_t_all['Intent'] = pd.to_numeric(p_t_all['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
+            if not p_ash.empty:
+                k1.metric("Avg Force", f"{int(p_ash['Peak Vertical Force [N]'].mean())}N")
+                asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
+                k2.metric("Block Asymmetry", f"{asym:.1f}%", delta=f"{asym-10:.1f}%" if asym > 10 else None, delta_color="inverse")
             
-            s3.metric("Total Throws", int(p_t_all['Throws'].sum()))
-            s4.metric("High Intent Throws", int(p_t_all['Intent'].sum()))
+            if not p_s.empty:
+                k3.metric("Total Swings", int(s_vol))
+                intent_sw = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').sum()
+                k4.metric("High Intent %", f"{(intent_sw/s_vol*100):.1f}%")
 
-        st.divider()
-
-        # 3. BOTTOM SECTION: RECENT ACTIVITY TABLE
-        st.markdown("### Recent Activity (Last 5 Sessions)")
-        
-        # Combine Swing and Throw data for a quick look at the last few days
-        try:
-            swing_mini = p_s_all[['Date', 'Session Type', 'Total']].rename(columns={'Total': 'Volume'})
-            swing_mini['Type'] = 'Swing'
-            throw_mini = p_t_all[['Date', 'Session Type', 'Throws']].rename(columns={'Throws': 'Volume'})
-            throw_mini['Type'] = 'Throw'
-            
-            activity = pd.concat([swing_mini, throw_mini]).sort_values('Date', ascending=False).head(5)
-            activity['Date'] = activity['Date'].dt.strftime('%m/%d')
-            
-            st.dataframe(activity, use_container_width=True, hide_index=True)
-        except:
-            st.info("Insufficient skill data for activity log.")
-
+                
         with tab_ash:
             if not ash_filt.empty:
                 # 1. MANUAL ASYMMETRY CALCULATION
