@@ -5,6 +5,23 @@ import plotly.express as px
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
+# --- GLOBAL TABLE STYLING ---
+st.markdown("""
+    <style>
+    /* Centers text in all table headers and cells */
+    [data-testid="stTable"] th, [data-testid="stTable"] td {
+        text-align: center !important;
+    }
+    [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
+        text-align: center !important;
+    }
+    /* Ensures the data inside the dataframe container is centered */
+    .stDataFrame div[data-testid="stTable"] div {
+        text-align: center !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- 2. CUSTOM LADY VOL CSS ---
 st.markdown("""
     <style>
