@@ -319,103 +319,105 @@ if not ash_df.empty:
     with tab_swing:
         if not swing_df.empty:
             # 1. INTERNAL TAB FILTERS
-            # Placing filters in a row at the top of the tab
             f1, f2 = st.columns([1, 2])
-            
             with f1:
-                # Year filter specific to this tab
-                swing_year = st.selectbox("Season", options=[2026, 2025, 2024], key="swing_year_select")
-            
+                swing_year = st.selectbox("Season", options=[2026, 2025, 2024], key="swing_yr")
             with f2:
-                # Category filter using segmented control for a modern look
-                swing_cat = st.segmented_control(
-                    "Session Type",
-                    options=["All", "Games", "Practices"],
-                    default="All",
-                    key="swing_cat_select"
-                )
+                swing_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="swing_ct")
 
-            # 2. DATA PROCESSING
+            # 2. DATA PROCESSING & NUMERIC CONVERSION
             df_s = swing_df.copy()
             df_s.columns = df_s.columns.str.strip()
             df_s['Date'] = pd.to_datetime(df_s['Date'])
             
-            # Apply Athlete Filter
             p_swing = df_s[df_s['Name'] == selected].copy()
-            
-            # Apply Year Filter
             p_swing = p_swing[p_swing['Date'].dt.year == swing_year]
             
-            # Apply Category Filter
             if swing_cat == "Games":
                 p_swing = p_swing[p_swing['Session Type'].str.contains('Game', case=False, na=False)]
             elif swing_cat == "Practices":
                 p_swing = p_swing[p_swing['Session Type'].str.contains('Practice|Session', case=False, na=False)]
 
             if not p_swing.empty:
-                # 1. PREP RADAR DATA
-                # Calculate Season Averages for the "Baseline" shape
+                # MANDATORY: Define the numeric columns right here to avoid KeyErrors
+                p_swing['Forward'] = pd.to_numeric(p_swing['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
+                p_swing['Side'] = pd.to_numeric(p_swing['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
+                p_swing['Up'] = pd.to_numeric(p_swing['Swing Max Player Load Up % (median)'], errors='coerce').fillna(0)
+                p_swing['Swing Count'] = pd.to_numeric(p_swing['Swing Count'], errors='coerce').fillna(1)
+                p_swing['Total Load'] = pd.to_numeric(p_swing['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+                
+                # Calculate Intensity (Load per Swing)
+                p_swing['Intensity'] = p_swing['Total Load'] / p_swing['Swing Count']
+                
+                p_swing = p_swing.sort_values('Date')
+                latest = p_swing.iloc[-1]
+
+                # 3. RADAR CHART DATA
+                # Season Averages
                 avg_fwd = p_swing['Forward'].mean()
                 avg_side = p_swing['Side'].mean()
                 avg_up = p_swing['Up'].mean()
-                avg_int = (p_swing['Sum Swing Max Player Load'] / p_swing['Swing Count']).mean()
+                avg_int = p_swing['Intensity'].mean()
 
-                # Get Latest Session Data for the "Current" shape
-                latest = p_swing.iloc[-1]
+                # Latest Session
                 lat_fwd = latest['Forward']
                 lat_side = latest['Side']
                 lat_up = latest['Up']
-                lat_int = (latest['Sum Swing Max Player Load'] / latest['Swing Count'])
+                lat_int = latest['Intensity']
 
-                # Create the Radar DataFrame
-                # We add 'Intensity' as a 4th point to see if the 'size' of the swing is changing
+                # Normalize intensity for the radar (multiply by 10 so it fits the 0-100 scale)
                 categories = ['Linear (Fwd)', 'Rotational (Side)', 'Vertical (Up)', 'Intensity']
-            
+                
+                import plotly.graph_objects as go
                 fig_radar = go.Figure()
 
-                # Add Season Baseline (The light grey background shape)
+                # Season Baseline Shape
                 fig_radar.add_trace(go.Scatterpolar(
-                    r=[avg_fwd, avg_side, avg_up, avg_int * 10], # Scaled intensity for visibility
+                    r=[avg_fwd, avg_side, avg_up, avg_int * 10],
                     theta=categories,
                     fill='toself',
                     name='Season Average',
-                    line_color='rgba(200, 200, 200, 0.5)',
-                    fillcolor='rgba(200, 200, 200, 0.3)'
+                    line_color='rgba(150, 150, 150, 0.5)',
+                    fillcolor='rgba(200, 200, 200, 0.2)'
                 ))
 
-                # Add Latest Session (The bold primary shape)
+                # Current Session Shape
                 fig_radar.add_trace(go.Scatterpolar(
                     r=[lat_fwd, lat_side, lat_up, lat_int * 10],
                     theta=categories,
                     fill='toself',
                     name='Latest Session',
-                    line_color='#FF8200'
+                    line_color='#FF8200',
+                    fillcolor='rgba(255, 130, 0, 0.3)'
                 ))
 
                 fig_radar.update_layout(
-                    polar=dict(
-                        radialaxis=dict(visible=True, range=[0, 100]),
-                        angularaxis=dict(direction="clockwise")
-                    ),
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
                     showlegend=True,
-                    height=500,
-                    title="Latest Session vs. Season Average Profile"
+                    height=450,
+                    margin=dict(t=40, b=40, l=60, r=60)
                 )
 
+                st.subheader("Swing 'Fingerprint': Latest vs. Season Average")
                 st.plotly_chart(fig_radar, use_container_width=True)
 
-                # 2. THE "QUICK GLANCE" TABLE
-                # Instead of a grid of circles, just show the last 5 sessions in a clean list
-                st.subheader("Recent Session Summary")
-            
-                # Create a simple summary table
+                # 4. RECENT HISTORY TABLE (Clean & Sorted)
+                st.subheader("Recent Session Breakdown")
                 summary_df = p_swing.sort_values('Date', ascending=False).head(5).copy()
-                summary_df['Intensity'] = (summary_df['Sum Swing Max Player Load'] / summary_df['Swing Count']).round(2)
                 summary_df['Date'] = summary_df['Date'].dt.strftime('%m/%d')
-            
-                display_cols = ['Date', 'Session Type', 'Swing Count', 'Intensity', 'Forward', 'Side', 'Up']
+                
+                # Clean up display columns
+                display_df = summary_df[['Date', 'Session Type', 'Swing Count', 'Intensity', 'Forward', 'Side', 'Up']].copy()
+                
                 st.dataframe(
-                    summary_df[display_cols],
+                    display_df.style.format({
+                        'Intensity': '{:.2f}',
+                        'Forward': '{:.1f}%',
+                        'Side': '{:.1f}%',
+                        'Up': '{:.1f}%'
+                    }),
                     hide_index=True,
                     use_container_width=True
                 )
+            else:
+                st.info(f"No records found for {selected} in {swing_year}.")
