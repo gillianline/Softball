@@ -36,6 +36,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+
 # --- 3. DATA LOADING & MERGING ---
 @st.cache_data(ttl=300)
 def load_all_data():
@@ -76,6 +77,7 @@ def load_all_data():
         
 
 ash_df, cmj_df, swing_df, throw_df = load_all_data()
+
 
 # --- 4. DASHBOARD UI ---
 if not ash_df.empty:
@@ -118,6 +120,44 @@ if not ash_df.empty:
             """, unsafe_allow_html=True)
 
         tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
+
+def check_password():
+    """Returns True if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == "YOUR_PASSWORD_HERE": # Replace with your actual password
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input for password.
+        st.text_input(
+            "Enter Password to Access Dashboard", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error.
+        st.text_input(
+            "Enter Password to Access Dashboard", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        # Password correct.
+        return True
+
+if check_password():
+    # --- ALL YOUR DASHBOARD CODE GOES HERE ---
+    st.title("Athlete Performance Dashboard")
 
     with tab_ash:
         if not ash_filt.empty:
