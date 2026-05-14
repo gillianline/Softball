@@ -353,91 +353,69 @@ if not ash_df.empty:
                 p_swing = p_swing[p_swing['Session Type'].str.contains('Practice|Session', case=False, na=False)]
 
             if not p_swing.empty:
-                p_swing = p_swing.sort_values('Date')
-                latest_swing = p_swing.iloc[-1]
-                
-                # 3. TOP METRICS (Numeric Safe)
-                m1, m2, m3, m4 = st.columns(4)
-                
-                s_count = pd.to_numeric(latest_swing.get('Swing Count'), errors='coerce') or 0
-                s_load = pd.to_numeric(latest_swing.get('Sum Swing Max Player Load'), errors='coerce') or 0
-                s_rot = pd.to_numeric(latest_swing.get('Swing Max Rotation Band 3 Count'), errors='coerce') or 0
-                
-                m1.metric("Volume", f"{int(s_count)} Swings")
-                m2.metric("Total Load", f"{float(s_load):.1f}")
-                m3.metric("B3 Rotation", f"{int(s_rot)}")
-                
-                intensity = float(s_load) / float(s_count) if s_count > 0 else 0
-                m4.metric("Intensity", f"{intensity:.2f} Load/Sw")
+                # 1. PREP RADAR DATA
+                # Calculate Season Averages for the "Baseline" shape
+                avg_fwd = p_swing['Forward'].mean()
+                avg_side = p_swing['Side'].mean()
+                avg_up = p_swing['Up'].mean()
+                avg_int = (p_swing['Sum Swing Max Player Load'] / p_swing['Swing Count']).mean()
 
-                st.divider()
+                # Get Latest Session Data for the "Current" shape
+                latest = p_swing.iloc[-1]
+                lat_fwd = latest['Forward']
+                lat_side = latest['Side']
+                lat_up = latest['Up']
+                lat_int = (latest['Sum Swing Max Player Load'] / latest['Swing Count'])
 
-                # 4. TREND GRAPH
-                st.subheader(f"{swing_cat} Intensity Trend: {swing_year}")
-                
-                p_swing['Sum Swing Max Player Load'] = pd.to_numeric(p_swing['Sum Swing Max Player Load'], errors='coerce').fillna(0)
-                
-                fig_trend = px.bar(
-                    p_swing, x='Date', y='Swing Count', 
-                    color_discrete_sequence=["#4895DB"], 
-                    template="plotly_white"
+                # Create the Radar DataFrame
+                # We add 'Intensity' as a 4th point to see if the 'size' of the swing is changing
+                categories = ['Linear (Fwd)', 'Rotational (Side)', 'Vertical (Up)', 'Intensity']
+            
+                fig_radar = go.Figure()
+
+                # Add Season Baseline (The light grey background shape)
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=[avg_fwd, avg_side, avg_up, avg_int * 10], # Scaled intensity for visibility
+                    theta=categories,
+                    fill='toself',
+                    name='Season Average',
+                    line_color='rgba(200, 200, 200, 0.5)',
+                    fillcolor='rgba(200, 200, 200, 0.3)'
+                ))
+
+                # Add Latest Session (The bold primary shape)
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=[lat_fwd, lat_side, lat_up, lat_int * 10],
+                    theta=categories,
+                    fill='toself',
+                    name='Latest Session',
+                    line_color='#FF8200'
+                ))
+
+                fig_radar.update_layout(
+                    polar=dict(
+                        radialaxis=dict(visible=True, range=[0, 100]),
+                        angularaxis=dict(direction="clockwise")
+                    ),
+                    showlegend=True,
+                    height=500,
+                    title="Latest Session vs. Season Average Profile"
                 )
-                
-                fig_trend.add_scatter(
-                    x=p_swing['Date'], y=p_swing['Sum Swing Max Player Load'], 
-                    name="Intensity (Load)", mode='lines+markers', yaxis="y2",
-                    line=dict(color="#FF8200", width=3)
+
+                st.plotly_chart(fig_radar, use_container_width=True)
+
+                # 2. THE "QUICK GLANCE" TABLE
+                # Instead of a grid of circles, just show the last 5 sessions in a clean list
+                st.subheader("Recent Session Summary")
+            
+                # Create a simple summary table
+                summary_df = p_swing.sort_values('Date', ascending=False).head(5).copy()
+                summary_df['Intensity'] = (summary_df['Sum Swing Max Player Load'] / summary_df['Swing Count']).round(2)
+                summary_df['Date'] = summary_df['Date'].dt.strftime('%m/%d')
+            
+                display_cols = ['Date', 'Session Type', 'Swing Count', 'Intensity', 'Forward', 'Side', 'Up']
+                st.dataframe(
+                    summary_df[display_cols],
+                    hide_index=True,
+                    use_container_width=True
                 )
-
-                fig_trend.update_layout(
-                    height=400,
-                    yaxis2=dict(title="Load", overlaying="y", side="right"),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    yaxis=dict(range=[0, p_swing['Swing Count'].max() * 1.2])
-                )
-                st.plotly_chart(fig_trend, use_container_width=True)
-
-                # 5. MOVEMENT PROFILE HISTORY: SIDE-BY-SIDE CIRCLES
-                st.subheader(f"Movement Profile History: {swing_cat}")
-                
-                # Filter p_swing to ensure we have numeric data for the charts
-                p_swing['Forward'] = pd.to_numeric(p_swing['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
-                p_swing['Side'] = pd.to_numeric(p_swing['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
-                p_swing['Up'] = pd.to_numeric(p_swing['Swing Max Player Load Up % (median)'], errors='coerce').fillna(0)
-
-                # Create rows of 3 circles each
-                num_sessions = len(p_swing)
-                cols_per_row = 3
-                
-                if num_sessions > 0:
-                    # Iterate through the filtered sessions (Most recent first)
-                    p_swing_reversed = p_swing.sort_values('Date', ascending=False)
-                    
-                    for i in range(0, num_sessions, cols_per_row):
-                        cols = st.columns(cols_per_row)
-                        for j in range(cols_per_row):
-                            if i + j < num_sessions:
-                                session = p_swing_reversed.iloc[i + j]
-                                s_date = session['Date'].strftime('%m/%d/%Y')
-                                s_type = session.get('Session Type', 'Practice')
-                                
-                                with cols[j]:
-                                    st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: -10px;'>{s_date}<br><small>{s_type}</small></p>", unsafe_allow_html=True)
-                                    
-                                    fig_mini = px.pie(
-                                        values=[session['Forward'], session['Side'], session['Up']],
-                                        names=['Fwd', 'Side', 'Up'],
-                                        color_discrete_map={'Fwd': '#4895DB', 'Side': '#FF8200', 'Up': '#28a745'},
-                                        hole=0.5
-                                    )
-                                    
-                                    fig_mini.update_layout(
-                                        showlegend=False,
-                                        height=200,
-                                        margin=dict(t=30, b=10, l=10, r=10),
-                                        annotations=[dict(text=f"{int(session['Swing Count'])}", x=0.5, y=0.5, font_size=12, showarrow=False)]
-                                    )
-                                    # Text in the middle of the hole shows the total swing count for that session
-                                    st.plotly_chart(fig_mini, use_container_width=True, key=f"swing_pie_{i+j}")
-                else:
-                    st.info("No sessions to display in this view.")
