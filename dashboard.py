@@ -46,6 +46,24 @@ if check_password():
         </style>
     """, unsafe_allow_html=True)
 
+    # --- BRANDING HEADER ---
+    col_logo, col_head = st.columns([1, 4])
+
+    with col_logo:
+        st.image(
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/250px-Tennessee_Lady_Volunteers_logo.svg.png",
+            width=100
+        )
+
+    with col_head:
+        st.markdown("""
+            <h1 style='margin-top: 10px; color: #FF8200; font-size: 42px;'>
+                Lady Vol Softball Performance
+            </h1>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
     # --- 2. CUSTOM LADY VOL CSS ---
     st.markdown("""
         <style>
