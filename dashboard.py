@@ -425,28 +425,48 @@ if not ash_df.empty:
 
     with tab_throwing:
         if not throw_df.empty:
-            # 1. FILTERS
-            f1, f2 = st.columns([1, 2])
+            # 1. DATE & CATEGORY FILTERS
+            f1, f2 = st.columns([2, 1])
             with f1:
-                t_year = st.selectbox("Season", options=[2026, 2025, 2024], key="t_yr")
+                # Defaulting to the last 7 days of data available
+                df_t_dates = pd.to_datetime(throw_df['Date'])
+                max_date = df_t_dates.max()
+                min_date = max_date - pd.Timedelta(days=7)
+                
+                selected_dates = st.date_input(
+                    "Select Date Range",
+                    value=(min_date, max_date),
+                    key="throw_date_range"
+                )
+            
             with f2:
-                t_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="t_ct")
+                t_cat = st.segmented_control(
+                    "Session Type", 
+                    options=["All", "Games", "Practices"], 
+                    default="All", 
+                    key="t_ct_date"
+                )
 
             # 2. DATA PROCESSING
             df_t = throw_df.copy()
             df_t.columns = df_t.columns.str.strip()
             df_t['Date'] = pd.to_datetime(df_t['Date'])
             
+            # Apply Athlete & Date Range Filter
             p_t = df_t[df_t['Name'] == selected].copy()
-            p_t = p_t[p_t['Date'].dt.year == t_year]
             
+            if len(selected_dates) == 2:
+                start_date, end_date = selected_dates
+                p_t = p_t[(p_t['Date'].dt.date >= start_date) & (p_t['Date'].dt.date <= end_date)]
+
+            # Apply Category Filter
             if t_cat == "Games":
-                p_t = p_t[p_t['Session Type'].str.contains('Game', case=False, na=False)]
+                p_t = p_t[p_t['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
             elif t_cat == "Practices":
-                p_t = p_t[p_t['Session Type'].str.contains('Practice|Session', case=False, na=False)]
+                p_t = p_t[p_t['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
 
             if not p_t.empty:
-                # --- DEFINE COACHING NAMES HERE TO FIX KEYERROR ---
+                # DEFINE COACHING NAMES
                 p_t['Throws'] = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').fillna(0)
                 p_t['Intent'] = pd.to_numeric(p_t['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
                 
@@ -465,28 +485,31 @@ if not ash_df.empty:
                 st.markdown(f"""
                     <div style="background-color:{color}; padding:20px; border-radius:15px; color:white; text-align:center;">
                         <h1 style="margin:0; font-size:32px;">{status} SESSION</h1>
-                        <p style="margin:0; font-size:18px; opacity:0.9;">{note}</p>
+                        <p style="margin:0; font-size:18px; opacity:0.9;">Latest Session: {latest['Date'].strftime('%m/%d')} — {note}</p>
                     </div>
                 """, unsafe_allow_html=True)
 
                 st.divider()
 
-                # 4. BIG NUMBER METRICS
+                # 4. BIG NUMBER METRICS (Range Summaries)
+                st.subheader(f"Summary for {start_date.strftime('%m/%d')} - {end_date.strftime('%m/%d')}")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.metric("Total Volume", f"{int(latest['Throws'])} Throws")
+                    total_vol = p_t['Throws'].sum()
+                    st.metric("Total Range Volume", f"{int(total_vol)} Throws")
                 with c2:
-                    st.metric("High-Intent Throws", f"{intent_val}")
+                    total_intent = p_t['Intent'].sum()
+                    st.metric("Total High-Intent", f"{int(total_intent)}")
                 with c3:
-                    quality = (intent_val / latest['Throws'] * 100) if latest['Throws'] > 0 else 0
-                    st.metric("Work Quality", f"{quality:.1f}%")
+                    avg_quality = (p_t['Intent'].sum() / p_t['Throws'].sum() * 100) if p_t['Throws'].sum() > 0 else 0
+                    st.metric("Avg Work Quality", f"{avg_quality:.1f}%")
 
                 st.divider()
 
-                # 5. SIMPLE TREND
-                st.subheader("Volume History (Last 10)")
+                # 5. SIMPLE TREND (The Bars)
+                st.subheader("Daily Volume in Selected Range")
                 fig_simple = px.bar(
-                    p_t.tail(10), x='Date', y='Throws',
+                    p_t, x='Date', y='Throws',
                     text_auto='.0f',
                     color_discrete_sequence=["#4895DB"],
                     template="plotly_white"
@@ -495,8 +518,8 @@ if not ash_df.empty:
                 st.plotly_chart(fig_simple, use_container_width=True)
 
                 # 6. TABLE
-                st.subheader("Quick History")
-                hist = p_t.sort_values('Date', ascending=False).head(5).copy()
+                st.subheader("Session Details")
+                hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
                 
                 st.table(hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
@@ -505,4 +528,4 @@ if not ash_df.empty:
                 }))
 
             else:
-                st.info(f"No {t_cat.lower()} records for {selected} in {t_year}.")
+                st.info(f"No throwing records found for the selected dates.")
