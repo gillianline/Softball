@@ -393,7 +393,7 @@ if not ash_df.empty:
                     m1, m2, m3, m4 = st.columns(4)
                     m1.metric("Total Swings", f"{int(p_s['Total'].sum())}")
                     m2.metric("Max Intent", f"{int(p_s['Max Intent'].sum())}")
-                    m3.metric("Avg Intensity", f"{p_s['Intensity'].mean():.2f}")
+                    m3.metric("Load/Sw (Intensity)", f"{p_s['Intensity'].mean():.2f}")
                     m4.metric("Avg Rot %", f"{p_s['Rot_Pct'].mean():.1f}%")
 
                     st.divider()
