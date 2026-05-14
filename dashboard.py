@@ -151,9 +151,9 @@ if check_password():
     with tab_profile:
         # 1. ANALYSIS WINDOW
         st.markdown("<br>", unsafe_allow_html=True)
-        p_dates = st.date_input("Analysis Window", 
-            value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
-            key="ultimate_profile_date")
+        p_dates = st.date_input("Summary Window", 
+            value=(ash_filt['Date'].max() - pd.Timedelta(days=14), ash_filt['Date'].max().date()),
+            key="overall_summary_date")
 
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
             start_p, end_p = p_dates
@@ -164,72 +164,89 @@ if check_password():
             p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
             p_c = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
 
-            # --- 2. THE TOP LINE: ATHLETE SNAPSHOT ---
-            st.markdown("### PERFORMANCE SNAPSHOT")
+            # --- 1. PERFORMANCE SCORECARD (The "Big 4" Categories) ---
+            st.markdown("### ATHLETE OVERALL STATUS")
+            c1, c2, c3, c4 = st.columns(4)
             
-            # Calculations for the Snapshot
+            # ASH: Force Grade
             f_max = ash_filt['Peak Vertical Force [N]'].max()
             f_curr = p_ash['Peak Vertical Force [N]'].mean() if not p_ash.empty else 0
+            c1.metric("Force Maintenance", f"{(f_curr/f_max*100):.1f}%" if f_max > 0 else "N/A", 
+                      delta=f"{int(f_curr - f_max)}N vs Best")
+            
+            # CMJ: Readiness Grade
+            rsi_max = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
             rsi_curr = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
+            c2.metric("CNS Readiness", f"{(rsi_curr/rsi_max*100):.1f}%" if rsi_max > 0 else "N/A",
+                      delta="Peaking" if rsi_curr > 0.4 else "Stable")
+
+            # HITTING: Quality Grade
             s_vol = p_s['Swing Count'].sum() if not p_s.empty else 0
-            
-            s1, s2, s3, s4 = st.columns(4)
-            s1.metric("Force Maint.", f"{(f_curr/f_max*100):.1f}%" if f_max > 0 else "N/A", help="Current Avg vs Season Best")
-            s2.metric("CNS Readiness", "PEAKING" if rsi_curr > 0.45 else "STABLE" if rsi_curr > 0.35 else "FATIGUED")
-            
-            l_avg = p_ash['Peak Vertical Force [N] (L)'].mean() if not p_ash.empty else 0
-            r_avg = p_ash['Peak Vertical Force [N] (R)'].mean() if not p_ash.empty else 0
-            asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
-            s3.metric("Asymmetry", f"{asym:.1f}%", delta="HIGH" if asym > 10 else None, delta_color="inverse")
-            
-            s4.metric("Weekly Volume", f"{int(s_vol + p_t['Total Throw Count'].sum())} Reps")
+            s_int = p_s['Swing Max Rotation Band 3 Count'].sum() if not p_s.empty else 0
+            s_quality = (s_int / s_vol * 100) if s_vol > 0 else 0
+            c3.metric("Swing Quality", f"{s_quality:.1f}%", help="% of High Intent Swings")
+
+            # THROWING: Volume Grade
+            t_vol = p_t['Total Throw Count'].sum() if not p_t.empty else 0
+            t_int = p_t['Total Throw Count - Rotation Band 3'].sum() if not p_t.empty else 0
+            t_quality = (t_int / t_vol * 100) if t_vol > 0 else 0
+            c4.metric("Throwing Quality", f"{t_quality:.1f}%", help="% of High Intent Throws")
 
             st.divider()
 
-            # --- 3. THE "STORY" COLUMNS ---
-            col_left, col_right = st.columns([2, 1])
-
-            with col_left:
-                st.markdown("### DAILY WORKLOAD (COMBINED)")
-                # Merging Swing and Throw for a stacked daily load view
-                s_daily = p_s.groupby('Date')['Swing Count'].sum().reset_index()
-                t_daily = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
-                work_trend = pd.merge(s_daily, t_daily, on='Date', how='outer').fillna(0)
-                
-                fig_load = px.bar(work_trend, x='Date', y=['Swing Count', 'Total Throw Count'],
-                                 color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
-                                 barmode='stack', template="plotly_white")
-                fig_load.update_layout(height=300, margin=dict(t=10, b=0), xaxis_title="", yaxis_title="Total Reps")
-                st.plotly_chart(fig_load, use_container_width=True)
-
-            with col_right:
-                st.markdown("### COACHING FOCUS")
-                # Automated logic-based coaching notes
-                notes = []
-                if asym > 10: notes.append("**Priority**: Address Lead Leg force deficit.")
-                if rsi_curr < 0.35: notes.append("**Recovery**: CNS fatigue detected. Low-intensity skill work only.")
-                if f_curr > (f_max * 0.95): notes.append("**Power**: Athlete is at peak strength.")
-                if s_vol > 200: notes.append("**Volume**: High swing count. Monitor hand/wrist health.")
-                
-                if not notes: notes.append("⚪ No significant flags. Continue baseline training.")
-                
-                for note in notes:
-                    st.markdown(note)
+            # --- 2. THE MULTI-DOMAIN VISUAL (Physicality vs. Skill) ---
+            st.markdown("### Performance vs. Physicality")
+            
+            row2_col1, row2_col2 = st.columns(2)
+            
+            with row2_col1:
+                st.subheader("Physical Profile (Bilateral Force)")
+                if not p_ash.empty:
+                    # Line chart showing Force L vs Force R Trend
+                    fig_sides = px.line(p_ash, x='Date', y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
+                                       markers=True, color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
+                                       template="plotly_white")
+                    fig_sides.update_layout(height=350, margin=dict(t=0, b=0), legend=dict(orientation="h", y=1.1))
+                    st.plotly_chart(fig_sides, use_container_width=True)
+            
+            with row2_col2:
+                st.subheader("Skill Profile (Volume Trend)")
+                if not p_s.empty or not p_t.empty:
+                    s_daily = p_s.groupby('Date')['Swing Count'].sum().reset_index()
+                    t_daily = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
+                    trend_df = pd.merge(s_daily, t_daily, on='Date', how='outer').fillna(0)
+                    
+                    fig_skill = px.bar(trend_df, x='Date', y=['Swing Count', 'Total Throw Count'],
+                                     barmode='group', color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
+                                     template="plotly_white")
+                    fig_skill.update_layout(height=350, margin=dict(t=0, b=0), legend=dict(orientation="h", y=1.1))
+                    st.plotly_chart(fig_skill, use_container_width=True)
 
             st.divider()
 
-            # --- 4. RECENT SESSIONS TABLE ---
-            st.markdown("###RECENT ACTIVITY LOG")
-            # Combine sessions into a readable table
-            swing_log = p_s[['Date', 'Session Type', 'Swing Count']].rename(columns={'Swing Count': 'Volume'})
-            swing_log['Activity'] = 'Hitting'
-            throw_log = p_t[['Date', 'Session Type', 'Total Throw Count']].rename(columns={'Total Throw Count': 'Volume'})
-            throw_log['Activity'] = 'Throwing'
+            # --- 3. THE "SCOUTING REPORT" SUMMARY ---
+            st.markdown("### Executive Summary")
+            report_col1, report_col2 = st.columns(2)
             
-            combined_log = pd.concat([swing_log, throw_log]).sort_values('Date', ascending=False).head(8)
-            combined_log['Date'] = combined_log['Date'].dt.strftime('%m/%d')
+            with report_col1:
+                # Automating the "Coaching Note"
+                l_avg = p_ash['Peak Vertical Force [N] (L)'].mean() if not p_ash.empty else 0
+                r_avg = p_ash['Peak Vertical Force [N] (R)'].mean() if not p_ash.empty else 0
+                asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
+                
+                st.info(f"""
+                **PHYSICAL HEALTH**:
+                * **Symmetry**: {asym:.1f}% Variance. {'Monitor Lead Leg' if asym > 12 else ' Within standard range.'}
+                * **Power Retention**: {((f_curr/f_max)*100):.1f}% of season best strength maintained.
+                """)
             
-            st.table(combined_log[['Date', 'Activity', 'Session Type', 'Volume']])
+            with report_col2:
+                st.info(f"""
+                **SKILL OUTPUT**:
+                * **Hitting**: {int(s_vol)} Swings in window | {s_quality:.1f}% High Intent.
+                * **Throwing**: {int(t_vol)} Throws in window | {t_quality:.1f}% High Intent.
+                """)
+                
             
                 
                 
