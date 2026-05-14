@@ -159,8 +159,76 @@ if not ash_df.empty:
             </div>
             """, unsafe_allow_html=True)
 
-        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
+        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
+        
+    with tab_profile:
+        st.subheader(f"Executive Summary: {selected}")
+        
+        # 1. TOP ROW: PHYSICAL OUTPUT (ASH & CMJ)
+        st.markdown("### Physical Output")
+        p1, p2, p3, p4 = st.columns(4)
+        
+        # ASH Summary
+        if not ash_filt.empty:
+            best_f = ash_filt['Peak Vertical Force [N]'].max()
+            p1.metric("Max ASH Force", f"{int(best_f)}N")
+            
+            l_f = latest_ash.get('Peak Vertical Force [N] (L)', 0)
+            r_f = latest_ash.get('Peak Vertical Force [N] (R)', 0)
+            clean_asym = (abs(l_f - r_f) / max(l_f, r_f) * 100) if max(l_f, r_f) > 0 else 0
+            p2.metric("Latest Asymmetry", f"{clean_asym:.1f}%")
+
+        # CMJ Summary
+        if not cmj_filt.empty:
+            best_jump = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
+            best_rsi = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
+            p3.metric("Max Jump Height", f"{best_jump:.1f} cm")
+            p4.metric("Max RSI-m", f"{best_rsi:.2f}")
+
+        st.divider()
+
+        # 2. MIDDLE ROW: SKILL OUTPUT (SWING & THROW)
+        st.markdown("### Skill Work (Season Totals)")
+        s1, s2, s3, s4 = st.columns(4)
+
+        # Swing Summary
+        p_s_all = swing_df[swing_df['Name'] == selected].copy()
+        if not p_s_all.empty:
+            p_s_all['Total'] = pd.to_numeric(p_s_all['Swing Count'], errors='coerce').fillna(0)
+            p_s_all['Max Intent'] = pd.to_numeric(p_s_all['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
+            
+            s1.metric("Total Swings", int(p_s_all['Total'].sum()))
+            s2.metric("Max Intent Swings", int(p_s_all['Max Intent'].sum()))
+
+        # Throwing Summary
+        p_t_all = throw_df[throw_df['Name'] == selected].copy()
+        if not p_t_all.empty:
+            p_t_all['Throws'] = pd.to_numeric(p_t_all['Total Throw Count'], errors='coerce').fillna(0)
+            p_t_all['Intent'] = pd.to_numeric(p_t_all['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
+            
+            s3.metric("Total Throws", int(p_t_all['Throws'].sum()))
+            s4.metric("High Intent Throws", int(p_t_all['Intent'].sum()))
+
+        st.divider()
+
+        # 3. BOTTOM SECTION: RECENT ACTIVITY TABLE
+        st.markdown("### Recent Activity (Last 5 Sessions)")
+        
+        # Combine Swing and Throw data for a quick look at the last few days
+        try:
+            swing_mini = p_s_all[['Date', 'Session Type', 'Total']].rename(columns={'Total': 'Volume'})
+            swing_mini['Type'] = 'Swing'
+            throw_mini = p_t_all[['Date', 'Session Type', 'Throws']].rename(columns={'Throws': 'Volume'})
+            throw_mini['Type'] = 'Throw'
+            
+            activity = pd.concat([swing_mini, throw_mini]).sort_values('Date', ascending=False).head(5)
+            activity['Date'] = activity['Date'].dt.strftime('%m/%d')
+            
+            st.dataframe(activity, use_container_width=True, hide_index=True)
+        except:
+            st.info("Insufficient skill data for activity log.")
+            
 
     with tab_ash:
         if not ash_filt.empty:
