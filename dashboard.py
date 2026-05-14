@@ -584,3 +584,21 @@ if not ash_df.empty:
             else:
                 # Placeholder while picking dates to prevent NameErrors
                 st.warning("Please select an end date to view report.")
+
+            # --- COACHING GLOSSARY ---
+`        with st.expander("ℹ️ What do these metrics mean?"):
+            st.markdown("""
+            ### Throwing Metric Definitions
+    
+            * **Total Volume**: The total number of throws recorded during the selected date range.
+            * **High Intent**: Any throw that reaches **Rotation Band 3**. This measures maximal torso rotation and arm speed—essentially, the throws where the athlete is "bringing it."
+            * **Avg Work Quality**: The percentage of total throws that were 'High Intent.' 
+                * *Example:* 10 High Intent throws out of 100 total throws = **10% Work Quality**.
+    
+            ---
+    
+            ### Intensity Status Guide
+            * 🔴 **HIGH INTENT**: A high volume of maximal effort throws. Typically seen in Games or high-effort defensive drills.
+            * 🟡 **MODERATE**: A balanced mix of warm-ups and skill work. This is the "standard" training zone.
+            * 🟢 **RECOVERY**: Low intent intensity. Focused on arm health, light catch, or technical "feel" drills.
+            """)
