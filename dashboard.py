@@ -338,32 +338,17 @@ if not ash_df.empty:
                 df_s_dates = pd.to_datetime(swing_df['Date'])
                 max_s = df_s_dates.max()
                 min_s = max_s - pd.Timedelta(days=7)
-            
-                selected_dates_s = st.date_input(
-                    "Select Date Range",
-                    value=(min_s.date(), max_s.date()),
-                    key="swing_date_range_final"
-                )
-        
+                selected_dates_s = st.date_input("Select Date Range", value=(min_s.date(), max_s.date()), key="swing_date_range_final")
             with f2:
-                s_cat = st.segmented_control(
-                    "Session Type", 
-                    options=["All", "Games", "Practices"], 
-                    default="All", 
-                    key="s_ct_final"
-                )
+                s_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="s_ct_final")
 
-            # 2. DATA PROCESSING & SAFETY GATE
+            # 2. DATA PROCESSING
             if isinstance(selected_dates_s, tuple) and len(selected_dates_s) == 2:
                 start_s, end_s = selected_dates_s
-            
                 df_s = swing_df.copy()
                 df_s.columns = df_s.columns.str.strip()
                 df_s['Date'] = pd.to_datetime(df_s['Date'])
-            
-                p_s = df_s[(df_s['Name'] == selected) & 
-                           (df_s['Date'].dt.date >= start_s) & 
-                           (df_s['Date'].dt.date <= end_s)].copy()
+                p_s = df_s[(df_s['Name'] == selected) & (df_s['Date'].dt.date >= start_s) & (df_s['Date'].dt.date <= end_s)].copy()
 
                 if s_cat == "Games":
                     p_s = p_s[p_s['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
@@ -379,8 +364,31 @@ if not ash_df.empty:
                     p_s['Rot_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
                 
                     p_s = p_s.sort_values('Date')
+                    latest_s = p_s.iloc[-1]
 
-                    # 3. RANGE SUMMARY HEADER
+                    # --- 3. NEW: HITTER STATUS BOX LOGIC ---
+                    intent_val = int(latest_s['Max Intent'])
+                    total_swings = int(latest_s['Total'])
+                    intent_pct = (intent_val / total_swings * 100) if total_swings > 0 else 0
+                
+                    # Logic for the "Traffic Light" Status
+                    if intent_pct > 25:
+                        status, color, note = "EXPLOSIVE", "#dc3545", "High percentage of Max Intent swings. Training for power/speed."
+                    elif intent_pct > 10:
+                        status, color, note = "STEADY", "#ffc107", "Standard training output. Good for maintenance and skill work."
+                    else:
+                        status, color, note = "LOW OUTPUT", "#28a745", "Sub-maximal effort. Focused on technical feel or recovery."
+
+                    st.markdown(f"""
+                        <div style="background-color:{color}; padding:20px; border-radius:15px; color:white; text-align:center;">
+                            <h1 style="margin:0; font-size:32px;">{status} SESSION</h1>
+                            <p style="margin:0; font-size:18px; opacity:0.9;">Latest Session: {latest_s['Date'].strftime('%m/%d')} — {note}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    st.divider()
+
+                    # 4. RANGE SUMMARY HEADER & METRICS
                     st.subheader(f"Swing Report: {start_s.strftime('%m/%d')} - {end_s.strftime('%m/%d')}")
                     m1, m2, m3, m4 = st.columns(4)
                     m1.metric("Total Swings", f"{int(p_s['Total'].sum())}")
@@ -390,44 +398,22 @@ if not ash_df.empty:
 
                     st.divider()
 
-                    # 4. COLOR-CODED BAR GRAPH
+                    # 5. BAR GRAPH
                     p_s['Session'] = p_s['Session Type'].apply(lambda x: 'Game' if 'Game' in str(x) else 'Practice')
-                
-                    fig_s = px.bar(p_s, x='Date', y='Total', 
-                                 color='Session',
-                                 color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
-                                 text='Total', 
-                                 template="plotly_white")
-                
+                    fig_s = px.bar(p_s, x='Date', y='Total', color='Session', color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'}, text='Total', template="plotly_white")
                     fig_s.update_traces(texttemplate='%{text:.0f}', textposition='outside', cliponaxis=False)
-                    fig_s.update_layout(
-                        height=350, yaxis_visible=False, xaxis_title="",
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""),
-                        uniformtext=dict(minsize=10, mode='hide'),
-                        xaxis=dict(tickformat="%m/%d")
-                    )
-                
+                    fig_s.update_layout(height=350, yaxis_visible=False, xaxis_title="", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""), uniformtext=dict(minsize=10, mode='hide'), xaxis=dict(tickformat="%m/%d"))
                     st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
 
-                    # 5. CENTERED HTML TABLE (Bulletproof Single-String)
+                    # 6. HTML TABLE
                     st.subheader("Session Details")
                     hist_s = p_s.sort_values('Date', ascending=False).copy()
                     hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
                 
                     rows_list = []
                     for _, row in hist_s.iterrows():
-                        rows_list.append(
-                            f"<tr>"
-                            f"<td>{row['Date']}</td>"
-                            f"<td>{row['Session Type']}</td>"
-                            f"<td>{int(row['Total'])}</td>"
-                            f"<td>{int(row['Max Intent'])}</td>"
-                            f"<td>{row['Intensity']:.2f}</td>"
-                            f"<td>{row['Rot_Pct']:.1f}%</td>"
-                            f"</tr>"
-                        )
-                    all_rows_html = "".join(rows_list)
-
+                        rows_list.append(f"<tr><td>{row['Date']}</td><td>{row['Session Type']}</td><td>{int(row['Total'])}</td><td>{int(row['Max Intent'])}</td><td>{row['Intensity']:.2f}</td><td>{row['Rot_Pct']:.1f}%</td></tr>")
+                
                     table_html = f"""
                     <style>
                         .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; }}
@@ -435,25 +421,31 @@ if not ash_df.empty:
                         .coach-table td {{ padding: 12px; border-bottom: 1px solid #eee; }}
                     </style>
                     <table class="coach-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {all_rows_html}
-                        </tbody>
+                        <thead><tr><th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th></tr></thead>
+                        <tbody>{"".join(rows_list)}</tbody>
                     </table>
                     """
                     st.markdown(table_html, unsafe_allow_html=True)
                 else:
                     st.info(f"No records found for {selected} in this range.")
             else:
-                # Prevents NameErrors while picking dates
                 st.warning("Please select both a start and end date.")
-        else:
-            st.error("Swing data source is empty.")
 
+        # --- GLOSSARY (Always at bottom) ---
+        with st.expander("What do these hitting metrics mean?"):
+            st.markdown("""
+            ### Swing Metric Definitions
+            * **Total Swings**: Absolute count of recorded swings.
+            * **Max Intent**: Swings reaching **Rotation Band 3** (maximal torso rotation speed).
+            * **Load/Sw (Intensity)**: Player Load divided by Swings. Measures explosiveness per rep.
+            * **Rot % (Rotation Style)**: Energy from rotation vs. forward movement. Higher = more rotational.
+        
+            ### Hitter Status Guide
+            * 🔴 **EXPLOSIVE**: High % of Max Intent swings.
+            * 🟡 **STEADY**: Standard training output. Good for maintenance/skill.
+            * 🟢 **LOW OUTPUT**: Sub-maximal effort. Technical feel or recovery.
+            """)
+        
     with tab_throwing:
         if not throw_df.empty:
             # 1. DATE & CATEGORY FILTERS
