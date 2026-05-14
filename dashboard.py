@@ -442,9 +442,9 @@ if not ash_df.empty:
             # 1. DATE & CATEGORY FILTERS
             f1, f2 = st.columns([2, 1])
             with f1:
-                # Defaulting to the last 7 days of data available
                 df_t_dates = pd.to_datetime(throw_df['Date'])
                 max_date = df_t_dates.max()
+                # Default to last 7 days of data
                 min_date = max_date - pd.Timedelta(days=7)
                 
                 selected_dates = st.date_input(
@@ -461,147 +461,126 @@ if not ash_df.empty:
                     key="t_ct_date"
                 )
 
-            # 2. DATA PROCESSING
-            df_t = throw_df.copy()
-            df_t.columns = df_t.columns.str.strip()
-            df_t['Date'] = pd.to_datetime(df_t['Date'])
-            
-            # Apply Athlete & Date Range Filter
-            p_t = df_t[df_t['Name'] == selected].copy()
-            
-            if len(selected_dates) == 2:
+            # 2. DATA PROCESSING & SAFETY CHECK
+            # This 'if' ensures we don't calculate anything until 2 dates are picked
+            if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
                 start_date, end_date = selected_dates
-                p_t = p_t[(p_t['Date'].dt.date >= start_date) & (p_t['Date'].dt.date <= end_date)]
-
-            # Apply Category Filter
-            if t_cat == "Games":
-                p_t = p_t[p_t['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
-            elif t_cat == "Practices":
-                p_t = p_t[p_t['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
-
-            if not p_t.empty:
-                # DEFINE COACHING NAMES
-                p_t['Throws'] = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').fillna(0)
-                p_t['Intent'] = pd.to_numeric(p_t['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
                 
-                p_t = p_t.sort_values('Date')
-                latest = p_t.iloc[-1]
+                df_t = throw_df.copy()
+                df_t.columns = df_t.columns.str.strip()
+                df_t['Date'] = pd.to_datetime(df_t['Date'])
                 
-                # 3. THE COACH'S "BOTTOM LINE" BOX
-                intent_val = int(latest['Intent'])
-                if intent_val > 15:
-                    status, color, note = "HIGH INTENT", "#dc3545", "Max effort defensive/pitching work detected."
-                elif intent_val > 5:
-                    status, color, note = "MODERATE", "#ffc107", "Standard skill work or active warm-up."
-                else:
-                    status, color, note = "RECOVERY", "#28a745", "Light catch or low-intent technical work."
+                # Apply Athlete & Date Range Filter
+                p_t = df_t[(df_t['Name'] == selected) & 
+                           (df_t['Date'].dt.date >= start_date) & 
+                           (df_t['Date'].dt.date <= end_date)].copy()
 
-                st.markdown(f"""
-                    <div style="background-color:{color}; padding:20px; border-radius:15px; color:white; text-align:center;">
-                        <h1 style="margin:0; font-size:32px;">{status} SESSION</h1>
-                        <p style="margin:0; font-size:18px; opacity:0.9;">Latest Session: {latest['Date'].strftime('%m/%d')} — {note}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                # Apply Category Filter
+                if t_cat == "Games":
+                    p_t = p_t[p_t['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
+                elif t_cat == "Practices":
+                    p_t = p_t[p_t['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
 
-                st.divider()
-
-                # 4. BIG NUMBER METRICS (Range Summaries)
-                st.subheader(f"Summary for {start_date.strftime('%m/%d')} - {end_date.strftime('%m/%d')}")
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    total_vol = p_t['Throws'].sum()
-                    st.metric("Total Range Volume", f"{int(total_vol)} Throws")
-                with c2:
-                    total_intent = p_t['Intent'].sum()
-                    st.metric("Total High-Intent", f"{int(total_intent)}")
-                with c3:
-                    avg_quality = (p_t['Intent'].sum() / p_t['Throws'].sum() * 100) if p_t['Throws'].sum() > 0 else 0
-                    st.metric("Avg Work Quality", f"{avg_quality:.1f}%")
-
-                st.divider()
-
-                # 5. SIMPLE TREND (Color-Coded, Forced Labels, No Errors)
-                st.subheader("Daily Volume in Selected Range")
-                
-                # PREVENT ERRORS: Only run if two dates are selected
-                if len(selected_dates) == 2:
-                    start_date, end_date = selected_dates
+                if not p_t.empty:
+                    # DEFINE COACHING NAMES
+                    p_t['Throws'] = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').fillna(0)
+                    p_t['Intent'] = pd.to_numeric(p_t['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
                     
-                    # Apply Date Filter
-                    p_t_trend = p_t[(p_t['Date'].dt.date >= start_date) & (p_t['Date'].dt.date <= end_date)].copy()
+                    p_t = p_t.sort_values('Date')
+                    latest = p_t.iloc[-1]
                     
-                    if not p_t_trend.empty:
-                        # Logic for Colors
-                        p_t_trend['Session'] = p_t_trend['Session Type'].apply(
-                            lambda x: 'Game' if 'Game' in str(x) else 'Practice'
-                        )
-
-                        fig_simple = px.bar(
-                            p_t_trend, x='Date', y='Throws',
-                            color='Session',
-                            color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
-                            text='Throws', # Use raw values for labels
-                            template="plotly_white"
-                        )
-
-                        fig_simple.update_traces(
-                            texttemplate='%{text}', 
-                            textposition='outside', # Force numbers outside the bar
-                            cliponaxis=False         # Ensure numbers don't get cut off at the top
-                        )
-
-                        fig_simple.update_layout(
-                            height=350, 
-                            yaxis_visible=False, 
-                            xaxis_title="",
-                            # Custom Legend at the Top
-                            legend=dict(
-                                orientation="h",
-                                yanchor="bottom",
-                                y=1.02,
-                                xanchor="right",
-                                x=1,
-                                title_text=""
-                            ),
-                            # Fix for sideways text: Force text to be horizontal
-                            uniformtext=dict(minsize=10, mode='hide'),
-                            xaxis=dict(tickformat="%m/%d")
-                        )
-
-                        st.plotly_chart(
-                            fig_simple, 
-                            use_container_width=True, 
-                            config={'displayModeBar': False, 'staticPlot': True}
-                        )
+                    # 3. THE COACH'S "BOTTOM LINE" BOX
+                    intent_val = int(latest['Intent'])
+                    if intent_val > 15:
+                        status, color, note = "HIGH INTENT", "#dc3545", "Max effort defensive/pitching work detected."
+                    elif intent_val > 5:
+                        status, color, note = "MODERATE", "#ffc107", "Standard skill work or active warm-up."
                     else:
-                        st.info("No data for these dates.")
-                else:
-                    # This prevents the red error message while the user is still clicking
-                    st.warning("Please select both a start and end date.")
-                    
-                
-                # 6. TABLE (HTML Forced Centering & No Index)
-                st.subheader("Session Details")
-                
-                hist = p_t.sort_values('Date', ascending=False).copy()
-                hist['Date'] = hist['Date'].dt.strftime('%m/%d')
-                
-                display_hist = hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
-                    'Throws': 'Total',
-                    'Intent': 'High Intent'
-                })
+                        status, color, note = "RECOVERY", "#28a745", "Light catch or low-intent technical work."
 
-                table_html = f"""
-                <style>
-                    .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
-                    .coach-table th, .coach-table td {{ text-align: center !important; padding: 12px; border-bottom: 1px solid #f0f2f6; }}
-                    .coach-table th {{ background-color: #f8f9fa; color: #495057; font-weight: bold; }}
-                </style>
-                <table class="coach-table">
-                    <thead><tr>{" ".join([f"<th>{col}</th>" for col in display_hist.columns])}</tr></thead>
-                    <tbody>
-                        {" ".join([f"<tr>{' '.join([f'<td>{int(val) if isinstance(val, (int, float)) else val}</td>' for val in row])}</tr>" for row in display_hist.values])}
-                    </tbody>
-                </table>
-                """
-                st.markdown(table_html, unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div style="background-color:{color}; padding:20px; border-radius:15px; color:white; text-align:center;">
+                            <h1 style="margin:0; font-size:32px;">{status} SESSION</h1>
+                            <p style="margin:0; font-size:18px; opacity:0.9;">Latest Session: {latest['Date'].strftime('%m/%d')} — {note}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    st.divider()
+
+                    # 4. BIG NUMBER METRICS (Range Summaries)
+                    st.subheader(f"Summary: {start_date.strftime('%m/%d')} - {end_date.strftime('%m/%d')}")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.metric("Total Range Volume", f"{int(p_t['Throws'].sum())} Throws")
+                    with c2:
+                        st.metric("Total High-Intent", f"{int(p_t['Intent'].sum())}")
+                    with c3:
+                        avg_q = (p_t['Intent'].sum() / p_t['Throws'].sum() * 100) if p_t['Throws'].sum() > 0 else 0
+                        st.metric("Avg Work Quality", f"{avg_q:.1f}%")
+
+                    st.divider()
+
+                    # 5. SIMPLE TREND (Color-Coded & Locked)
+                    st.subheader("Daily Volume")
+                    
+                    # Map colors: Game = Blue, Practice = Orange
+                    p_t['Session'] = p_t['Session Type'].apply(lambda x: 'Game' if 'Game' in str(x) else 'Practice')
+
+                    fig_simple = px.bar(
+                        p_t, x='Date', y='Throws',
+                        color='Session',
+                        color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
+                        text='Throws', 
+                        template="plotly_white"
+                    )
+
+                    fig_simple.update_traces(
+                        texttemplate='%{text}', 
+                        textposition='outside', # Forced outside
+                        cliponaxis=False         # Prevents top numbers from cutting off
+                    )
+
+                    fig_simple.update_layout(
+                        height=350, 
+                        yaxis_visible=False, 
+                        xaxis_title="",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""),
+                        uniformtext=dict(minsize=10, mode='hide'), # Prevents sideways text
+                        xaxis=dict(tickformat="%m/%d")
+                    )
+
+                    st.plotly_chart(
+                        fig_simple, 
+                        use_container_width=True, 
+                        config={'displayModeBar': False, 'staticPlot': True}
+                    )
+
+                    # 6. TABLE (HTML Forced Centering & No Index)
+                    st.subheader("Session Details")
+                    hist = p_t.sort_values('Date', ascending=False).copy()
+                    hist['Date'] = hist['Date'].dt.strftime('%m/%d')
+                    
+                    display_hist = hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
+                        'Throws': 'Total',
+                        'Intent': 'High Intent'
+                    })
+
+                    table_html = f"""
+                    <style>
+                        .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
+                        .coach-table th, .coach-table td {{ text-align: center !important; padding: 12px; border-bottom: 1px solid #f0f2f6; }}
+                        .coach-table th {{ background-color: #f8f9fa; color: #495057; font-weight: bold; }}
+                    </style>
+                    <table class="coach-table">
+                        <thead><tr>{" ".join([f"<th>{col}</th>" for col in display_hist.columns])}</tr></thead>
+                        <tbody>
+                            {" ".join([f"<tr>{' '.join([f'<td>{int(val) if isinstance(val, (int, float)) else val}</td>' for val in row])}</tr>" for row in display_hist.values])}
+                        </tbody>
+                    </table>
+                    """
+                    st.markdown(table_html, unsafe_allow_html=True)
+                else:
+                    st.info(f"No records found for {selected} in this range.")
+            else:
+                # Placeholder while picking dates to prevent NameErrors
+                st.warning("Please select an end date to view report.")
