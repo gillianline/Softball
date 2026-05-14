@@ -444,7 +444,7 @@ if not ash_df.empty:
             * <span style="color:#dc3545;">**HIGH INTENT**</span>: High % of Max Intent swings. If Intent % is greater than 25%. (1 out of every 4 swings is max effort).
             * <span style="color:#ffc107;">**STEADY**</span>: Standard training output. Good for maintenance/skill. If Intent % is between 10% and 25%.
             * <span style="color:#28a745;">**LOW OUTPUT**</span>: Sub-maximal effort. Technical feel or recovery. If Intent % is less than 10%
-            """)
+            """, unsafe_allow_html=True)
         
     with tab_throwing:
         if not throw_df.empty:
@@ -610,4 +610,4 @@ if not ash_df.empty:
             * <span style="color:#dc3545;">**HIGH INTENT**</span>: A high volume of maximal effort throws. Typically seen in Games or high-effort defensive drills.
             * <span style="color:#ffc107;">**MODERATE**</span>: A balanced mix of warm-ups and skill work. This is the "standard" training zone.
             * <span style="color:#28a745;">**LOW OUTPUT**</span>: Low intent intensity. Focused on arm health, light catch, or technical "feel" drills.
-            """)
+            """, unsafe_allow_html=True)
