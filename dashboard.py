@@ -411,11 +411,13 @@ if not ash_df.empty:
                 
                     st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
 
-                    # 5. CENTERED HTML TABLE
+                    # 5. CENTERED HTML TABLE (Fixed Formatting & Alignment)
                     st.subheader("Session Details")
+
+                    # Ensure your data is sorted and formatted before building the HTML
                     hist_s = p_s.sort_values('Date', ascending=False).copy()
                     hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
-                
+
                     rows_html = ""
                     for _, row in hist_s.iterrows():
                         rows_html += f"""
@@ -431,20 +433,42 @@ if not ash_df.empty:
 
                     table_html = f"""
                     <style>
-                        .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
-                        .coach-table th {{ background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: center !important; }}
-                        .coach-table td {{ padding: 12px; border-bottom: 1px solid #eee; text-align: center !important; }}
+                        .coach-table {{ 
+                            width: 100%; 
+                            border-collapse: collapse; 
+                            font-family: sans-serif; 
+                        }}
+                        .coach-table th {{ 
+                            background-color: #f8f9fa; 
+                            padding: 12px; 
+                            border-bottom: 2px solid #dee2e6; 
+                            text-align: center !important; 
+                            color: #495057;
+                        }}
+                        .coach-table td {{ 
+                            padding: 12px; 
+                            border-bottom: 1px solid #eee; 
+                            text-align: center !important; 
+                        }}
                     </style>
                     <table class="coach-table">
                         <thead>
                             <tr>
-                                <th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th>
-                            </tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Total</th>
+                                <th>Max Intent</th>
+                                <th>Load/Sw</th>
+                                <th>Rot %</th>
+                        </tr>
                         </thead>
-                        <tbody>{rows_html}</tbody>
+                        <tbody>
+                            {rows_html}
+                        </tbody>
                     </table>
                     """
-                    st.markdown(table_html, unsafe_allow_html=True)
+
+st.markdown(table_html, unsafe_allow_html=True)
                 else:
                     st.info(f"No records found for {selected} in this range.")
             else:
