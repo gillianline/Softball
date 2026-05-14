@@ -2,34 +2,29 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- 1. PAGE CONFIG (Must be at the very top) ---
+# --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
 # --- 2. PASSWORD GATE ---
 def check_password():
-    """Returns True if the user has the correct password from st.secrets."""
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == st.secrets["password"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Clear password from state for security
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
-
     if "password_correct" not in st.session_state:
-        st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
+        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
+        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
         st.error("😕 Password incorrect")
         return False
-    else:
-        return True
+    return True
 
-# --- MAIN APP EXECUTION ---
 if check_password():
 
-    # --- 3. CUSTOM STYLES (Centers, Tables, and Lady Vol Colors) ---
+    # --- 3. CUSTOM CSS ---
     st.markdown("""
         <style>
         [data-testid="stHeaderCell"] { text-align: center !important; display: flex; justify-content: center; }
@@ -41,25 +36,22 @@ if check_password():
             border-left: 10px solid #FF8200; margin-bottom: 25px;
         }
         .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
-        .metric-sub { font-size: 14px; font-weight: 700; margin-top: -15px; margin-bottom: 10px; }
-        .red-text { color: #dc3545; }
-        .green-text { color: #28a745; }
         #MainMenu, footer, header { visibility: hidden; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- BRANDING HEADER (CENTERED) ---
+    # BRANDING HEADER
     st.markdown("""
         <div style="text-align: center;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/250px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
-            <h1 style="color: #FF8200; margin-top: 10px; font-size: 40px; font-weight: 800;">
+            <h1 style="color: #FF8200; margin-top: 10px; font-size: 40px; font-weight: 800; text-transform: uppercase;">
                 Lady Vol Softball Performance
             </h1>
         </div>
     """, unsafe_allow_html=True)
     st.divider()
 
-    # --- 4. DATA LOADING & CLEANING ---
+    # --- 4. DATA LOADING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
@@ -91,48 +83,40 @@ if check_password():
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
-    # --- 5. DASHBOARD UI ---
-    if not ash_df.empty:
-        # 1. TABS AT THE TOP (Per your screenshot)
-        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
+    # --- 5. TABS ---
+    tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING Analysis", "THROW Analysis"])
 
-        # 2. GLOBAL SELECTION & FILTERING
-        # These are defined outside the tabs so they are accessible to ALL tabs
-        f_col1, f_col2 = st.columns(2)
-        with f_col1:
-            selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
+    # --- 6. UI LOGIC FUNCTION ---
+    # We create a function to handle the "Top Section" (Selection + Photo) so it doesn't get pushed to the bottom
+    def render_top_section(tab_key):
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            player = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()), key=f"sel_{tab_key}")
         
-        p_ash_all = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+        p_data = ash_df[ash_df['Player Name'] == player].sort_values('Date')
         
-        with f_col2:
-            years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
-            selected_year = st.selectbox("Select Season", ["All Time"] + years)
+        with c2:
+            years = sorted(p_data['Date'].dt.year.dropna().unique().astype(int), reverse=True)
+            yr = st.selectbox("Select Season", ["All Time"] + years, key=f"yr_{tab_key}")
 
-        if selected_year == "All Time":
-            ash_filt = p_ash_all
-            cmj_filt = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
-            label = "All-Time"
-        else:
-            ash_filt = p_ash_all[p_ash_all['Date'].dt.year == selected_year]
-            cmj_filt = cmj_df[(cmj_df['Player Name'] == selected) & (cmj_df['Date'].dt.year == selected_year)].sort_values('Date')
-            label = str(selected_year)
-
-        # 3. ATHLETE PROFILE HEADER
-        latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
-        if latest_ash is not None:
-            img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
+        filt = p_data if yr == "All Time" else p_data[p_data['Date'].dt.year == yr]
+        
+        latest = filt.iloc[-1] if not filt.empty else None
+        if latest is not None:
+            img = latest.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
             st.markdown(f"""
                 <div class="athlete-header">
                     <div style="display: flex; align-items: center;">
-                        <img src="{img_url}" class="player-photo">
+                        <img src="{img}" class="player-photo">
                         <div style="margin-left: 30px;">
-                            <h1 style="margin:0;">{selected}</h1>
-                            <p style="color:#4895DB; font-weight:700; margin:0;">PERFORMANCE HUB | {label}</p>
+                            <h1 style="margin:0;">{player}</h1>
+                            <p style="color:#4895DB; font-weight:700; margin:0; text-transform: uppercase;">PERFORMANCE HUB | {yr}</p>
                         </div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-
+        return player, filt, yr
 
 
         with tab_ash:
