@@ -332,110 +332,104 @@ if not ash_df.empty:
 
     with tab_swing:
         if not swing_df.empty:
-            # 1. INTERNAL TAB FILTERS
-            f1, f2 = st.columns([1, 2])
+            # 1. DATE FILTERS (Matches Throwing Tab Style)
+            f1, f2 = st.columns([2, 1])
             with f1:
-                swing_year = st.selectbox("Season", options=[2026, 2025, 2024], key="swing_yr")
+                df_s_dates = pd.to_datetime(swing_df['Date'])
+                selected_dates_s = st.date_input(
+                    "Select Date Range",
+                    value=(df_s_dates.max() - pd.Timedelta(days=7), df_s_dates.max()),
+                    key="swing_date_range"
+                )
             with f2:
-                swing_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="swing_ct")
+                s_cat = st.segmented_control("Type", options=["All", "Games", "Practices"], default="All", key="s_ct_date")
 
-            # 2. DATA PROCESSING & NUMERIC CONVERSION
-            df_s = swing_df.copy()
-            df_s.columns = df_s.columns.str.strip()
-            df_s['Date'] = pd.to_datetime(df_s['Date'])
-            
-            p_swing = df_s[df_s['Name'] == selected].copy()
-            p_swing = p_swing[p_swing['Date'].dt.year == swing_year]
-            
-            if swing_cat == "Games":
-                p_swing = p_swing[p_swing['Session Type'].str.contains('Game', case=False, na=False)]
-            elif swing_cat == "Practices":
-                p_swing = p_swing[p_swing['Session Type'].str.contains('Practice|Session', case=False, na=False)]
-
-            if not p_swing.empty:
-                # MANDATORY: Define the numeric columns right here to avoid KeyErrors
-                p_swing['Forward'] = pd.to_numeric(p_swing['Swing Max Player Load Fwd % (median)'], errors='coerce').fillna(0)
-                p_swing['Side'] = pd.to_numeric(p_swing['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
-                p_swing['Up'] = pd.to_numeric(p_swing['Swing Max Player Load Up % (median)'], errors='coerce').fillna(0)
-                p_swing['Swing Count'] = pd.to_numeric(p_swing['Swing Count'], errors='coerce').fillna(1)
-                p_swing['Total Load'] = pd.to_numeric(p_swing['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+            # 2. DATA PROCESSING & SAFETY
+            if isinstance(selected_dates_s, tuple) and len(selected_dates_s) == 2:
+                start_s, end_s = selected_dates_s
                 
-                # Calculate Intensity (Load per Swing)
-                p_swing['Intensity'] = p_swing['Total Load'] / p_swing['Swing Count']
-                
-                p_swing = p_swing.sort_values('Date')
-                latest = p_swing.iloc[-1]
+                df_s = swing_df.copy()
+                df_s['Date'] = pd.to_datetime(df_s['Date'])
+                p_s = df_s[(df_s['Name'] == selected) & 
+                           (df_s['Date'].dt.date >= start_s) & 
+                           (df_s['Date'].dt.date <= end_s)].copy()
 
-                # 3. RADAR CHART DATA
-                # Season Averages
-                avg_fwd = p_swing['Forward'].mean()
-                avg_side = p_swing['Side'].mean()
-                avg_up = p_swing['Up'].mean()
-                avg_int = p_swing['Intensity'].mean()
+                if s_cat == "Games":
+                    p_s = p_s[p_s['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
+                elif s_cat == "Practices":
+                    p_s = p_s[p_s['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
 
-                # Latest Session
-                lat_fwd = latest['Forward']
-                lat_side = latest['Side']
-                lat_up = latest['Up']
-                lat_int = latest['Intensity']
+                if not p_s.empty:
+                    # CLEAN NAMES
+                    p_s['Swings'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').fillna(0)
+                    p_s['Max_Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+                    # Using Rotation Band 3 as "Max Effort" for Swings
+                    p_s['Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
+                    
+                    p_s = p_s.sort_values('Date')
+                    latest_s = p_s.iloc[-1]
 
-                # Normalize intensity for the radar (multiply by 10 so it fits the 0-100 scale)
-                categories = ['Linear (Fwd)', 'Rotational (Side)', 'Vertical (Up)', 'Intensity']
-                
-                import plotly.graph_objects as go
-                fig_radar = go.Figure()
+                    # 3. THE "HITTER STATUS" BOX
+                    intent_val = int(latest_s['Intent'])
+                    # Logic: If more than 25% of swings are Max Rotation, it's High Intensity
+                    intent_pct = (intent_val / latest_s['Swings'] * 100) if latest_s['Swings'] > 0 else 0
+                    
+                    if intent_pct > 30:
+                        status, color, note = "EXPLOSIVE", "#dc3545", "Athlete is rotating at maximal speeds. High intent day."
+                    elif intent_pct > 15:
+                        status, color, note = "STEADY", "#ffc107", "Consistent rotational output. Good for maintenance/skill."
+                    else:
+                        status, color, note = "LOW OUTPUT", "#28a745", "Sub-maximal rotation. Technical feel or recovery day."
 
-                # Season Baseline Shape
-                fig_radar.add_trace(go.Scatterpolar(
-                    r=[avg_fwd, avg_side, avg_up, avg_int * 10],
-                    theta=categories,
-                    fill='toself',
-                    name='Season Average',
-                    line_color='rgba(150, 150, 150, 0.5)',
-                    fillcolor='rgba(200, 200, 200, 0.2)'
-                ))
+                    st.markdown(f"""
+                        <div style="background-color:{color}; padding:15px; border-radius:10px; color:white; text-align:center;">
+                            <h2 style="margin:0;">LATEST: {int(latest_s['Swings'])} Swings ({intent_val} Max Intent)</h2>
+                            <p style="margin:0; opacity:0.9;">{note}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-                # Current Session Shape
-                fig_radar.add_trace(go.Scatterpolar(
-                    r=[lat_fwd, lat_side, lat_up, lat_int * 10],
-                    theta=categories,
-                    fill='toself',
-                    name='Latest Session',
-                    line_color='#FF8200',
-                    fillcolor='rgba(255, 130, 0, 0.3)'
-                ))
+                    # 4. SWING VOLUME TREND (Color Coded: Blue=Game, Orange=Practice)
+                    st.subheader("Daily Swing Volume")
+                    p_s['Session'] = p_s['Session Type'].apply(lambda x: 'Game' if 'Game' in str(x) else 'Practice')
+                    
+                    fig_s = px.bar(p_s, x='Date', y='Swings', color='Session',
+                                 color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
+                                 text='Swings', template="plotly_white")
+                    
+                    fig_s.update_traces(textposition='outside', cliponaxis=False)
+                    fig_s.update_layout(height=350, yaxis_visible=False, xaxis_title="",
+                                      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""),
+                                      uniformtext=dict(minsize=10, mode='hide'))
+                    
+                    st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
 
-                fig_radar.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    showlegend=True,
-                    height=450,
-                    margin=dict(t=40, b=40, l=60, r=60)
-                )
-
-                st.subheader("Swing 'Fingerprint': Latest vs. Season Average")
-                st.plotly_chart(fig_radar, use_container_width=True)
-
-                # 4. RECENT HISTORY TABLE (Clean & Sorted)
-                st.subheader("Recent Session Breakdown")
-                summary_df = p_swing.sort_values('Date', ascending=False).head(5).copy()
-                summary_df['Date'] = summary_df['Date'].dt.strftime('%m/%d')
-                
-                # Clean up display columns
-                display_df = summary_df[['Date', 'Session Type', 'Swing Count', 'Intensity', 'Forward', 'Side', 'Up']].copy()
-                
-                st.dataframe(
-                    display_df.style.format({
-                        'Swing Count': '{:.0f}',
-                        'Intensity': '{:.2f}',
-                        'Forward': '{:.1f}%',
-                        'Side': '{:.1f}%',
-                        'Up': '{:.1f}%'
-                    }),
-                    hide_index=True,
-                    use_container_width=True
-                )
+                    # 5. CENTERED HTML TABLE
+                    st.subheader("Swing Session Details")
+                    hist_s = p_s.sort_values('Date', ascending=False).copy()
+                    hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
+                    
+                    # Formatting for the table
+                    display_s = hist_s[['Date', 'Session Type', 'Swings', 'Intent']].rename(columns={'Swings':'Total', 'Intent':'Max Intent'})
+                    
+                    table_html = f"""
+                    <style>
+                        .s-table {{ width:100%; border-collapse:collapse; text-align:center; font-family: sans-serif; }}
+                        .s-table th {{ background:#f8f9fa; padding:10px; border-bottom:2px solid #dee2e6; }}
+                        .s-table td {{ padding:10px; border-bottom:1px solid #eee; }}
+                    </style>
+                    <table class="s-table">
+                        <thead><tr>{" ".join([f"<th>{c}</th>" for c in display_s.columns])}</tr></thead>
+                        <tbody>
+                            {" ".join([f"<tr>{' '.join([f'<td>{int(v) if isinstance(v,(int,float)) else v}</td>' for v in r])}</tr>" for r in display_s.values])}
+                        </tbody>
+                    </table>
+                    """
+                    st.markdown(table_html, unsafe_allow_html=True)
+                else:
+                    st.info("No swing data for these dates.")
             else:
-                st.info(f"No records found for {selected} in {swing_year}.")
+                st.warning("Please select a date range to view report.")
+                
 
     with tab_throwing:
         if not throw_df.empty:
