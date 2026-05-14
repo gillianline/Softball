@@ -7,10 +7,12 @@ st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
 # --- 2. PASSWORD GATE ---
 def check_password():
+    """Returns True if the user has the correct password from st.secrets."""
     def password_entered():
+        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == st.secrets["password"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]
+            del st.session_state["password"]  # Clear password from state for security
         else:
             st.session_state["password_correct"] = False
 
@@ -24,9 +26,10 @@ def check_password():
     else:
         return True
 
+# --- MAIN APP EXECUTION ---
 if check_password():
 
-    # --- 3. CUSTOM STYLES & BRANDING ---
+    # --- 3. CUSTOM STYLES (Centers, Tables, and Lady Vol Colors) ---
     st.markdown("""
         <style>
         [data-testid="stHeaderCell"] { text-align: center !important; display: flex; justify-content: center; }
@@ -37,22 +40,26 @@ if check_password():
             background-color: #F8F9FA; padding: 20px; border-radius: 15px;
             border-left: 10px solid #FF8200; margin-bottom: 25px;
         }
-        .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #FF8200; }
+        .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
+        .metric-sub { font-size: 14px; font-weight: 700; margin-top: -15px; margin-bottom: 10px; }
+        .red-text { color: #dc3545; }
+        .green-text { color: #28a745; }
         #MainMenu, footer, header { visibility: hidden; }
         </style>
     """, unsafe_allow_html=True)
 
+    # --- BRANDING HEADER (CENTERED) ---
     st.markdown("""
         <div style="text-align: center;">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/250px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
-            <h1 style="color: #FF8200; margin-top: 10px; font-size: 40px; font-weight: 800; text-transform: uppercase;">
+            <h1 style="color: #FF8200; margin-top: 10px; font-size: 40px; font-weight: 800;">
                 Lady Vol Softball Performance
             </h1>
         </div>
     """, unsafe_allow_html=True)
     st.divider()
 
-    # --- 4. DATA LOADING (CLEANING PRESERVED) ---
+    # --- 4. DATA LOADING & CLEANING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
@@ -62,20 +69,17 @@ if check_password():
             swing_df = pd.read_csv(st.secrets["SWING_URL"])
             throw_df = pd.read_csv(st.secrets["THROW_URL"])
             
-            # Cleaning Column Names
             for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-            # Dynamic Photo Fix
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
             if photo_col:
                 roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
             else:
                 roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
 
-            # Merging Logic
             if 'Player Name' in roster_df.columns:
                 ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
                 cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
@@ -87,41 +91,47 @@ if check_password():
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
-    # --- 5. TABS AT THE TOP ---
-    tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING Analysis", "THROW Analysis"])
-
-    # --- 6. DASHBOARD UI LOGIC ---
+    # --- 5. DASHBOARD UI ---
     if not ash_df.empty:
-        # This function renders the Athlete Profile inside the active tab
-        def render_athlete_profile(tab_df, current_cmj, current_swing, current_throw):
-            f_col1, f_col2 = st.columns(2)
-            with f_col1:
-                selected_player = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()), key=f"search_{st.session_state.get('active_tab', 'global')}")
-            
-            p_ash_all = ash_df[ash_df['Player Name'] == selected_player].sort_values('Date')
-            
-            with f_col2:
-                years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
-                selected_yr = st.selectbox("Select Season", ["All Time"] + years, key=f"year_{st.session_state.get('active_tab', 'global')}")
+        # 1. TABS AT THE TOP (Per your screenshot)
+        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
-            # Filter data
-            a_filt = p_ash_all if selected_yr == "All Time" else p_ash_all[p_ash_all['Date'].dt.year == selected_yr]
-            l_ash = a_filt.iloc[-1] if not a_filt.empty else None
+        # 2. GLOBAL SELECTION & FILTERING
+        # These are defined outside the tabs so they are accessible to ALL tabs
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
+        
+        p_ash_all = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+        
+        with f_col2:
+            years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
+            selected_year = st.selectbox("Select Season", ["All Time"] + years)
 
-            if l_ash is not None:
-                img_url = l_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
-                st.markdown(f"""
-                    <div class="athlete-header">
-                        <div style="display: flex; align-items: center;">
-                            <img src="{img_url}" class="player-photo">
-                            <div style="margin-left: 30px;">
-                                <h1 style="margin:0;">{selected_player}</h1>
-                                <p style="color:#FF8200; font-weight:700; margin:0; text-transform: uppercase;">Performance Hub | {selected_yr}</p>
-                            </div>
+        if selected_year == "All Time":
+            ash_filt = p_ash_all
+            cmj_filt = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
+            label = "All-Time"
+        else:
+            ash_filt = p_ash_all[p_ash_all['Date'].dt.year == selected_year]
+            cmj_filt = cmj_df[(cmj_df['Player Name'] == selected) & (cmj_df['Date'].dt.year == selected_year)].sort_values('Date')
+            label = str(selected_year)
+
+        # 3. ATHLETE PROFILE HEADER
+        latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
+        if latest_ash is not None:
+            img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
+            st.markdown(f"""
+                <div class="athlete-header">
+                    <div style="display: flex; align-items: center;">
+                        <img src="{img_url}" class="player-photo">
+                        <div style="margin-left: 30px;">
+                            <h1 style="margin:0;">{selected}</h1>
+                            <p style="color:#4895DB; font-weight:700; margin:0;">PERFORMANCE HUB | {label}</p>
                         </div>
                     </div>
-                """, unsafe_allow_html=True)
-                return selected_player, a_filt, selected_yr
+                </div>
+            """, unsafe_allow_html=True)
 
 
 
