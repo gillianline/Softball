@@ -5,18 +5,16 @@ import plotly.express as px
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
-# --- GLOBAL TABLE STYLING ---
 st.markdown("""
     <style>
-    /* Targets the actual data cells in Streamlit DataFrames */
-    [data-testid="stDataFrameDataLayer"] td {
-        text-align: center !important;
-    }
-    /* Targets the column headers */
+    /* Centers everything inside the dataframe cells */
     [data-testid="stHeaderCell"] {
         text-align: center !important;
         display: flex;
         justify-content: center;
+    }
+    [data-testid="stTable"] td, [data-testid="stDataFrameDataLayer"] td {
+        text-align: center !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -544,13 +542,13 @@ if not ash_df.empty:
                     'Intent': 'High Intent'
                 })
 
-                # Using column_config to force alignment and number formatting
+                # config forces centering and removes those decimal spaces
                 st.dataframe(
                     display_hist,
                     hide_index=True,
                     use_container_width=True,
                     column_config={
-                        "Date": st.column_config.TextColumn("Date", help="Session Date", width="small"),
+                        "Date": st.column_config.TextColumn("Date", width="small"),
                         "Session Type": st.column_config.TextColumn("Session Type"),
                         "Total": st.column_config.NumberColumn("Total", format="%d"),
                         "High Intent": st.column_config.NumberColumn("High Intent", format="%d"),
