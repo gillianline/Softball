@@ -119,10 +119,12 @@ if check_password():
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
-    tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
-
     # --- 4. DASHBOARD UI ---
     if not ash_df.empty:
+        # 1. TABS AT THE TOP
+        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
+
+        # 2. SELECTION & FILTERS (Now underneath the tabs)
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
@@ -133,6 +135,7 @@ if check_password():
             years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
             selected_year = st.selectbox("Select Season", ["All Time"] + years)
 
+        # 3. DATA FILTERING LOGIC
         if selected_year == "All Time":
             ash_filt = p_ash_all
             cmj_filt = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
@@ -142,13 +145,11 @@ if check_password():
             cmj_filt = cmj_df[(cmj_df['Player Name'] == selected) & (cmj_df['Date'].dt.year == selected_year)].sort_values('Date')
             label = str(selected_year)
 
+        # 4. ATHLETE PROFILE HEADER (Below selection, above charts)
         latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
 
         if latest_ash is not None:
-            # PROFILE HEADER FIX
-            # Using the merged 'Photo' column
             img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
-        
             st.markdown(f"""
                 <div class="athlete-header">
                     <div style="display: flex; align-items: center;">
