@@ -8,16 +8,15 @@ st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 # --- GLOBAL TABLE STYLING ---
 st.markdown("""
     <style>
-    /* Centers text in all table headers and cells */
-    [data-testid="stTable"] th, [data-testid="stTable"] td {
+    /* Targets the actual data cells in Streamlit DataFrames */
+    [data-testid="stDataFrameDataLayer"] td {
         text-align: center !important;
     }
-    [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
+    /* Targets the column headers */
+    [data-testid="stHeaderCell"] {
         text-align: center !important;
-    }
-    /* Ensures the data inside the dataframe container is centered */
-    .stDataFrame div[data-testid="stTable"] div {
-        text-align: center !important;
+        display: flex;
+        justify-content: center;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -534,7 +533,7 @@ if not ash_df.empty:
                 fig_simple.update_layout(height=300, yaxis_visible=False, xaxis_title="")
                 st.plotly_chart(fig_simple, use_container_width=True)
 
-                # 6. TABLE (Centered and Clean)
+                # 6. TABLE (Centered and No Index)
                 st.subheader("Session Details")
                 hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
@@ -544,5 +543,9 @@ if not ash_df.empty:
                     'Intent': 'High Intent'
                 })
                 
-                # Using st.table for a cleaner, centered look
-                st.table(display_hist)
+                # We use dataframe to hide the index; the CSS above handles the centering
+                st.dataframe(
+                    display_hist,
+                    hide_index=True,
+                    use_container_width=True
+                )
