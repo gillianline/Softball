@@ -522,10 +522,15 @@ if not ash_df.empty:
                 hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
                 
-                st.table(hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
+                # Create a clean version with only your 4 columns
+                display_hist = hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
                     'Throws': 'Total',
                     'Intent': 'High Intent'
-                }))
-
-            else:
-                st.info(f"No throwing records found for the selected dates.")
+                })
+                
+                # Using st.dataframe instead of st.table to allow index hiding
+                st.dataframe(
+                    display_hist,
+                    hide_index=True,
+                    use_container_width=True
+                )
