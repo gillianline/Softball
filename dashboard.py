@@ -531,26 +531,51 @@ if not ash_df.empty:
                 fig_simple.update_layout(height=300, yaxis_visible=False, xaxis_title="")
                 st.plotly_chart(fig_simple, use_container_width=True)
 
-                # 6. TABLE (Centered, No Decimals, No Index)
+                # 6. TABLE (HTML Forced Centering & No Index)
                 st.subheader("Session Details")
-
+                
+                # Prep the data
                 hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
-
+                
                 display_hist = hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
                     'Throws': 'Total',
                     'Intent': 'High Intent'
                 })
 
-                # config forces centering and removes those decimal spaces
-                st.dataframe(
-                    display_hist,
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "Date": st.column_config.TextColumn("Date", width="small"),
-                        "Session Type": st.column_config.TextColumn("Session Type"),
-                        "Total": st.column_config.NumberColumn("Total", format="%d"),
-                        "High Intent": st.column_config.NumberColumn("High Intent", format="%d"),
-                    }
-                )
+                # Create the HTML Table string
+                table_html = f"""
+                <style>
+                    .coach-table {{
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-family: sans-serif;
+                    }}
+                    .coach-table th, .coach-table td {{
+                        text-align: center !important;
+                        padding: 12px;
+                        border-bottom: 1px solid #f0f2f6;
+                    }}
+                    .coach-table th {{
+                        background-color: #f8f9fa;
+                        color: #495057;
+                        font-weight: bold;
+                    }}
+                </style>
+                <table class="coach-table">
+                    <thead>
+                        <tr>
+                            {" ".join([f"<th>{col}</th>" for col in display_hist.columns])}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {" ".join([
+                            f"<tr>{' '.join([f'<td>{val}</td>' for val in row])}</tr>" 
+                            for row in display_hist.values
+                        ])}
+                    </tbody>
+                </table>
+                """
+                
+                # Display the HTML
+                st.markdown(table_html, unsafe_allow_html=True)
