@@ -14,10 +14,10 @@ def check_password():
         else:
             st.session_state["password_correct"] = False
     if "password_correct" not in st.session_state:
-        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
+        st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        st.text_input("Enter Password", type="password", on_change=password_entered, key="password")
+        st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
         st.error("😕 Password incorrect")
         return False
     return True
@@ -60,22 +60,16 @@ if check_password():
             roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
             swing_df = pd.read_csv(st.secrets["SWING_URL"])
             throw_df = pd.read_csv(st.secrets["THROW_URL"])
-            
             for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
-            if photo_col:
-                roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
-            else:
-                roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
-
+            roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'}) if photo_col else roster_df
+            if 'Photo' not in roster_df.columns: roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
             if 'Player Name' in roster_df.columns:
                 ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
                 cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
-            
             return ash_df, cmj_df, swing_df, throw_df
         except Exception as e:
             st.error(f"Data Sync Error: {e}")
@@ -86,23 +80,20 @@ if check_password():
     # --- 5. TABS ---
     tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING Analysis", "THROW Analysis"])
 
-    # --- 6. UI LOGIC FUNCTION ---
-    # We create a function to handle the "Top Section" (Selection + Photo) so it doesn't get pushed to the bottom
-    def render_top_section(tab_key):
+    # --- 6. TOP SECTION RENDERER ---
+    def render_profile_section(tab_key):
         st.markdown("<br>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
-            player = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()), key=f"sel_{tab_key}")
-        
-        p_data = ash_df[ash_df['Player Name'] == player].sort_values('Date')
-        
+            p_name = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()), key=f"sel_{tab_key}")
+        p_all = ash_df[ash_df['Player Name'] == p_name].sort_values('Date')
         with c2:
-            years = sorted(p_data['Date'].dt.year.dropna().unique().astype(int), reverse=True)
-            yr = st.selectbox("Select Season", ["All Time"] + years, key=f"yr_{tab_key}")
-
-        filt = p_data if yr == "All Time" else p_data[p_data['Date'].dt.year == yr]
+            years = sorted(p_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
+            yr_sel = st.selectbox("Select Season", ["All Time"] + years, key=f"yr_{tab_key}")
         
-        latest = filt.iloc[-1] if not filt.empty else None
+        filt_df = p_all if yr_sel == "All Time" else p_all[p_all['Date'].dt.year == yr_sel]
+        latest = filt_df.iloc[-1] if not filt_df.empty else None
+        
         if latest is not None:
             img = latest.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
             st.markdown(f"""
@@ -110,13 +101,13 @@ if check_password():
                     <div style="display: flex; align-items: center;">
                         <img src="{img}" class="player-photo">
                         <div style="margin-left: 30px;">
-                            <h1 style="margin:0;">{player}</h1>
-                            <p style="color:#4895DB; font-weight:700; margin:0; text-transform: uppercase;">PERFORMANCE HUB | {yr}</p>
+                            <h1 style="margin:0;">{p_name}</h1>
+                            <p style="color:#4895DB; font-weight:700; margin:0; text-transform: uppercase;">PERFORMANCE HUB | {yr_sel}</p>
                         </div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-        return player, filt, yr
+        return p_name, filt_df, yr_sel
 
 
         with tab_ash:
