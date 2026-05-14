@@ -2,17 +2,20 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- 1. PAGE CONFIG ---
+# --- 1. PAGE CONFIG (Must be at the very top) ---
 st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
 # --- 2. PASSWORD GATE ---
 def check_password():
+    """Returns True if the user has the correct password from st.secrets."""
     def password_entered():
+        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == st.secrets["password"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]
+            del st.session_state["password"]  # Clear password from state for security
         else:
             st.session_state["password_correct"] = False
+
     if "password_correct" not in st.session_state:
         st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
         return False
@@ -20,15 +23,46 @@ def check_password():
         st.text_input("Enter Password to Access Dashboard", type="password", on_change=password_entered, key="password")
         st.error("😕 Password incorrect")
         return False
-    return True
+    else:
+        return True
 
+# --- MAIN APP EXECUTION ---
 if check_password():
+    
+    # --- 1. PAGE CONFIG ---
+    st.set_page_config(page_title="Softball Performance Hub", layout="wide")
 
-    # --- 3. CUSTOM CSS ---
     st.markdown("""
         <style>
-        [data-testid="stHeaderCell"] { text-align: center !important; display: flex; justify-content: center; }
-        [data-testid="stTable"] td, [data-testid="stDataFrameDataLayer"] td { text-align: center !important; }
+        /* Centers everything inside the dataframe cells */
+        [data-testid="stHeaderCell"] {
+            text-align: center !important;
+            display: flex;
+            justify-content: center;
+        }
+        [data-testid="stTable"] td, [data-testid="stDataFrameDataLayer"] td {
+            text-align: center !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- BRANDING HEADER (CENTERED) ---
+    st.markdown(
+        """
+        <div style="text-align: center;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/250px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
+            <h1 style="color: #FF8200; margin-top: 10px; font-size: 40px; font-weight: 800;">
+                Lady Vol Softball Performance
+            </h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.divider()
+
+    # --- 2. CUSTOM LADY VOL CSS ---
+    st.markdown("""
+        <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; }
         [data-testid="stMetricValue"] { font-size: 28px; font-weight: 800; color: #FF8200; }
         .athlete-header {
@@ -36,78 +70,97 @@ if check_password():
             border-left: 10px solid #FF8200; margin-bottom: 25px;
         }
         .player-photo { border-radius: 50%; width: 150px; height: 150px; object-fit: cover; border: 4px solid #4895DB; }
+        .metric-sub { font-size: 14px; font-weight: 700; margin-top: -15px; margin-bottom: 10px; }
+        .red-text { color: #dc3545; }
+        .green-text { color: #28a745; }
         #MainMenu, footer, header { visibility: hidden; }
         </style>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    # BRANDING HEADER
-    st.markdown("""
-        <div style="text-align: center;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tennessee_Lady_Volunteers_logo.svg/250px-Tennessee_Lady_Volunteers_logo.svg.png" width="120">
-            <h1 style="color: #FF8200; margin-top: 10px; font-size: 40px; font-weight: 800; text-transform: uppercase;">
-                Lady Vol Softball Performance
-            </h1>
-        </div>
-    """, unsafe_allow_html=True)
-    st.divider()
 
-    # --- 4. DATA LOADING ---
+    # --- 3. DATA LOADING & MERGING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
+            # 1. Load Raw Data
             ash_df = pd.read_csv(st.secrets["ASH_URL"])
             cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
             roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
             swing_df = pd.read_csv(st.secrets["SWING_URL"])
             throw_df = pd.read_csv(st.secrets["THROW_URL"])
+        
+            # 2. Clean Column Names
             for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+            # 3. DYNAMIC PHOTO COLUMN FIX
+            # This finds whatever column you named the photos and renames it to 'Photo'
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
-            roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'}) if photo_col else roster_df
-            if 'Photo' not in roster_df.columns: roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
+            if photo_col:
+                roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
+            else:
+                # Fallback if no photo column exists at all
+                roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
+
+            # 4. MERGE (Ensuring 'Photo' and 'Player Name' exist)
             if 'Player Name' in roster_df.columns:
+                # Merge photo into performance dataframes
                 ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
                 cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+        
             return ash_df, cmj_df, swing_df, throw_df
+
         except Exception as e:
             st.error(f"Data Sync Error: {e}")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
-    # --- 5. TABS ---
-    tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING Analysis", "THROW Analysis"])
+    tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
-    # --- 6. TOP SECTION RENDERER ---
-    def render_profile_section(tab_key):
-        st.markdown("<br>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            p_name = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()), key=f"sel_{tab_key}")
-        p_all = ash_df[ash_df['Player Name'] == p_name].sort_values('Date')
-        with c2:
-            years = sorted(p_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
-            yr_sel = st.selectbox("Select Season", ["All Time"] + years, key=f"yr_{tab_key}")
+    # --- 4. DASHBOARD UI ---
+    if not ash_df.empty:
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
+    
+        p_ash_all = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+    
+        with f_col2:
+            years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
+            selected_year = st.selectbox("Select Season", ["All Time"] + years)
+
+        if selected_year == "All Time":
+            ash_filt = p_ash_all
+            cmj_filt = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
+            label = "All-Time"
+        else:
+            ash_filt = p_ash_all[p_ash_all['Date'].dt.year == selected_year]
+            cmj_filt = cmj_df[(cmj_df['Player Name'] == selected) & (cmj_df['Date'].dt.year == selected_year)].sort_values('Date')
+            label = str(selected_year)
+
+        latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
+
+        if latest_ash is not None:
+            # PROFILE HEADER FIX
+            # Using the merged 'Photo' column
+            img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
         
-        filt_df = p_all if yr_sel == "All Time" else p_all[p_all['Date'].dt.year == yr_sel]
-        latest = filt_df.iloc[-1] if not filt_df.empty else None
-        
-        if latest is not None:
-            img = latest.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
             st.markdown(f"""
                 <div class="athlete-header">
                     <div style="display: flex; align-items: center;">
-                        <img src="{img}" class="player-photo">
+                        <img src="{img_url}" class="player-photo">
                         <div style="margin-left: 30px;">
-                            <h1 style="margin:0;">{p_name}</h1>
-                            <p style="color:#4895DB; font-weight:700; margin:0; text-transform: uppercase;">PERFORMANCE HUB | {yr_sel}</p>
+                            <h1 style="margin:0;">{selected}</h1>
+                            <p style="color:#4895DB; font-weight:700; margin:0;">PERFORMANCE HUB | {label}</p>
                         </div>
                     </div>
                 </div>
-            """, unsafe_allow_html=True)
-        return p_name, filt_df, yr_sel
+                """, unsafe_allow_html=True)
+
 
 
         with tab_ash:
