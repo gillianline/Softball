@@ -152,8 +152,8 @@ if check_password():
         # 1. ANALYSIS WINDOW
         st.markdown("<br>", unsafe_allow_html=True)
         p_dates = st.date_input("Scouting Window", 
-            value=(ash_filt['Date'].max() - pd.Timedelta(days=14), ash_filt['Date'].max().date()),
-            key="final_scouting_window")
+            value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
+            key="profile_final_scout")
 
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
             start_p, end_p = p_dates
@@ -164,99 +164,75 @@ if check_password():
             p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
             p_c = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
 
-            # --- 1. THE READINESS SCORE CARD ---
-            # Grade = (Current / Season Max) * 100
-            f_max = ash_filt['Peak Vertical Force [N]'].max()
-            f_curr = p_ash['Peak Vertical Force [N]'].mean() if not p_ash.empty else 0
-            
-            rsi_max = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
-            rsi_curr = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
-            
-            # Aggregate Score
-            f_grade = (f_curr / f_max * 100) if f_max > 0 else 0
-            rsi_grade = (rsi_curr / rsi_max * 100) if rsi_max > 0 else 0
-            readiness_score = (f_grade * 0.5) + (rsi_grade * 0.5)
-
-            st.markdown(f"""
-                <div style="background-color:#F8F9FA; padding:25px; border-radius:15px; border-left: 10px solid #FF8200; text-align:center;">
-                    <h3 style="margin:0; color:grey; font-size:14px; text-transform:uppercase;">Overall Readiness Score</h3>
-                    <h1 style="margin:0; font-size:65px; color:#1D1D1F;">{readiness_score:.0f}<span style="font-size:25px; color:grey;">/100</span></h1>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # --- 2. ATHLETE STATUS ROW ---
-            st.markdown("### STATUS CHECK")
+            # --- 2. ATHLETE STATUS (Top Row) ---
+            st.markdown("### ATHLETE STATUS")
             s1, s2, s3, s4 = st.columns(4)
             
-            # Readiness Status (CMJ focus)
-            status = "PEAKING" if rsi_curr > 0.45 else "STABLE" if rsi_curr > 0.35 else "FATIGUED"
-            s1.metric("CNS Status", status, delta=f"{rsi_curr:.2f} RSI")
+            # CNS STATUS (RSI focus)
+            rsi_best = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
+            rsi_curr = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
+            rsi_status = "PEAKING" if rsi_curr >= (rsi_best * 0.95) else "STABLE" if rsi_curr >= (rsi_best * 0.85) else "FATIGUED"
             
-            # Jump Height (CMJ focus)
-            j_max = cmj_filt['Jump Height (Imp-Mom) [cm]'].max()
-            j_curr = p_c['Jump Height (Imp-Mom) [cm]'].mean() if not p_c.empty else 0
-            s2.metric("Jump Height", f"{j_curr:.1f}cm", delta=f"{j_curr - j_max:.1f}cm vs Best")
+            s1.metric("CNS Status", rsi_status, help="Based on RSI-m compared to All-Time Best")
+            s1.markdown(f"**{rsi_curr:.2f} RSI** \n(Best: {rsi_best:.2f})")
 
-            # Asymmetry (ASH focus)
+            # ASYMMETRY (ASH focus)
             l_avg = p_ash['Peak Vertical Force [N] (L)'].mean() if not p_ash.empty else 0
             r_avg = p_ash['Peak Vertical Force [N] (R)'].mean() if not p_ash.empty else 0
             asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
-            s3.metric("L/R Variance", f"{asym:.1f}%", delta="HIGH" if asym > 10 else "NORMAL", delta_color="inverse")
+            
+            s2.metric("Asymmetry", f"{asym:.1f}%", delta="LOW" if asym < 10 else "HIGH", delta_color="inverse")
+            s2.markdown(f"**{int(l_avg)}N (L) / {int(r_avg)}N (R)**")
 
-            # Intent (Skill focus)
+            # LOAD (Total Reps)
             s_vol = p_s['Swing Count'].sum() if not p_s.empty else 0
+            t_vol = p_t['Total Throw Count'].sum() if not p_t.empty else 0
+            total_reps = int(s_vol + t_vol)
+            l_status = "HIGH" if total_reps > 300 else "MODERATE" if total_reps > 150 else "LOW"
+            
+            s3.metric("Load", l_status)
+            s3.markdown(f"**{total_reps} Total Reps**")
+
+            # INTENT (Skill Quality)
             s_int = p_s['Swing Max Rotation Band 3 Count'].sum() if not p_s.empty else 0
             s_qual = (s_int / s_vol * 100) if s_vol > 0 else 0
-            s4.metric("Swing Quality", f"{s_qual:.0f}%", help="% of High Intent Swings")
-
-            st.divider()
-
-            # --- 3. THE "SCOUTING" VISUALS ---
-            c1, c2 = st.columns([2, 1])
-
-            with c1:
-                st.subheader("Bilateral Force History (L vs R)")
-                if not p_ash.empty:
-                    # Line chart showing Lead vs Trail Force
-                    fig_ash = px.line(p_ash, x='Date', y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
-                                     markers=True, color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
-                                     template="plotly_white")
-                    fig_ash.update_layout(height=300, margin=dict(t=10, b=0), legend=dict(orientation="h", y=1.2, x=1))
-                    st.plotly_chart(fig_ash, use_container_width=True)
-
-            with c2:
-                st.subheader("Weekly Workload")
-                t_vol = p_t['Total Throw Count'].sum() if not p_t.empty else 0
-                total_work = s_vol + t_vol
-                
-                # Big volume metrics
-                st.markdown(f"""
-                    <div style="background-color:#F8F9FA; padding:20px; border-radius:10px; text-align:center; border: 1px solid #E0E0E0;">
-                        <p style="margin:0; font-size:12px; color:grey;">TOTAL REPS</p>
-                        <h2 style="margin:0; color:#FF8200;">{int(total_work)}</h2>
-                        <hr style="margin:10px 0;">
-                        <p style="margin:0; font-size:12px; color:#FF8200;">SWINGS: {int(s_vol)}</p>
-                        <p style="margin:0; font-size:12px; color:#4895DB;">THROWS: {int(t_vol)}</p>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            st.divider()
-
-            # --- 4. COACHING NOTES ---
-            st.markdown("### COACHING NOTES")
-            notes_col1, notes_col2 = st.columns(2)
+            i_status = "HIGH" if s_qual > 25 else "NORMAL"
             
-            with notes_col1:
-                st.markdown(f"**Physical Status (ASH/CMJ)**")
-                if asym > 10: st.write("High Asymmetry: Prioritize Lead Leg (Left) stability.")
-                if rsi_curr < 0.35: st.write("Fatigue Alert: CNS readiness is below baseline.")
-                else: st.write("Physical metrics are within stable performance ranges.")
+            s4.metric("Intent", i_status)
+            s4.markdown(f"**{s_qual:.1f}% Quality**")
 
-            with notes_col2:
-                st.markdown(f"**Skill Status (Swing/Throw)**")
-                if s_qual > 25: st.write("High Intent: Athlete is maintaining elite rotational speeds.")
-                if total_work > 300: st.write(" High Volume: Monitor for overuse/soreness.")
-                else: st.write(" Workload volume is balanced for the current block.")
+            st.divider()
+
+            # --- 3. THE 7-DAY TREND (L vs R Force focus) ---
+            st.markdown("### 7-DAY ASH TREND (L vs R)")
+            if not p_ash.empty:
+                fig_ash = px.line(p_ash, x='Date', y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
+                                 markers=True, color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
+                                 template="plotly_white")
+                fig_ash.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="", yaxis_title="Force (N)", legend=dict(orientation="h", y=1.2))
+                st.plotly_chart(fig_ash, use_container_width=True)
+
+            st.divider()
+
+            # --- 4. COACHING NOTES & ACTIVITY ---
+            n_col, a_col = st.columns(2)
+            
+            with n_col:
+                st.markdown("### COACHING NOTES")
+                st.markdown(f"""
+                * **CNS**: {rsi_status} ({rsi_curr:.2f}). { 'Ready for high intent.' if rsi_status == "PEAKING" else 'Monitor fatigue.' }
+                * **Symmetry**: {asym:.1f}% variance. { 'Normal' if asym < 10 else 'High - Check Lead Leg.' }
+                * **Workload**: {l_status} volume detected this week.
+                """)
+
+            with a_col:
+                st.markdown("### RECENT ACTIVITY")
+                st.markdown(f"""
+                * **Hitting**: {int(s_vol)} Swings
+                * **Throwing**: {int(t_vol)} Throws
+                * **Force Testing**: {len(p_ash)} ASH Sessions
+                * **Jump Testing**: {len(p_c)} CMJ Sessions
+                """)
                 
             
                 
