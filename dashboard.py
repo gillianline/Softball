@@ -534,20 +534,15 @@ if not ash_df.empty:
                 fig_simple.update_layout(height=300, yaxis_visible=False, xaxis_title="")
                 st.plotly_chart(fig_simple, use_container_width=True)
 
-                # 6. TABLE
+                # 6. TABLE (Centered and Clean)
                 st.subheader("Session Details")
                 hist = p_t.sort_values('Date', ascending=False).copy()
                 hist['Date'] = hist['Date'].dt.strftime('%m/%d')
                 
-                # Create a clean version with only your 4 columns
                 display_hist = hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
                     'Throws': 'Total',
                     'Intent': 'High Intent'
                 })
                 
-                # Using st.dataframe instead of st.table to allow index hiding
-                st.dataframe(
-                    display_hist,
-                    hide_index=True,
-                    use_container_width=True
-                )
+                # Using st.table for a cleaner, centered look
+                st.table(display_hist)
