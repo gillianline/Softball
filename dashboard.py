@@ -423,70 +423,70 @@ if not ash_df.empty:
             else:
                 st.info(f"No records found for {selected} in {swing_year}.")
 
-    with tab_throwing:
+   with tab_throwing:
         if not throw_df.empty:
-            # 1. INTERNAL TAB FILTERS
+            # 1. FILTERS
             f1, f2 = st.columns([1, 2])
             with f1:
-                throw_year = st.selectbox("Season", options=[2026, 2025, 2024], key="throw_yr")
+                t_year = st.selectbox("Season", options=[2026, 2025, 2024], key="t_yr")
             with f2:
-                throw_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="throw_ct")
+                t_cat = st.segmented_control("Session Type", options=["All", "Games", "Practices"], default="All", key="t_ct")
 
-            # 2. DATA PROCESSING & NUMERIC CONVERSION
+            # 2. DATA PROCESSING
             df_t = throw_df.copy()
             df_t.columns = df_t.columns.str.strip()
             df_t['Date'] = pd.to_datetime(df_t['Date'])
             
-            p_throw = df_t[df_t['Name'] == selected].copy()
-            p_throw = p_throw[p_throw['Date'].dt.year == throw_year]
+            p_t = df_t[df_t['Name'] == selected].copy()
+            p_t = p_t[p_t['Date'].dt.year == t_year]
             
-            if throw_cat == "Games":
-                p_throw = p_throw[p_throw['Session Type'].str.contains('Game', case=False, na=False)]
-            elif throw_cat == "Practices":
-                p_throw = p_throw[p_throw['Session Type'].str.contains('Practice|Session', case=False, na=False)]
+            if t_cat == "Games":
+                p_t = p_t[p_t['Session Type'].str.contains('Game', case=False, na=False)]
+            elif t_cat == "Practices":
+                p_t = p_t[p_t['Session Type'].str.contains('Practice|Session', case=False, na=False)]
 
-            if not p_throw.empty:
-                latest = p_throw.iloc[-1]
-            
-                # 1. THE COACH'S "BOTTOM LINE" BOX
-                # Determine session intensity based on Rotation Band 3
-                b3_val = int(latest['B3_Rot'])
-                if b3_val > 15:
+            if not p_t.empty:
+                # --- DEFINE COACHING NAMES HERE TO FIX KEYERROR ---
+                p_t['Throws'] = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').fillna(0)
+                p_t['Intent'] = pd.to_numeric(p_t['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
+                
+                p_t = p_t.sort_values('Date')
+                latest = p_t.iloc[-1]
+                
+                # 3. THE COACH'S "BOTTOM LINE" BOX
+                intent_val = int(latest['Intent'])
+                if intent_val > 15:
                     status, color, note = "HIGH INTENT", "#dc3545", "Max effort defensive/pitching work detected."
-                elif b3_val > 5:
+                elif intent_val > 5:
                     status, color, note = "MODERATE", "#ffc107", "Standard skill work or active warm-up."
                 else:
                     status, color, note = "RECOVERY", "#28a745", "Light catch or low-intent technical work."
 
                 st.markdown(f"""
                     <div style="background-color:{color}; padding:20px; border-radius:15px; color:white; text-align:center;">
-                        <h1 style="margin:0;">{status} SESSION</h1>
-                        <p style="margin:0; font-size:18px;">{note}</p>
+                        <h1 style="margin:0; font-size:32px;">{status} SESSION</h1>
+                        <p style="margin:0; font-size:18px; opacity:0.9;">{note}</p>
                     </div>
                 """, unsafe_allow_html=True)
 
                 st.divider()
 
-                # 2. BIG NUMBER METRICS
+                # 4. BIG NUMBER METRICS
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.metric("Total Volume", f"{int(latest['Throw Count'])} Throws")
+                    st.metric("Total Volume", f"{int(latest['Throws'])} Throws")
                 with c2:
-                    st.metric("High-Speed Throws", f"{b3_val}", help="Throws in Rotation Band 3")
+                    st.metric("High-Intent Throws", f"{intent_val}")
                 with c3:
-                    # Intensity percentage: What % of throws were 'High Effort'?
-                    effort_pct = (b3_val / latest['Throw Count'] * 100) if latest['Throw Count'] > 0 else 0
-                    st.metric("Work Quality", f"{effort_pct:.1f}%")
+                    quality = (intent_val / latest['Throws'] * 100) if latest['Throws'] > 0 else 0
+                    st.metric("Work Quality", f"{quality:.1f}%")
 
                 st.divider()
 
-                # 3. SIMPLE VOLUME TREND (Bar only, no lines)
-                st.subheader("Throwing Volume (Last 10 Sessions)")
-                # Only show the last 10 days so the bars stay wide and readable
-                p_recent = p_throw.tail(10)
-            
+                # 5. SIMPLE TREND
+                st.subheader("Volume History (Last 10)")
                 fig_simple = px.bar(
-                    p_recent, x='Date', y='Throw Count',
+                    p_t.tail(10), x='Date', y='Throws',
                     text_auto='.0f',
                     color_discrete_sequence=["#4895DB"],
                     template="plotly_white"
@@ -494,16 +494,15 @@ if not ash_df.empty:
                 fig_simple.update_layout(height=300, yaxis_visible=False, xaxis_title="")
                 st.plotly_chart(fig_simple, use_container_width=True)
 
-                # 4. RECENT HISTORY (Cleanest possible table)
+                # 6. TABLE
                 st.subheader("Quick History")
-                hist_display = p_throw.sort_values('Date', ascending=False).head(5).copy()
-                hist_display['Date'] = hist_display['Date'].dt.strftime('%m/%d')
-            
-                # Filter to just the most important columns for a coach
-                st.table(hist_display[['Date', 'Session Type', 'Throw Count', 'B3_Rot']].rename(columns={
-                    'Throw Count': 'Total',
-                    'B3_Rot': 'High Intent'
+                hist = p_t.sort_values('Date', ascending=False).head(5).copy()
+                hist['Date'] = hist['Date'].dt.strftime('%m/%d')
+                
+                st.table(hist[['Date', 'Session Type', 'Throws', 'Intent']].rename(columns={
+                    'Throws': 'Total',
+                    'Intent': 'High Intent'
                 }))
 
             else:
-                st.info(f"No throwing records found for {selected}.")
+                st.info(f"No {t_cat.lower()} records for {selected} in {t_year}.")
