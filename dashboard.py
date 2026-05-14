@@ -331,113 +331,142 @@ if not ash_df.empty:
             st.info("No CMJ records found for the selected criteria.")
 
     with tab_swing:
-        if not swing_df.empty:
-            # 1. DATE & CATEGORY FILTERS
-            f1, f2 = st.columns([2, 1])
-            with f1:
-                df_s_dates = pd.to_datetime(swing_df['Date'])
-                selected_dates_s = st.date_input(
-                    "Select Date Range",
-                    value=(df_s_dates.max() - pd.Timedelta(days=7), df_s_dates.max()),
-                    key="swing_date_range"
+    if not swing_df.empty:
+        # 1. DATE & CATEGORY FILTERS
+        f1, f2 = st.columns([2, 1])
+        with f1:
+            df_s_dates = pd.to_datetime(swing_df['Date'])
+            # Default to the most recent 7 days of data
+            max_s = df_s_dates.max()
+            min_s = max_s - pd.Timedelta(days=7)
+            
+            selected_dates_s = st.date_input(
+                "Select Date Range",
+                value=(min_s.date(), max_s.date()),
+                key="swing_date_range_final"
+            )
+        
+        with f2:
+            s_cat = st.segmented_control(
+                "Session Type", 
+                options=["All", "Games", "Practices"], 
+                default="All", 
+                key="s_ct_final"
+            )
+
+        # 2. DATA PROCESSING & SAFETY GATE
+        if isinstance(selected_dates_s, tuple) and len(selected_dates_s) == 2:
+            start_s, end_s = selected_dates_s
+            
+            df_s = swing_df.copy()
+            df_s.columns = df_s.columns.str.strip()
+            df_s['Date'] = pd.to_datetime(df_s['Date'])
+            
+            # Apply Athlete, Date Range, and Name Filter
+            p_s = df_s[(df_s['Name'] == selected) & 
+                       (df_s['Date'].dt.date >= start_s) & 
+                       (df_s['Date'].dt.date <= end_s)].copy()
+
+            # Apply Session Type Filter
+            if s_cat == "Games":
+                p_s = p_s[p_s['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
+            elif s_cat == "Practices":
+                p_s = p_s[p_s['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
+
+            if not p_s.empty:
+                # CLEAN NUMERIC DATA
+                p_s['Total'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').fillna(0)
+                p_s['Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
+                p_s['Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+                
+                # Metrics for Table/Summary
+                p_s['Intensity'] = p_s['Load'] / p_s['Total'].replace(0, 1)
+                p_s['Rot_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
+                
+                p_s = p_s.sort_values('Date')
+
+                # 3. RANGE SUMMARY HEADER
+                st.subheader(f"Swing Report: {start_s.strftime('%m/%d')} - {end_s.strftime('%m/%d')}")
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Total Swings", f"{int(p_s['Total'].sum())}")
+                m2.metric("Max Intent", f"{int(p_s['Intent'].sum())}")
+                m3.metric("Avg Intensity", f"{p_s['Intensity'].mean():.2f}")
+                m4.metric("Avg Rot %", f"{p_s['Rot_Pct'].mean():.1f}%")
+
+                st.divider()
+
+                # 4. COLOR-CODED BAR GRAPH
+                # Assign Blue for Games, Orange for Practices
+                p_s['Session'] = p_s['Session Type'].apply(lambda x: 'Game' if 'Game' in str(x) else 'Practice')
+                
+                fig_s = px.bar(p_s, x='Date', y='Total', 
+                             color='Session',
+                             color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
+                             text='Total', 
+                             template="plotly_white")
+                
+                # Formatting: Force upright labels outside the bars
+                fig_s.update_traces(
+                    texttemplate='%{text:.0f}', 
+                    textposition='outside', 
+                    cliponaxis=False
                 )
-            with f2:
-                s_cat = st.segmented_control("Type", options=["All", "Games", "Practices"], default="All", key="s_ct_date")
-
-            # 2. SAFETY CHECK & DATA PROCESSING
-            if isinstance(selected_dates_s, tuple) and len(selected_dates_s) == 2:
-                start_s, end_s = selected_dates_s
                 
-                df_s = swing_df.copy()
-                df_s.columns = df_s.columns.str.strip()
-                df_s['Date'] = pd.to_datetime(df_s['Date'])
+                fig_s.update_layout(
+                    height=350, 
+                    yaxis_visible=False, 
+                    xaxis_title="",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""),
+                    uniformtext=dict(minsize=10, mode='hide'),
+                    xaxis=dict(tickformat="%m/%d")
+                )
                 
-                # Filter Athlete, Date, and Category
-                p_s = df_s[(df_s['Name'] == selected) & 
-                           (df_s['Date'].dt.date >= start_s) & 
-                           (df_s['Date'].dt.date <= end_s)].copy()
+                st.plotly_chart(
+                    fig_s, 
+                    use_container_width=True, 
+                    config={'displayModeBar': False, 'staticPlot': True}
+                )
 
-                if s_cat == "Games":
-                    p_s = p_s[p_s['Session Type'].astype(str).str.contains('Game', case=False, na=False)]
-                elif s_cat == "Practices":
-                    p_s = p_s[p_s['Session Type'].astype(str).str.contains('Practice|Session', case=False, na=False)]
-
-                if not p_s.empty:
-                    # RENAME & CLEAN NUMERICS
-                    p_s['Total'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').fillna(0)
-                    p_s['Max Intent'] = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').fillna(0)
-                    p_s['Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
-                    
-                    # Calculated Metrics
-                    p_s['Intensity'] = p_s['Load'] / p_s['Total'].replace(0, 1)
-                    p_s['Rot_Pct'] = pd.to_numeric(p_s['Swing Max Player Load Side % (median)'], errors='coerce').fillna(0)
-                    
-                    p_s = p_s.sort_values('Date')
-                    latest_s = p_s.iloc[-1]
-
-                    # 3. BIG NUMBER METRICS
-                    st.subheader(f"Range Summary: {start_s.strftime('%m/%d')} - {end_s.strftime('%m/%d')}")
-                    m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("Total Swings", f"{int(p_s['Total'].sum())}")
-                    m2.metric("Max Intent", f"{int(p_s['Max Intent'].sum())}")
-                    m3.metric("Avg Intensity", f"{p_s['Intensity'].mean():.2f}")
-                    m4.metric("Avg Rot %", f"{p_s['Rot_Pct'].mean():.1f}%")
-
-                    st.divider()
-
-                    # 4. COLOR-CODED BAR GRAPH (Blue = Game, Orange = Practice)
-                    p_s['Session'] = p_s['Session Type'].apply(lambda x: 'Game' if 'Game' in str(x) else 'Practice')
-                    
-                    fig_s = px.bar(p_s, x='Date', y='Total', color='Session',
-                                 color_discrete_map={'Game': '#4895DB', 'Practice': '#FF8200'},
-                                 text='Total', template="plotly_white")
-                    
-                    fig_s.update_traces(texttemplate='%{text:.0f}', textposition='outside', cliponaxis=False)
-                    fig_s.update_layout(height=350, yaxis_visible=False, xaxis_title="",
-                                      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title_text=""),
-                                      uniformtext=dict(minsize=10, mode='hide'))
-                    
-                    st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
-
-                    # 5. CENTERED HTML TABLE (Fixed Traceback Error)
-                    st.subheader("Session Details")
-                    hist_s = p_s.sort_values('Date', ascending=False).copy()
-                    hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
-                    
-                    # Building rows manually to ensure precise formatting
-                    rows_html = ""
-                    for _, row in hist_s.iterrows():
-                        rows_html += f"""
-                        <tr>
-                            <td>{row['Date']}</td>
-                            <td>{row['Session Type']}</td>
-                            <td>{int(row['Total'])}</td>
-                            <td>{int(row['Max Intent'])}</td>
-                            <td>{row['Intensity']:.2f}</td>
-                            <td>{row['Rot_Pct']:.1f}%</td>
-                        </tr>
-                        """
-
-                    table_html = f"""
-                    <style>
-                        .s-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
-                        .s-table th {{ background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: center !important; }}
-                        .s-table td {{ padding: 12px; border-bottom: 1px solid #eee; text-align: center !important; }}
-                    </style>
-                    <table class="s-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th>
-                            </tr>
-                        </thead>
-                        <tbody>{rows_html}</tbody>
-                    </table>
+                # 5. CENTERED HTML TABLE (No Index, Clean Formatting)
+                st.subheader("Session Details")
+                hist_s = p_s.sort_values('Date', ascending=False).copy()
+                hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
+                
+                # Build rows manually to control exact formatting
+                rows_html = ""
+                for _, row in hist_s.iterrows():
+                    rows_html += f"""
+                    <tr>
+                        <td>{row['Date']}</td>
+                        <td>{row['Session Type']}</td>
+                        <td>{int(row['Total'])}</td>
+                        <td>{int(row['Max Intent'])}</td>
+                        <td>{row['Intensity']:.2f}</td>
+                        <td>{row['Rot_Pct']:.1f}%</td>
+                    </tr>
                     """
-                    st.markdown(table_html, unsafe_allow_html=True)
-                else:
-                    st.info("No data found for this range.")
+
+                table_html = f"""
+                <style>
+                    .coach-table {{ width: 100%; border-collapse: collapse; font-family: sans-serif; }}
+                    .coach-table th {{ background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: center !important; }}
+                    .coach-table td {{ padding: 12px; border-bottom: 1px solid #eee; text-align: center !important; }}
+                </style>
+                <table class="coach-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th><th>Type</th><th>Total</th><th>Max Intent</th><th>Load/Sw</th><th>Rot %</th>
+                        </tr>
+                    </thead>
+                    <tbody>{rows_html}</tbody>
+                </table>
+                """
+                st.markdown(table_html, unsafe_allow_html=True)
             else:
-                st.warning("Please select both a start and end date.")
+                st.info(f"No records found for {selected} in this range.")
+        else:
+            # Prevents NameErrors while picking dates
+            st.warning("Please select both a start and end date.")
                 
 
     with tab_throwing:
