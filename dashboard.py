@@ -149,56 +149,93 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        # 1. TIME WINDOW FILTER (Clean & Tight)
-        p_dates = st.date_input("Analysis Window", 
-            value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
-            key="scouting_report_date")
-
+        # 1. DATE SELECTION (Session Selection)
+        st.markdown("<br>", unsafe_allow_html=True)
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            # We use this as the "Session Selection" like your screenshot
+            p_dates = st.date_input("Session Selection", 
+                value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
+                key="vball_style_date")
+        
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
-            # --- 1. READINESS SCORE CALCULATION (Volleyball Logic) ---
-            # Grade = (Current / Individual Max) * 100
+            start_p, end_p = p_dates
             
-            # Metric A: Force Grade
-            force_max = ash_filt['Peak Vertical Force [N]'].max()
-            force_curr = p_ash['Peak Vertical Force [N]'].mean() if not p_ash.empty else 0
-            force_grade = (force_curr / force_max * 100) if force_max > 0 else 0
+            # --- DATA FILTERING (Fixes the NameError) ---
+            p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
+            p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)].copy()
+            p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
+            p_c = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
+
+            # --- CALCULATIONS ---
+            # Force Grade
+            f_max = ash_filt['Peak Vertical Force [N]'].max()
+            f_curr = p_ash['Peak Vertical Force [N]'].mean() if not p_ash.empty else 0
+            f_grade = (f_curr / f_max * 100) if f_max > 0 else 0
             
-            # Metric B: RSI Grade
+            # RSI Grade
             rsi_max = cmj_filt['RSI-modified (Imp-Mom) [m/s]'].max()
             rsi_curr = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
             rsi_grade = (rsi_curr / rsi_max * 100) if rsi_max > 0 else 0
-            
-            # Metric C: Symmetry Grade (100 - Asymmetry)
-            asym_val = (abs(p_ash['Peak Vertical Force [N] (L)'].mean() - p_ash['Peak Vertical Force [N] (R)'].mean()) / p_ash['Peak Vertical Force [N] (L)'].mean() * 100) if not p_ash.empty else 0
-            sym_grade = max(0, 100 - asym_val)
 
-            # FINAL READINESS SCORE
-            readiness_score = (force_grade * 0.4) + (rsi_grade * 0.4) + (sym_grade * 0.2)
-            
-            # Fatigue Flag (Volleyball Logic: If score < 85% of rolling average)
-            rolling_avg = 90 # Replace with actual rolling avg logic if desired
-            fatigue_flag = "⚠️" if readiness_score < 85 else "✅"
+            # Intent Grade
+            s_vol = p_s['Swing Count'].sum() if not p_s.empty else 0
+            s_intent = p_s['Swing Max Rotation Band 3 Count'].sum() if not p_s.empty else 0
+            s_grade = (s_intent / s_vol * 100) if s_vol > 0 else 0
 
-            # --- 2. THE VOLLEYBALL-STYLE READINESS CARD ---
-            st.markdown(f"""
-                <div style="background-color:#F8F9FA; padding:30px; border-radius:20px; border-left: 15px solid #FF8200; text-align:center; margin-bottom:25px;">
-                    <h3 style="margin:0; color:grey; font-size:16px; text-transform:uppercase; letter-spacing:2px;">Readiness Score</h3>
-                    <h1 style="margin:0; font-size:80px; color:#1D1D1F;">{readiness_score:.0f}<span style="font-size:30px; color:grey;">/100</span></h1>
-                    <p style="font-size:20px; font-weight:bold; margin-top:10px;">Status: {readiness} {fatigue_flag}</p>
-                </div>
-            """, unsafe_allow_html=True)
+            # Aggregate Session Score (Gold Box)
+            session_score = (f_grade * 0.4) + (rsi_grade * 0.4) + (s_grade * 0.2)
 
-            # --- 3. QUICK STATUS ROW (The 5 metrics you liked) ---
-            st.markdown("### ATHLETE STATUS")
-            s1, s2, s3, s4, s5 = st.columns(5)
-            s1.metric("Load", load_status)
-            s2.metric("Asymmetry", asym_status)
-            s3.metric("Force Grade", f"{force_grade:.0f}%", delta=f"{int(force_curr - force_max)}N")
-            s4.metric("RSI Grade", f"{rsi_grade:.0f}%")
-            
-            prev_rsi = cmj_filt[cmj_filt['Date'].dt.date < start_p]['RSI-modified (Imp-Mom) [m/s]'].tail(3).mean()
-            rsi_trend = "↑" if rsi_curr > (prev_rsi if prev_rsi else 0) else "↓"
-            s5.metric("CNS Trend", f"{rsi_curr:.2f} {rsi_trend}")
+            # --- 2. THE VOLLEYBALL LAYOUT ---
+            # Column 1: Photo | Column 2: Table | Column 3: Score Box
+            row_col1, row_col2, row_col3 = st.columns([1, 2, 1])
+
+            with row_col1:
+                st.markdown(f"""
+                    <div style="text-align: center;">
+                        <img src="{img_url}" style="border-radius: 50%; width: 220px; height: 220px; object-fit: cover; border: 6px solid #FF8200;">
+                        <h2 style="margin-top: 15px; font-size: 32px;">{selected}</h2>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            with row_col2:
+                # Summary Table (Metric, Today, 30D Max, Grade)
+                table_data = [
+                    {"Metric": "Peak Force (N)", "Today": f"{int(f_curr)}", "30D Max": f"{int(f_max)}", "Grade": f"{f_grade:.0f}"},
+                    {"Metric": "RSI-modified", "Today": f"{rsi_curr:.2f}", "30D Max": f"{rsi_max:.2f}", "Grade": f"{rsi_grade:.0f}"},
+                    {"Metric": "Swing Intent %", "Today": f"{s_grade:.1f}%", "30D Max": "30%", "Grade": f"{(s_grade/30*100):.0f}"},
+                ]
+                
+                # Manual HTML Table to match the screenshot styling
+                rows = "".join([f"""
+                    <tr>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">{d['Metric']}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; font-weight:bold; background-color:#fce4e4;">{d['Today']}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">{d['30D Max']}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">{d['Grade']}</td>
+                    </tr>""" for d in table_data])
+                
+                st.markdown(f"""
+                    <table style="width:100%; border-collapse: collapse; text-align: center; font-family: sans-serif;">
+                        <tr style="background-color:#4895DB; color:white;">
+                            <th style="padding:12px;">METRIC</th>
+                            <th style="padding:12px;">TODAY TOTAL</th>
+                            <th style="padding:12px;">SEASON MAX</th>
+                            <th style="padding:12px;">GRADE</th>
+                        </tr>
+                        {rows}
+                    </table>
+                    <p style="font-size:11px; color:grey; margin-top:10px;">* Red highlight and arrows indicate a significant change (> or < 10%) from the athlete's 30-day session average.</p>
+                """, unsafe_allow_html=True)
+
+            with row_col3:
+                # The Gold Session Score Box
+                st.markdown(f"""
+                    <div style="background-color:#CC9E40; padding:40px 10px; border-radius:20px; text-align:center; color:white; margin-top:20px;">
+                        <h1 style="font-size:70px; margin:0;">{session_score:.0f}</h1>
+                    </div>
+                    <p style="text-align:center; font-weight:bold; color:grey; margin-top:10px; text-transform:uppercase; letter-spacing:1px;">Session Score</p>
+                """, unsafe_allow_html=True)
 
             st.divider()
 
