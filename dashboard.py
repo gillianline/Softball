@@ -149,75 +149,88 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        # 1. TIME WINDOW SELECTION
+        # 1. ANALYSIS WINDOW
         st.markdown("<br>", unsafe_allow_html=True)
         p_dates = st.date_input("Analysis Window", 
             value=(ash_filt['Date'].max() - pd.Timedelta(days=7), ash_filt['Date'].max().date()),
-            key="simple_profile_date")
+            key="ultimate_profile_date")
 
         if isinstance(p_dates, tuple) and len(p_dates) == 2:
             start_p, end_p = p_dates
             
-            # Filter Data
+            # Data Filtering
             p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
             p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)].copy()
             p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
             p_c = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
 
-            # --- 2. TOP LEVEL STATUS ---
-            st.markdown("### ATHLETE STATUS")
-            s1, s2, s3, s4 = st.columns(4)
+            # --- 2. THE TOP LINE: ATHLETE SNAPSHOT ---
+            st.markdown("### PERFORMANCE SNAPSHOT")
             
-            # Readiness Status
-            rsi = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
-            status = "PEAKING" if rsi > 0.45 else "STABLE" if rsi > 0.35 else "FATIGUED"
-            s1.metric("Readiness", status)
-
-            # Load Status
-            total_reps = p_s.shape[0] + p_t.shape[0]
-            l_status = "HIGH" if total_reps > 15 else "MODERATE" if total_reps > 5 else "LOW"
-            s2.metric("Load", l_status)
-
-            # Asymmetry
+            # Calculations for the Snapshot
+            f_max = ash_filt['Peak Vertical Force [N]'].max()
+            f_curr = p_ash['Peak Vertical Force [N]'].mean() if not p_ash.empty else 0
+            rsi_curr = p_c['RSI-modified (Imp-Mom) [m/s]'].mean() if not p_c.empty else 0
+            s_vol = p_s['Swing Count'].sum() if not p_s.empty else 0
+            
+            s1, s2, s3, s4 = st.columns(4)
+            s1.metric("Force Maint.", f"{(f_curr/f_max*100):.1f}%" if f_max > 0 else "N/A", help="Current Avg vs Season Best")
+            s2.metric("CNS Readiness", "PEAKING" if rsi_curr > 0.45 else "STABLE" if rsi_curr > 0.35 else "FATIGUED")
+            
             l_avg = p_ash['Peak Vertical Force [N] (L)'].mean() if not p_ash.empty else 0
             r_avg = p_ash['Peak Vertical Force [N] (R)'].mean() if not p_ash.empty else 0
             asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
-            s3.metric("Asymmetry", f"{asym:.1f}%")
-
-            # High Intent
-            s_total = p_s['Swing Count'].sum() if not p_s.empty else 0
-            s_intent = p_s['Swing Max Rotation Band 3 Count'].sum() if not p_s.empty else 0
-            intent_pct = (s_intent / s_total * 100) if s_total > 0 else 0
-            s4.metric("Intent Quality", f"{intent_pct:.1f}%")
+            s3.metric("Asymmetry", f"{asym:.1f}%", delta="HIGH" if asym > 10 else None, delta_color="inverse")
+            
+            s4.metric("Weekly Volume", f"{int(s_vol + p_t['Total Throw Count'].sum())} Reps")
 
             st.divider()
 
-            # --- 3. 7-DAY TREND ---
-            st.markdown("### 7-DAY VOLUME TREND")
-            if not p_s.empty or not p_t.empty:
-                s_trend = p_s.groupby('Date')['Swing Count'].sum().reset_index()
-                t_trend = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
-                trend_df = pd.merge(s_trend, t_trend, on='Date', how='outer').fillna(0)
-                
-                fig_trend = px.line(trend_df, x='Date', y=['Swing Count', 'Total Throw Count'],
-                                   color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
-                                   template="plotly_white")
-                fig_trend.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), xaxis_title="", legend=dict(orientation="h", y=1.2))
-                st.plotly_chart(fig_trend, use_container_width=True)
+            # --- 3. THE "STORY" COLUMNS ---
+            col_left, col_right = st.columns([2, 1])
 
-            # --- 4. RECENT ACTIVITY ---
-            st.markdown("### RECENT ACTIVITY")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown(f"""
-                * **Swings**: {int(p_s['Swing Count'].sum())}
-                * **Throws**: {int(p_t['Total Throw Count'].sum())}
-                """)
-            with c2:
-                st.markdown(f"""
-                * **ASH Sessions**: {len(p_ash)}
-                * **CMJ Sessions**: {len(p_c)}
-                """)
+            with col_left:
+                st.markdown("### DAILY WORKLOAD (COMBINED)")
+                # Merging Swing and Throw for a stacked daily load view
+                s_daily = p_s.groupby('Date')['Swing Count'].sum().reset_index()
+                t_daily = p_t.groupby('Date')['Total Throw Count'].sum().reset_index()
+                work_trend = pd.merge(s_daily, t_daily, on='Date', how='outer').fillna(0)
+                
+                fig_load = px.bar(work_trend, x='Date', y=['Swing Count', 'Total Throw Count'],
+                                 color_discrete_map={'Swing Count': '#FF8200', 'Total Throw Count': '#4895DB'},
+                                 barmode='stack', template="plotly_white")
+                fig_load.update_layout(height=300, margin=dict(t=10, b=0), xaxis_title="", yaxis_title="Total Reps")
+                st.plotly_chart(fig_load, use_container_width=True)
+
+            with col_right:
+                st.markdown("### COACHING FOCUS")
+                # Automated logic-based coaching notes
+                notes = []
+                if asym > 10: notes.append("**Priority**: Address Lead Leg force deficit.")
+                if rsi_curr < 0.35: notes.append("**Recovery**: CNS fatigue detected. Low-intensity skill work only.")
+                if f_curr > (f_max * 0.95): notes.append("**Power**: Athlete is at peak strength.")
+                if s_vol > 200: notes.append("**Volume**: High swing count. Monitor hand/wrist health.")
+                
+                if not notes: notes.append("⚪ No significant flags. Continue baseline training.")
+                
+                for note in notes:
+                    st.markdown(note)
+
+            st.divider()
+
+            # --- 4. RECENT SESSIONS TABLE ---
+            st.markdown("###RECENT ACTIVITY LOG")
+            # Combine sessions into a readable table
+            swing_log = p_s[['Date', 'Session Type', 'Swing Count']].rename(columns={'Swing Count': 'Volume'})
+            swing_log['Activity'] = 'Hitting'
+            throw_log = p_t[['Date', 'Session Type', 'Total Throw Count']].rename(columns={'Total Throw Count': 'Volume'})
+            throw_log['Activity'] = 'Throwing'
+            
+            combined_log = pd.concat([swing_log, throw_log]).sort_values('Date', ascending=False).head(8)
+            combined_log['Date'] = combined_log['Date'].dt.strftime('%m/%d')
+            
+            st.table(combined_log[['Date', 'Activity', 'Session Type', 'Volume']])
+            
                 
                 
         with tab_ash:
