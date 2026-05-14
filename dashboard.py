@@ -411,16 +411,37 @@ if not ash_df.empty:
                 
                     st.plotly_chart(fig_s, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
 
-                    # 5. CENTERED HTML TABLE (Fixed Formatting & Alignment)
-                    st.subheader("Session Details")
+                    # 5. CENTERED HTML TABLE (Complete Single-String Build)
+                st.subheader("Session Details")
+                
+                # Sort and format the data
+                hist_s = p_s.sort_values('Date', ascending=False).copy()
+                hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
+                
+                # Start building the HTML string
+                table_html = """
+                <style>
+                    .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; }
+                    .coach-table th { background-color: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: center !important; }
+                    .coach-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: center !important; }
+                </style>
+                <table class="coach-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Total</th>
+                            <th>Max Intent</th>
+                            <th>Load/Sw</th>
+                            <th>Rot %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                """
 
-                    # Ensure your data is sorted and formatted before building the HTML
-                    hist_s = p_s.sort_values('Date', ascending=False).copy()
-                    hist_s['Date'] = hist_s['Date'].dt.strftime('%m/%d')
-
-                    rows_html = ""
-                    for _, row in hist_s.iterrows():
-                        rows_html += f"""
+                # Loop through data to add rows
+                for _, row in hist_s.iterrows():
+                    table_html += f"""
                         <tr>
                             <td>{row['Date']}</td>
                             <td>{row['Session Type']}</td>
@@ -429,50 +450,13 @@ if not ash_df.empty:
                             <td>{row['Intensity']:.2f}</td>
                             <td>{row['Rot_Pct']:.1f}%</td>
                         </tr>
-                        """
-
-                    table_html = f"""
-                    <style>
-                        .coach-table {{ 
-                            width: 100%; 
-                            border-collapse: collapse; 
-                            font-family: sans-serif; 
-                        }}
-                        .coach-table th {{ 
-                            background-color: #f8f9fa; 
-                            padding: 12px; 
-                            border-bottom: 2px solid #dee2e6; 
-                            text-align: center !important; 
-                            color: #495057;
-                        }}
-                        .coach-table td {{ 
-                            padding: 12px; 
-                            border-bottom: 1px solid #eee; 
-                            text-align: center !important; 
-                        }}
-                    </style>
-                    <table class="coach-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Total</th>
-                                <th>Max Intent</th>
-                                <th>Load/Sw</th>
-                                <th>Rot %</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                            {rows_html}
-                        </tbody>
-                    </table>
                     """
 
-                    st.markdown(table_html, unsafe_allow_html=True)
-                else:
-                    st.info(f"No records found for {selected} in this range.")
-            else:
-                st.warning("Please select both a start and end date.")
+                # Close the table tags
+                table_html += "</tbody></table>"
+
+                # Render it once
+                st.markdown(table_html, unsafe_allow_html=True)
 
     with tab_throwing:
         if not throw_df.empty:
