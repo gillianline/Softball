@@ -468,7 +468,7 @@ if not ash_df.empty:
                     </table>
                     """
 
-st.markdown(table_html, unsafe_allow_html=True)
+                    st.markdown(table_html, unsafe_allow_html=True)
                 else:
                     st.info(f"No records found for {selected} in this range.")
             else:
