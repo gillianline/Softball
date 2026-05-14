@@ -149,81 +149,105 @@ if check_password():
             tab_profile, tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["INDIVIDUAL PROFILE", "ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     with tab_profile:
-        # 1. DATE FILTER FOR PROFILE
-        st.markdown("### 🗓️ Profile View Settings")
-        profile_dates = st.date_input(
-            "Select Training Block", 
+        # 1. DATE FILTERS (Anchored at the top of the tab)
+        st.markdown("### Training Block Analysis")
+        p_dates = st.date_input(
+            "Select Performance Window", 
             value=(ash_filt['Date'].max() - pd.Timedelta(days=14), ash_filt['Date'].max().date()),
-            key="profile_date_range"
+            key="prof_date_block"
         )
 
-        if isinstance(profile_dates, tuple) and len(profile_dates) == 2:
-            start_p, end_p = profile_dates
+        if isinstance(p_dates, tuple) and len(p_dates) == 2:
+            start_p, end_p = p_dates
             
-            # Filter all datasets for the profile view
+            # Filter all datasets for the specific window
             p_ash = ash_filt[(ash_filt['Date'].dt.date >= start_p) & (ash_filt['Date'].dt.date <= end_p)]
-            p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)]
-            p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)]
+            p_s = swing_df[(swing_df['Name'] == selected) & (pd.to_datetime(swing_df['Date']).dt.date >= start_p) & (pd.to_datetime(swing_df['Date']).dt.date <= end_p)].copy()
+            p_t = throw_df[(throw_df['Name'] == selected) & (pd.to_datetime(throw_df['Date']).dt.date >= start_p) & (pd.to_datetime(throw_df['Date']).dt.date <= end_p)].copy()
 
             st.divider()
 
-            # 2. TOP ROW: VISUAL COMPARISONS
-            c1, c2 = st.columns(2)
+            # 2. THE "LADY VOL PERFORMANCE RADAR" (Bilateral Comparison)
+            c1, c2 = st.columns([2, 1])
 
             with c1:
-                st.subheader("Bilateral ASH Force Comparison")
+                st.subheader("Bilateral Force Profile (Lead vs. Trail)")
                 if not p_ash.empty:
-                    # L vs R Comparison using a Bar chart for the specific block
-                    l_avg = p_ash['Peak Vertical Force [N] (L)'].mean()
-                    r_avg = p_ash['Peak Vertical Force [N] (R)'].mean()
-                    
-                    fig_ash_comp = px.bar(
-                        x=["Left (Lead)", "Right (Trail)"], 
-                        y=[l_avg, r_avg],
-                        color=["Left", "Right"],
-                        color_discrete_map={"Left": "#4895DB", "Right": "#FF8200"},
-                        labels={'x': 'Side', 'y': 'Avg Force (N)'},
-                        template="plotly_white"
-                    )
-                    fig_ash_comp.update_layout(showlegend=False, height=350)
-                    st.plotly_chart(fig_ash_comp, use_container_width=True)
+                    # Rolling history of L vs R in this window
+                    fig_bilateral = px.line(p_ash, x='Date', 
+                                            y=['Peak Vertical Force [N] (L)', 'Peak Vertical Force [N] (R)'],
+                                            markers=True,
+                                            color_discrete_map={'Peak Vertical Force [N] (L)': '#4895DB', 'Peak Vertical Force [N] (R)': '#FF8200'},
+                                            template="plotly_white")
+                    fig_bilateral.update_layout(height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    st.plotly_chart(fig_bilateral, use_container_width=True)
                 else:
-                    st.info("No ASH data for this date range.")
+                    st.info("No ASH test data in this window.")
 
             with c2:
-                st.subheader("Workload Distribution")
+                st.subheader("Workload Balance")
                 s_vol = pd.to_numeric(p_s['Swing Count'], errors='coerce').sum()
                 t_vol = pd.to_numeric(p_t['Total Throw Count'], errors='coerce').sum()
                 
                 if s_vol + t_vol > 0:
-                    # Donut Chart for Hitting vs Throwing Volume
-                    fig_donut = px.pie(
-                        values=[s_vol, t_vol], 
-                        names=["Swings", "Throws"],
-                        hole=0.5,
-                        color_discrete_sequence=["#FF8200", "#4895DB"],
-                        template="plotly_white"
-                    )
-                    fig_donut.update_layout(height=350, legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5))
-                    st.plotly_chart(fig_donut, use_container_width=True)
+                    fig_pie = px.pie(values=[s_vol, t_vol], names=["Swings", "Throws"],
+                                     hole=0.6, color_discrete_sequence=["#FF8200", "#4895DB"])
+                    fig_pie.update_layout(height=350, showlegend=False, 
+                                          annotations=[dict(text=f'Total Reps<br>{int(s_vol+t_vol)}', x=0.5, y=0.5, font_size=16, showarrow=False)])
+                    st.plotly_chart(fig_pie, use_container_width=True)
                 else:
-                    st.info("No Skill Volume data for this date range.")
+                    st.info("No volume data found.")
 
             st.divider()
 
-            # 3. PERFORMANCE KPIS
-            st.subheader("Block Performance KPIs")
+            # 3. THE "PERFORMANCE SCORECARD" (Relative to Season Best)
+            st.subheader("Relative Performance Status")
             k1, k2, k3, k4 = st.columns(4)
-            
-            if not p_ash.empty:
-                k1.metric("Avg Force", f"{int(p_ash['Peak Vertical Force [N]'].mean())}N")
-                asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
-                k2.metric("Block Asymmetry", f"{asym:.1f}%", delta=f"{asym-10:.1f}%" if asym > 10 else None, delta_color="inverse")
-            
+
+            # Intensity Logic
             if not p_s.empty:
-                k3.metric("Total Swings", int(s_vol))
-                intent_sw = pd.to_numeric(p_s['Swing Max Rotation Band 3 Count'], errors='coerce').sum()
-                k4.metric("High Intent %", f"{(intent_sw/s_vol*100):.1f}%")
+                p_s['Load'] = pd.to_numeric(p_s['Sum Swing Max Player Load'], errors='coerce').fillna(0)
+                p_s['Total'] = pd.to_numeric(p_s['Swing Count'], errors='coerce').replace(0, 1)
+                curr_int = (p_s['Load'].sum() / p_s['Total'].sum())
+                season_best_int = (pd.to_numeric(swing_df['Sum Swing Max Player Load'], errors='coerce').max() / 1) # Approximation
+                
+                # Metric with Season-Best Context
+                k1.metric("Swing Intensity", f"{curr_int:.2f}", delta=f"{curr_int-2.0:.2f} vs Avg")
+                
+            if not p_ash.empty:
+                curr_force = p_ash['Peak Vertical Force [N]'].mean()
+                season_max = ash_filt['Peak Vertical Force [N]'].max()
+                diff_force = ((curr_force - season_max) / season_max) * 100
+                k2.metric("Force Maintenance", f"{int(curr_force)}N", delta=f"{diff_force:.1f}% from Max")
+
+            if not p_t.empty:
+                p_t['Intent'] = pd.to_numeric(p_t['Total Throw Count - Rotation Band 3'], errors='coerce').fillna(0)
+                quality = (p_t['Intent'].sum() / pd.to_numeric(p_t['Total Throw Count'], errors='coerce').sum()) * 100
+                k3.metric("Throwing Quality", f"{quality:.1f}%")
+                
+            # CMJ Readiness Check
+            c_win = cmj_filt[(cmj_filt['Date'].dt.date >= start_p) & (cmj_filt['Date'].dt.date <= end_p)]
+            if not c_win.empty:
+                curr_rsi = c_win['RSI-modified (Imp-Mom) [m/s]'].mean()
+                k4.metric("Readiness (RSI-m)", f"{curr_rsi:.2f}")
+
+            st.divider()
+
+            # 4. PLAYER TYPE CLASSIFICATION
+            st.subheader("Athlete Profile Summary")
+            
+            # Simple Logic to categorize the athlete's week
+            if not p_ash.empty and not p_s.empty:
+                l_avg = p_ash['Peak Vertical Force [N] (L)'].mean()
+                r_avg = p_ash['Peak Vertical Force [N] (R)'].mean()
+                asym = abs(l_avg - r_avg) / max(l_avg, r_avg) * 100
+                
+                if asym > 12:
+                    st.error(f"**ASYMMETRY WARNING**: Player is currently showing {asym:.1f}% force variance. Monitor Lead-leg fatigue.")
+                elif curr_int > 2.2:
+                    st.success(f"**POWER PROFILE**: Player is maintaining elite swing intensity ({curr_int:.2f}) during this block.")
+                else:
+                    st.info("**STEADY STATE**: Player is maintaining consistent baseline volume and intensity.")
 
                 
         with tab_ash:
