@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 # --- 1. PAGE CONFIG (Must be at the very top) ---
-st.set_page_config(page_title="Softball Performance Hub", layout="wide")
+st.set_page_config(page_title="Softball Performance", layout="wide")
 
 # --- 2. PASSWORD GATE ---
 def check_password():
@@ -30,7 +30,7 @@ def check_password():
 if check_password():
     
     # --- 1. PAGE CONFIG ---
-    st.set_page_config(page_title="Softball Performance Hub", layout="wide")
+    st.set_page_config(page_title="Softball Performance", layout="wide")
 
     st.markdown("""
         <style>
@@ -68,50 +68,46 @@ if check_password():
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
+            # 1. Load Raw Data
             ash_df = pd.read_csv(st.secrets["ASH_URL"])
             cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
             roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
             swing_df = pd.read_csv(st.secrets["SWING_URL"])
             throw_df = pd.read_csv(st.secrets["THROW_URL"])
         
+            # 2. Clean Column Names
             for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
-                d    f['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-            # Photo Column Fix
+            # 3. DYNAMIC PHOTO COLUMN FIX
+            # This finds whatever column you named the photos and renames it to 'Photo'
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
             if photo_col:
                 roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
-        
-            # Position Column Fix (Looking for 'Pos' or 'Position')
-            pos_col = [c for c in roster_df.columns if 'pos' in c.lower()]
-            if pos_col:
-                roster_df = roster_df.rename(columns={pos_col[0]: 'Position'})
             else:
-                roster_df['Position'] = 'N/A'
+                # Fallback if no photo column exists at all
+                roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
 
+            # 4. MERGE (Ensuring 'Photo' and 'Player Name' exist)
             if 'Player Name' in roster_df.columns:
-                # Merge both Photo and Position into performance data
-                ash_df = ash_df.merge(roster_df[['Player Name', 'Photo', 'Position']], on='Player Name', how='left')
-                cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo', 'Position']], on='Player Name', how='left')
-            
+                # Merge photo into performance dataframes
+                ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+                cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+        
             return ash_df, cmj_df, swing_df, throw_df
 
         except Exception as e:
             st.error(f"Data Sync Error: {e}")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
+
     # --- 4. DASHBOARD UI ---
     if not ash_df.empty:
-        # 1. TABS (Placed at the very top as requested)
-             tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs([
-                "ASH TEST", "CMJ READINESS", "SWING", "THROW"
-            ])
-
-        # 2. SELECTION (Global)
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
@@ -122,20 +118,21 @@ if check_password():
             years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
             selected_year = st.selectbox("Select Season", ["All Time"] + years)
 
-        # 3. DEFINE THE VARIABLES (This fixes the NameError)
         if selected_year == "All Time":
             ash_filt = p_ash_all
+            cmj_filt = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
             label = "All-Time"
         else:
             ash_filt = p_ash_all[p_ash_all['Date'].dt.year == selected_year]
+            cmj_filt = cmj_df[(cmj_df['Player Name'] == selected) & (cmj_df['Date'].dt.year == selected_year)].sort_values('Date')
             label = str(selected_year)
 
         latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
 
-        # 4. ATHLETE PROFILE HEADER (Visible on every tab)
         if latest_ash is not None:
+            # PROFILE HEADER FIX
+            # Using the merged 'Photo' column
             img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
-            player_pos = latest_ash.get('Position', 'N/A')
         
             st.markdown(f"""
                 <div class="athlete-header">
@@ -143,15 +140,13 @@ if check_password():
                         <img src="{img_url}" class="player-photo">
                         <div style="margin-left: 30px;">
                             <h1 style="margin:0;">{selected}</h1>
-                            <p style="color:#4895DB; font-weight:700; margin:0; font-size:18px;">
-                                {player_pos} | PERFORMANCE HUB | {label}
-                            </p>
+                            <p style="color:#4895DB; font-weight:700; margin:0;">{label}</p>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-        tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
+            tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
     #with tab_profile:
         # 1. ANALYSIS WINDOW
@@ -276,9 +271,9 @@ if check_password():
                 c1, c2 = st.columns([2, 1])
                 with c1:
                     st.subheader("Left vs Right Force Profile")
-                    side_df = pd.DataFrame({'Side': ['Left (Lead)', 'Right (Trail)'], 'Force [N]': [l_f_latest, r_f_latest]})
+                    side_df = pd.DataFrame({'Side': ['Left', 'Right'], 'Force [N]': [l_f_latest, r_f_latest]})
                     fig = px.bar(side_df, x='Side', y='Force [N]', text='Force [N]', color='Side', 
-                                 color_discrete_map={'Left (Lead)': '#4895DB', 'Right (Trail)': '#FF8200'}, template="plotly_white")
+                                 color_discrete_map={'Left': '#4895DB', 'Right': '#FF8200'}, template="plotly_white")
                     st.plotly_chart(fig, use_container_width=True)
             
                 with c2:
