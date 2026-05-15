@@ -287,7 +287,7 @@ if check_password():
                                 <div style="width:45%;"><p style="color:#4895DB; font-weight:800; margin:0;">LEFT</p><h2>{l_f_latest}N</h2><p style="color:grey; font-size:12px;">{l_rfd} RFD</p></div>
                                 <div style="width:45%;"><p style="color:#FF8200; font-weight:800; margin:0;">RIGHT</p><h2>{r_f_latest}N</h2><p style="color:grey; font-size:12px;">{r_rfd} RFD</p></div>
                             </div>
-                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">CALCULATED ASYMMETRY</p>
+                            <p style="margin:0; font-size:11px; color:grey; font-weight:700;">ASYMMETRY</p>
                             <h1 style="margin:0; color:{asym_color};">{clean_asym:.1f}%</h1>
                         </div>
                     """, unsafe_allow_html=True)
