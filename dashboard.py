@@ -77,14 +77,14 @@ if check_password():
             for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
-                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                d    f['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
             # Photo Column Fix
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
             if photo_col:
                 roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
         
-            # POSITION COLUMN FIX (Ensuring we grab the position)
+            # Position Column Fix (Looking for 'Pos' or 'Position')
             pos_col = [c for c in roster_df.columns if 'pos' in c.lower()]
             if pos_col:
                 roster_df = roster_df.rename(columns={pos_col[0]: 'Position'})
@@ -92,35 +92,64 @@ if check_password():
                 roster_df['Position'] = 'N/A'
 
             if 'Player Name' in roster_df.columns:
-                # Merge both Photo and Position into the performance data
+                # Merge both Photo and Position into performance data
                 ash_df = ash_df.merge(roster_df[['Player Name', 'Photo', 'Position']], on='Player Name', how='left')
                 cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo', 'Position']], on='Player Name', how='left')
-        
+            
             return ash_df, cmj_df, swing_df, throw_df
 
         except Exception as e:
             st.error(f"Data Sync Error: {e}")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    # --- 4. ATHLETE PROFILE HEADER ---
-    if latest_ash is not None:
-        img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
-        # Get the position from the dataframe
-        player_pos = latest_ash.get('Position', 'N/A')
+    ash_df, cmj_df, swing_df, throw_df = load_all_data()
+
+    # --- 4. DASHBOARD UI ---
+    if not ash_df.empty:
+        # 1. TABS (Placed at the very top as requested)
+             tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs([
+                "ASH TEST", "CMJ READINESS", "SWING", "THROW"
+            ])
+
+        # 2. SELECTION (Global)
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            selected = st.selectbox("Search Athlete", sorted(ash_df['Player Name'].unique()))
     
-        st.markdown(f"""
-            <div class="athlete-header">
-                <div style="display: flex; align-items: center;">
-                    <img src="{img_url}" class="player-photo">
-                    <div style="margin-left: 30px;">
-                        <h1 style="margin:0;">{selected}</h1>
-                        <p style="color:#4895DB; font-weight:700; margin:0; font-size:18px;">
-                            {player_pos} | PERFORMANCE HUB | {label}
-                        </p>
+        p_ash_all = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+    
+        with f_col2:
+            years = sorted(p_ash_all['Date'].dt.year.dropna().unique().astype(int), reverse=True)
+            selected_year = st.selectbox("Select Season", ["All Time"] + years)
+
+        # 3. DEFINE THE VARIABLES (This fixes the NameError)
+        if selected_year == "All Time":
+            ash_filt = p_ash_all
+            label = "All-Time"
+        else:
+            ash_filt = p_ash_all[p_ash_all['Date'].dt.year == selected_year]
+            label = str(selected_year)
+
+        latest_ash = ash_filt.iloc[-1] if not ash_filt.empty else None
+
+        # 4. ATHLETE PROFILE HEADER (Visible on every tab)
+        if latest_ash is not None:
+            img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png')
+            player_pos = latest_ash.get('Position', 'N/A')
+        
+            st.markdown(f"""
+                <div class="athlete-header">
+                    <div style="display: flex; align-items: center;">
+                        <img src="{img_url}" class="player-photo">
+                        <div style="margin-left: 30px;">
+                            <h1 style="margin:0;">{selected}</h1>
+                            <p style="color:#4895DB; font-weight:700; margin:0; font-size:18px;">
+                                {player_pos} | PERFORMANCE HUB | {label}
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
         tab_ash, tab_cmj, tab_swing, tab_throwing = st.tabs(["ASH TEST", "CMJ READINESS", "SWING", "THROW"])
 
