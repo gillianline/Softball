@@ -4,7 +4,7 @@ import plotly.express as px
 from datetime import datetime, date
 
 # --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="Lady Vol Performance", layout="wide")
+st.set_page_config(page_title="Softball Performance", layout="wide")
 
 # --- 2. PASSWORD GATE ---
 def check_password():
@@ -28,7 +28,7 @@ def check_password():
 # --- MAIN APP EXECUTION ---
 if check_password():
 
-    # --- 3. CUSTOM LADY VOL STYLING ---
+    # --- 3. CUSTOM LADY VOL CSS ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -45,6 +45,20 @@ if check_password():
         .red-text { color: #dc3545; }
         .green-text { color: #28a745; }
         
+        /* Best Test Hero Card */
+        .best-card {
+            background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
+            border: 1px solid #E0E0E0;
+            border-top: 4px solid #FF8200;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .best-card h4 { margin: 0; color: #6c757d; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .best-card h2 { margin: 8px 0 2px 0; font-size: 28px; font-weight: 800; color: #FF8200; }
+        .best-card p { margin: 0; font-size: 12px; color: #4895DB; font-weight: 700; }
+
         /* Centered Tables */
         [data-testid="stHeaderCell"] { text-align: center !important; display: flex; justify-content: center; }
         [data-testid="stTable"] td, [data-testid="stDataFrameDataLayer"] td { text-align: center !important; }
@@ -113,14 +127,19 @@ if check_password():
                 return df[df['Date'] >= FALL_START]
             return df
 
-        # Filtered subsets
-        p_ash = filter_season(ash_df[ash_df['Player Name'] == selected].sort_values('Date')).copy()
-        p_cmj = filter_season(cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')).copy()
-        p_swing = filter_season(swing_df[swing_df['Name'] == selected].sort_values('Date')).copy()
-        p_throw = filter_season(throw_df[throw_df['Name'] == selected].sort_values('Date')).copy()
+        # Athlete Full History vs Season Subsets
+        raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
+        raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
+        raw_swing = swing_df[swing_df['Name'] == selected].sort_values('Date')
+        raw_throw = throw_df[throw_df['Name'] == selected].sort_values('Date')
+
+        p_ash = filter_season(raw_ash).copy()
+        p_cmj = filter_season(raw_cmj).copy()
+        p_swing = filter_season(raw_swing).copy()
+        p_throw = filter_season(raw_throw).copy()
 
         # Header Photo & Metadata
-        latest_ash = p_ash.iloc[-1] if not p_ash.empty else (ash_df[ash_df['Player Name'] == selected].iloc[-1] if not ash_df[ash_df['Player Name'] == selected].empty else None)
+        latest_ash = p_ash.iloc[-1] if not p_ash.empty else (raw_ash.iloc[-1] if not raw_ash.empty else None)
         img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png') if latest_ash is not None else 'https://www.w3schools.com/howto/img_avatar.png'
 
         st.markdown(f"""
@@ -135,6 +154,19 @@ if check_password():
             </div>
         """, unsafe_allow_html=True)
 
+        # Helper to compute Best Test benchmarks
+        def get_best_record(df, col_name, is_min=False):
+            if df.empty or col_name not in df.columns:
+                return None, None
+            temp = df.dropna(subset=[col_name, 'Date']).copy()
+            temp[col_name] = pd.to_numeric(temp[col_name], errors='coerce')
+            temp = temp.dropna(subset=[col_name])
+            if temp.empty:
+                return None, None
+            idx = temp[col_name].idxmin() if is_min else temp[col_name].idxmax()
+            best_row = temp.loc[idx]
+            return best_row[col_name], best_row['Date'].strftime('%m/%d/%Y')
+
         # --- 6. NAVIGATION TABS ---
         tab_profile, tab_testing, tab_catapult = st.tabs(["INDIVIDUAL PROFILE", "TESTING PROFILE", "CATAPULT PROFILE"])
 
@@ -142,7 +174,34 @@ if check_password():
         # TAB 1: INDIVIDUAL PROFILE
         # =========================================================================
         with tab_profile:
-            st.markdown("<br>", unsafe_allow_html=True)
+            # --- OVERALL BEST TEST HERO CARDS ---
+            st.subheader("ALL-TIME PERSONAL BESTS")
+            b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, 'Jump Height (Imp-Mom) [cm]')
+            b_rsi, b_rsi_date = get_best_record(raw_cmj, 'RSI-modified (Imp-Mom) [m/s]')
+            b_ash_f, b_ash_f_date = get_best_record(raw_ash, 'Peak Vertical Force [N]')
+            b_ash_rfd, b_ash_rfd_date = get_best_record(raw_ash, 'RFD - 200ms [N/s]')
+
+            b1, b2, b3, b4 = st.columns(4)
+            with b1:
+                val = f"{b_cmj_h:.1f} cm" if b_cmj_h is not None else "N/A"
+                d_str = f"Set on {b_cmj_h_date}" if b_cmj_h_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best Jump Height</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b2:
+                val = f"{b_rsi:.2f}" if b_rsi is not None else "N/A"
+                d_str = f"Set on {b_rsi_date}" if b_rsi_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best RSI-modified</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b3:
+                val = f"{int(b_ash_f)} N" if b_ash_f is not None else "N/A"
+                d_str = f"Set on {b_ash_f_date}" if b_ash_f_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best ASH Force</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b4:
+                val = f"{int(b_ash_rfd)} N/s" if b_ash_rfd is not None else "N/A"
+                d_str = f"Set on {b_ash_rfd_date}" if b_ash_rfd_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best ASH RFD</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+
+            st.divider()
+
+            # Scouting Window Section
             all_dates = [df['Date'].max() for df in [p_ash, p_cmj, p_swing, p_throw] if not df.empty and 'Date' in df.columns]
             max_p_date = max(all_dates).date() if all_dates and pd.notnull(max(all_dates)) else date.today()
             min_p_date = max_p_date - pd.Timedelta(days=7)
@@ -156,10 +215,10 @@ if check_password():
                 w_swing = p_swing[(p_swing['Date'].dt.date >= start_p) & (p_swing['Date'].dt.date <= end_p)]
                 w_throw = p_throw[(p_throw['Date'].dt.date >= start_p) & (p_throw['Date'].dt.date <= end_p)]
 
-                st.subheader("ATHLETE STATUS")
+                st.subheader("ATHLETE STATUS (WINDOW)")
                 s1, s2, s3, s4 = st.columns(4)
 
-                # RSI
+                # RSI Status
                 rsi_col = 'RSI-modified (Imp-Mom) [m/s]'
                 rsi_best = pd.to_numeric(p_cmj[rsi_col], errors='coerce').max() if rsi_col in p_cmj.columns and not p_cmj.empty else 0
                 rsi_curr = pd.to_numeric(w_cmj[rsi_col], errors='coerce').mean() if rsi_col in w_cmj.columns and not w_cmj.empty else 0
@@ -222,6 +281,23 @@ if check_password():
 
             with sub_ash:
                 if not p_ash.empty:
+                    # Best ASH Test Overview
+                    s_best_f, s_best_f_d = get_best_record(p_ash, 'Peak Vertical Force [N]')
+                    s_best_rfd, s_best_rfd_d = get_best_record(p_ash, 'RFD - 200ms [N/s]')
+                    s_best_t, s_best_t_d = get_best_record(p_ash, 'Start Time to Peak Force [s]', is_min=True)
+
+                    st.markdown(f"""
+                        <div style="background-color: #F8F9FA; border-left: 6px solid #4895DB; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <span style="font-weight: 800; color: #1D1D1F;">🏆 SEASON BEST ASH FORCE: </span>
+                            <span style="color: #FF8200; font-weight: 800;">{int(s_best_f) if s_best_f else 'N/A'} N</span> 
+                            <span style="color: grey; font-size: 13px;">(Achieved {s_best_f_d})</span>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            <span style="font-weight: 800; color: #1D1D1F;">BEST RFD: </span>
+                            <span style="color: #FF8200; font-weight: 800;">{int(s_best_rfd) if s_best_rfd else 'N/A'} N/s</span>
+                            <span style="color: grey; font-size: 13px;">(Achieved {s_best_rfd_d})</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+
                     lat_ash = p_ash.iloc[-1]
                     l_f = pd.to_numeric(lat_ash.get('Peak Vertical Force [N] (L)', 0), errors='coerce') or 0
                     r_f = pd.to_numeric(lat_ash.get('Peak Vertical Force [N] (R)', 0), errors='coerce') or 0
@@ -232,10 +308,6 @@ if check_password():
                     base_l = p_ash['Peak Vertical Force [N] (L)'].mean()
                     base_r = p_ash['Peak Vertical Force [N] (R)'].mean()
 
-                    best_f = pd.to_numeric(p_ash.get('Peak Vertical Force [N]', 0), errors='coerce').max()
-                    best_r = pd.to_numeric(p_ash.get('RFD - 200ms [N/s]', 0), errors='coerce').max()
-                    best_t = pd.to_numeric(p_ash.get('Start Time to Peak Force [s]', 0), errors='coerce').min()
-
                     def colored_metric(label, best_val, curr_val, unit, is_time=False):
                         diff = ((curr_val - best_val) / best_val * 100) if best_val != 0 else 0
                         is_bad = diff > 10 if is_time else diff < -10
@@ -244,10 +316,10 @@ if check_password():
                         st.markdown(f'<p class="metric-sub {color}">Latest: {curr_val:.1f}{unit} ({diff:+.1f}%)</p>', unsafe_allow_html=True)
 
                     m1, m2, m3, m4 = st.columns(4)
-                    with m1: colored_metric("Best Force", best_f, pd.to_numeric(lat_ash.get('Peak Vertical Force [N]', 0), errors='coerce'), " N")
-                    with m2: colored_metric("Best RFD", best_r, pd.to_numeric(lat_ash.get('RFD - 200ms [N/s]', 0), errors='coerce'), " N/s")
+                    with m1: colored_metric("Best Force", s_best_f or 0, pd.to_numeric(lat_ash.get('Peak Vertical Force [N]', 0), errors='coerce'), " N")
+                    with m2: colored_metric("Best RFD", s_best_rfd or 0, pd.to_numeric(lat_ash.get('RFD - 200ms [N/s]', 0), errors='coerce'), " N/s")
                     with m3: st.metric("Asymmetry", f"{clean_asym:.1f}%", delta="High" if clean_asym > 10 else "Normal", delta_color="inverse")
-                    with m4: colored_metric("Best Time", best_t, pd.to_numeric(lat_ash.get('Start Time to Peak Force [s]', 0), errors='coerce'), "s", is_time=True)
+                    with m4: colored_metric("Best Time", s_best_t or 0, pd.to_numeric(lat_ash.get('Start Time to Peak Force [s]', 0), errors='coerce'), "s", is_time=True)
 
                     st.divider()
                     c1, c2 = st.columns([2, 1])
@@ -321,6 +393,21 @@ if check_password():
 
             with sub_cmj:
                 if not p_cmj.empty:
+                    s_best_jh, s_best_jh_d = get_best_record(p_cmj, 'Jump Height (Imp-Mom) [cm]')
+                    s_best_pp, s_best_pp_d = get_best_record(p_cmj, 'Peak Power [W]')
+
+                    st.markdown(f"""
+                        <div style="background-color: #F8F9FA; border-left: 6px solid #4895DB; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <span style="font-weight: 800; color: #1D1D1F;">🏆 SEASON BEST JUMP HEIGHT: </span>
+                            <span style="color: #FF8200; font-weight: 800;">{s_best_jh:.1f} cm</span> 
+                            <span style="color: grey; font-size: 13px;">(Achieved {s_best_jh_d})</span>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            <span style="font-weight: 800; color: #1D1D1F;">PEAK POWER: </span>
+                            <span style="color: #FF8200; font-weight: 800;">{int(s_best_pp) if s_best_pp else 'N/A'} W</span>
+                            <span style="color: grey; font-size: 13px;">(Achieved {s_best_pp_d})</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+
                     metrics_map = {
                         'Jump Height (Imp-Mom) [cm]': 'Jump Height (cm)',
                         'Peak Power [W]': 'Peak Power (W)',
@@ -333,7 +420,7 @@ if check_password():
                         p_cmj[m] = pd.to_numeric(p_cmj[m], errors='coerce').fillna(0) if m in p_cmj.columns else 0.0
 
                     c_lat = p_cmj.iloc[-1]
-                    st.subheader("CMJ Season Bests & Latest Status")
+                    st.subheader("CMJ Performance Grid")
 
                     def cmj_metric_box(col, label_text, col_name, unit, precision=".1f"):
                         best_val = p_cmj[col_name].max()
