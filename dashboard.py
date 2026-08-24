@@ -45,7 +45,7 @@ if check_password():
             box-shadow: 0 1px 4px rgba(0,0,0,0.05);
         }
         .athlete-info { display: flex; align-items: center; }
-        .player-photo { border-radius: 50%; width: 90px; height: 90px; object-fit: cover; border: 3px solid #2F80ED; margin-right: 20px; }
+        .player-photo { border-radius: 50%; width: 95px; height: 95px; object-fit: cover; border: 3px solid #2F80ED; margin-right: 20px; }
         .athlete-name { margin: 0; font-size: 26px; font-weight: 800; color: #1D1D1F; }
         .athlete-sub { margin: 2px 0 0 0; color: #2F80ED; font-weight: 700; font-size: 14px; }
         
@@ -106,7 +106,7 @@ if check_password():
             lambda x: re.findall(r"[-+]?\d*\.?\d+", x)[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan
         ).astype(float)
 
-    # --- 4. SAFE DATA LOADING & MERGING ---
+    # --- 4. SAFE DATA LOADING & PHOTO MAPPER ---
     @st.cache_data(ttl=300)
     def load_all_data():
         def safe_read_csv(secret_key):
@@ -128,11 +128,26 @@ if check_password():
         swing_df = safe_read_csv("SWING_URL")
         throw_df = safe_read_csv("THROW_URL")
 
-        # Standardize athlete column name across sheets
+        # Standardize athlete name column
         for df in [ash_df, cmj_df, er_df, roster_df, swing_df, throw_df]:
             if not df.empty:
                 if 'Name' in df.columns and 'Player Name' not in df.columns:
                     df.rename(columns={'Name': 'Player Name'}, inplace=True)
+                if 'Player Name' in df.columns:
+                    df['Player Name'] = df['Player Name'].astype(str).str.strip()
+
+        # Build dedicated Roster Photo Dictionary
+        photo_dict = {}
+        if not roster_df.empty:
+            photo_col_candidates = [c for c in roster_df.columns if any(k in c.lower() for k in ['photo', 'picture', 'headshot', 'image', 'url'])]
+            p_col = photo_col_candidates[0] if photo_col_candidates else None
+            name_col = 'Player Name' if 'Player Name' in roster_df.columns else roster_df.columns[0]
+            
+            if p_col:
+                for _, r in roster_df.iterrows():
+                    val = str(r[p_col]).strip()
+                    if val and val.lower() != 'nan':
+                        photo_dict[str(r[name_col]).strip().lower()] = val
 
         # Clean ASH numeric columns
         if not ash_df.empty:
@@ -152,20 +167,9 @@ if check_password():
                 if any(k in col.lower() for k in ['rom', 'asymmetry', 'asym']):
                     er_df[col] = clean_num_series(er_df[col])
 
-        photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()] if not roster_df.empty else []
-        if photo_col:
-            roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
-        elif not roster_df.empty:
-            roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
+        return ash_df, cmj_df, er_df, swing_df, throw_df, photo_dict
 
-        if not roster_df.empty and 'Player Name' in roster_df.columns:
-            for d in [ash_df, cmj_df, er_df, swing_df, throw_df]:
-                if not d.empty and 'Player Name' in d.columns:
-                    d = d.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
-
-        return ash_df, cmj_df, er_df, swing_df, throw_df
-
-    ash_df, cmj_df, er_df, swing_df, throw_df = load_all_data()
+    ash_df, cmj_df, er_df, swing_df, throw_df, photo_dict = load_all_data()
 
     def find_col(df, options):
         if df.empty:
@@ -196,7 +200,8 @@ if check_password():
         with f_col1:
             selected = st.selectbox("Select Athlete", all_athletes)
         with f_col2:
-            season_option = st.selectbox("Select Season", ["Spring 2026", "Fall 2026 (Current)", "All Time"])
+            # Fall 2026 (Current Season) is now indexed first (default)
+            season_option = st.selectbox("Select Season", ["Fall 2026 (Current)", "Spring 2026", "All Time"], index=0)
 
         def filter_season(df):
             if df.empty or 'Date' not in df.columns:
@@ -232,10 +237,8 @@ if check_password():
         er_r_col = find_col(er_df, ['R Max ROM (°)', 'R Max ROM', 'Right Max ROM', 'R ROM'])
         er_asym_col = find_col(er_df, ['ROM Asymmetry (%)', 'ROM Asymmetry', 'Asymmetry (%)', 'Asym (%)'])
 
-        # Header Photo
-        photo_source = raw_ash if not raw_ash.empty else (raw_cmj if not raw_cmj.empty else raw_er)
-        latest_photo_rec = photo_source.iloc[-1] if not photo_source.empty else None
-        img_url = latest_photo_rec.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png') if latest_photo_rec is not None else 'https://www.w3schools.com/howto/img_avatar.png'
+        # Robust Direct Photo Lookup
+        img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
         st.markdown(f"""
             <div class="athlete-banner">
