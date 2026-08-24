@@ -68,7 +68,7 @@ if check_password():
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .best-card h4 { margin: 0; color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .best-card h2 { margin: 6px 0 2px 0; font-size: 24px; font-weight: 800; color: #FF8200; }
+        .best-card h2 { margin: 6px 0 2px 0; font-size: 22px; font-weight: 800; color: #FF8200; }
         .best-card p { margin: 0; font-size: 11px; color: #2F80ED; font-weight: 700; }
 
         /* Metric Tile Badges */
@@ -98,57 +98,72 @@ if check_password():
         </style>
     """, unsafe_allow_html=True)
 
-    # Clean numeric helper to extract float values even if followed by L, R, %, etc.
+    # Clean numeric helper
     def clean_num_series(series):
         if series is None:
             return pd.Series(dtype=float)
-        return series.astype(str).apply(lambda x: re.findall(r"[-+]?\d*\.?\d+", x)[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan).astype(float)
+        return series.astype(str).apply(
+            lambda x: re.findall(r"[-+]?\d*\.?\d+", x)[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan
+        ).astype(float)
 
     # --- 4. DATA LOADING & MERGING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
-            ash_df = pd.read_csv(st.secrets["ASH_URL"])
-            cmj_df = pd.read_csv(st.secrets["CMJ_URL"])
-            roster_df = pd.read_csv(st.secrets["ROSTER_URL"])
-            swing_df = pd.read_csv(st.secrets["SWING_URL"])
-            throw_df = pd.read_csv(st.secrets["THROW_URL"])
+            ash_df = pd.read_csv(st.secrets["ASH_URL"]) if "ASH_URL" in st.secrets else pd.DataFrame()
+            cmj_df = pd.read_csv(st.secrets["CMJ_URL"]) if "CMJ_URL" in st.secrets else pd.DataFrame()
+            er_df = pd.read_csv(st.secrets["ER_URL"]) if "ER_URL" in st.secrets else pd.DataFrame()
+            roster_df = pd.read_csv(st.secrets["ROSTER_URL"]) if "ROSTER_URL" in st.secrets else pd.DataFrame()
+            swing_df = pd.read_csv(st.secrets["SWING_URL"]) if "SWING_URL" in st.secrets else pd.DataFrame()
+            throw_df = pd.read_csv(st.secrets["THROW_URL"]) if "THROW_URL" in st.secrets else pd.DataFrame()
 
-            for df in [ash_df, cmj_df, roster_df, swing_df, throw_df]:
-                df.columns = df.columns.str.strip()
-                if 'Date' in df.columns:
-                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            dataframes = [ash_df, cmj_df, er_df, roster_df, swing_df, throw_df]
 
-            # Clean ASH numbers
-            for col in ash_df.columns:
-                if any(k in col.lower() for k in ['force', 'asym', 'rfd']):
-                    ash_df[col] = clean_num_series(ash_df[col])
+            for df in dataframes:
+                if not df.empty:
+                    df.columns = df.columns.str.strip()
+                    if 'Date' in df.columns:
+                        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-            # Clean CMJ numbers
-            for col in cmj_df.columns:
-                if any(k in col.lower() for k in ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']):
-                    cmj_df[col] = clean_num_series(cmj_df[col])
+            for df in [ash_df, er_df]:
+                if not df.empty:
+                    for col in df.columns:
+                        if any(k in col.lower() for k in ['force', 'asym', 'rfd']):
+                            df[col] = clean_num_series(df[col])
 
-            photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
+            if not cmj_df.empty:
+                for col in cmj_df.columns:
+                    if any(k in col.lower() for k in ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']):
+                        cmj_df[col] = clean_num_series(cmj_df[col])
+
+            photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()] if not roster_df.empty else []
             if photo_col:
                 roster_df = roster_df.rename(columns={photo_col[0]: 'Photo'})
-            else:
+            elif not roster_df.empty:
                 roster_df['Photo'] = 'https://www.w3schools.com/howto/img_avatar.png'
 
-            if 'Player Name' in roster_df.columns:
-                ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
-                cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
-                swing_df = swing_df.merge(roster_df[['Player Name', 'Photo']].rename(columns={'Player Name': 'Name'}), on='Name', how='left')
-                throw_df = throw_df.merge(roster_df[['Player Name', 'Photo']].rename(columns={'Player Name': 'Name'}), on='Name', how='left')
+            if not roster_df.empty and 'Player Name' in roster_df.columns:
+                if not ash_df.empty and 'Player Name' in ash_df.columns:
+                    ash_df = ash_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+                if not cmj_df.empty and 'Player Name' in cmj_df.columns:
+                    cmj_df = cmj_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+                if not er_df.empty and 'Player Name' in er_df.columns:
+                    er_df = er_df.merge(roster_df[['Player Name', 'Photo']], on='Player Name', how='left')
+                if not swing_df.empty and 'Name' in swing_df.columns:
+                    swing_df = swing_df.merge(roster_df[['Player Name', 'Photo']].rename(columns={'Player Name': 'Name'}), on='Name', how='left')
+                if not throw_df.empty and 'Name' in throw_df.columns:
+                    throw_df = throw_df.merge(roster_df[['Player Name', 'Photo']].rename(columns={'Player Name': 'Name'}), on='Name', how='left')
 
-            return ash_df, cmj_df, swing_df, throw_df
+            return ash_df, cmj_df, er_df, swing_df, throw_df
         except Exception as e:
             st.error(f"Data Sync Error: {e}")
-            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-    ash_df, cmj_df, swing_df, throw_df = load_all_data()
+    ash_df, cmj_df, er_df, swing_df, throw_df = load_all_data()
 
     def find_col(df, options):
+        if df.empty:
+            return None
         for opt in options:
             match = [c for c in df.columns if c.strip().lower() == opt.strip().lower()]
             if match:
@@ -158,7 +173,7 @@ if check_password():
                 return match_part[0]
         return None
 
-    if not ash_df.empty or not cmj_df.empty:
+    if not ash_df.empty or not cmj_df.empty or not er_df.empty:
         # --- 5. SEASON SETUP ---
         TODAY = pd.to_datetime(date.today())
         SPRING_START = pd.to_datetime("2026-01-01")
@@ -167,7 +182,8 @@ if check_password():
 
         all_athletes = sorted(list(set(
             list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
-            list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else [])
+            list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else []) +
+            list(er_df['Player Name'].dropna().unique() if 'Player Name' in er_df.columns else [])
         )))
 
         f_col1, f_col2 = st.columns(2)
@@ -188,11 +204,13 @@ if check_password():
         # Athlete raw and season filtered slices
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
+        raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
         raw_swing = swing_df[swing_df['Name'] == selected].sort_values('Date') if 'Name' in swing_df.columns else pd.DataFrame()
         raw_throw = throw_df[throw_df['Name'] == selected].sort_values('Date') if 'Name' in throw_df.columns else pd.DataFrame()
 
         p_ash = filter_season(raw_ash).copy()
         p_cmj = filter_season(raw_cmj).copy()
+        p_er = filter_season(raw_er).copy()
         p_swing = filter_season(raw_swing).copy()
         p_throw = filter_season(raw_throw).copy()
 
@@ -206,8 +224,13 @@ if check_password():
         cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]'])
         cmj_rsi_col = find_col(cmj_df, ['RSI-modified (Imp-Mom) [m/s]', 'RSI-modified'])
 
+        # Dynamic ER Column Identification
+        er_l_col = find_col(er_df, ['Peak Vertical Force [N] (L)', 'Force (L)', 'Peak Force (L)', 'Left Peak Force [N]'])
+        er_r_col = find_col(er_df, ['Peak Vertical Force [N] (R)', 'Force (R)', 'Peak Force (R)', 'Right Peak Force [N]'])
+        er_asym_col = find_col(er_df, ['Peak Vertical Force [N] (Asym)(%)', 'Asymmetry', 'Asym(%)'])
+
         # Header Photo
-        photo_source = raw_ash if not raw_ash.empty else raw_cmj
+        photo_source = raw_ash if not raw_ash.empty else (raw_cmj if not raw_cmj.empty else raw_er)
         latest_photo_rec = photo_source.iloc[-1] if not photo_source.empty else None
         img_url = latest_photo_rec.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png') if latest_photo_rec is not None else 'https://www.w3schools.com/howto/img_avatar.png'
 
@@ -242,13 +265,15 @@ if check_password():
         # TAB 1: TESTING PROFILE
         # =========================================================================
         with tab_testing:
-            # --- OVERALL BEST TEST HERO CARDS (WITH BOTH L & R SIDES) ---
             st.subheader("ALL-TIME PERSONAL BESTS")
             b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, cmj_h_col)
             b_rsi, b_rsi_date = get_best_record(raw_cmj, cmj_rsi_col)
             b_ash_l, b_ash_l_date = get_best_record(raw_ash, ash_l_col)
             b_ash_r, b_ash_r_date = get_best_record(raw_ash, ash_r_col)
+            b_er_l, b_er_l_date = get_best_record(raw_er, er_l_col)
+            b_er_r, b_er_r_date = get_best_record(raw_er, er_r_col)
 
+            # Top Row Best Cards (CMJ & ASH)
             b1, b2, b3, b4 = st.columns(4)
             with b1:
                 val = f"{b_cmj_h:.1f} cm" if b_cmj_h is not None else "N/A"
@@ -267,6 +292,17 @@ if check_password():
                 d_str = f"Set on {b_ash_r_date}" if b_ash_r_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best ASH Force (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
 
+            # ER Row Best Cards
+            b_er1, b_er2, _, _ = st.columns(4)
+            with b_er1:
+                val = f"{int(b_er_l)} N" if b_er_l is not None else "N/A"
+                d_str = f"Set on {b_er_l_date}" if b_er_l_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best ER Force (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b_er2:
+                val = f"{int(b_er_r)} N" if b_er_r is not None else "N/A"
+                d_str = f"Set on {b_er_r_date}" if b_er_r_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best ER Force (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+
             st.markdown('<div class="section-header">WEEKLY READINESS PROFILE</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
@@ -283,7 +319,6 @@ if check_password():
                 p_cmj_ready = p_cmj_ready.dropna(subset=[cmj_h_col, cmj_rsi_col])
                 
                 if not p_cmj_ready.empty:
-                    # Group by Date to average multiple reps on the same day
                     cmj_plot_df = p_cmj_ready.groupby('Date', as_index=False)[[cmj_h_col, cmj_rsi_col]].mean()
 
                     lat_cmj = cmj_plot_df.iloc[-1]
@@ -327,7 +362,7 @@ if check_password():
                     with c_right:
                         fig_cmj = go.Figure()
 
-                        # 1. JUMP HEIGHT TRACE (Left Axis: yaxis)
+                        # 1. JUMP HEIGHT (Left Axis: yaxis)
                         fig_cmj.add_trace(
                             go.Scatter(
                                 x=cmj_plot_df['Date'],
@@ -340,7 +375,7 @@ if check_password():
                             )
                         )
 
-                        # 2. RSI MODIFIED TRACE (Right Axis: yaxis2)
+                        # 2. RSI MODIFIED (Right Axis: yaxis2)
                         fig_cmj.add_trace(
                             go.Scatter(
                                 x=cmj_plot_df['Date'],
@@ -352,10 +387,6 @@ if check_password():
                                 marker=dict(size=8, color="#2F80ED", symbol="circle")
                             )
                         )
-
-                        # Explicit dual axis ranges to prevent overlay collapsing
-                        h_val = float(latest_h)
-                        rsi_val = float(latest_rsi)
 
                         h_min = cmj_plot_df[cmj_h_col].min()
                         h_max = cmj_plot_df[cmj_h_col].max()
@@ -393,6 +424,8 @@ if check_password():
             else:
                 st.info("No Countermovement Jump records available for this season.")
 
+            st.markdown("<br>", unsafe_allow_html=True)
+
             # -------------------------------------------------------------
             # SECTION 2: ASH SHOULDER: ISO I
             # -------------------------------------------------------------
@@ -403,8 +436,6 @@ if check_password():
             if not p_ash_ready.empty and ash_l_col and ash_r_col and ash_l_col in p_ash_ready.columns and ash_r_col in p_ash_ready.columns:
                 p_ash_ready[ash_l_col] = pd.to_numeric(p_ash_ready[ash_l_col], errors='coerce').fillna(0)
                 p_ash_ready[ash_r_col] = pd.to_numeric(p_ash_ready[ash_r_col], errors='coerce').fillna(0)
-                
-                # Filter rows where at least one side was recorded
                 p_ash_ready = p_ash_ready[(p_ash_ready[ash_l_col] > 0) | (p_ash_ready[ash_r_col] > 0)]
 
                 if not p_ash_ready.empty:
@@ -420,7 +451,6 @@ if check_password():
                     chg_l = ((latest_l - base_l) / base_l * 100) if base_l > 0 else 0
                     chg_r = ((latest_r - base_r) / base_r * 100) if base_r > 0 else 0
 
-                    # Asymmetry logic: prefer precalculated or calculate dynamically
                     if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]):
                         asym_val = float(lat_ash_r[ash_asym_col])
                     else:
@@ -447,13 +477,13 @@ if check_password():
                                 </div>
                             """, unsafe_allow_html=True)
 
-                        st.markdown(f"""
-                            <div class="detail-box">
-                                <div><b>Asymmetry:</b> {asym_val:+.1f}%</div>
-                                <div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div>
-                                <div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div class="detail-box">
+                            <div><b>Asymmetry:</b> {asym_val:+.1f}%</div>
+                            <div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div>
+                            <div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                     with a_right:
                         fig_ash_p = go.Figure()
@@ -485,6 +515,98 @@ if check_password():
                     st.info("No ASH Shoulder records available for this selection.")
             else:
                 st.info("No ASH Shoulder records available for this season.")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # -------------------------------------------------------------
+            # SECTION 3: EXTERNAL ROTATION (ER) TEST
+            # -------------------------------------------------------------
+            st.markdown('<div class="sub-header-title">EXTERNAL ROTATION (ER) TEST</div>', unsafe_allow_html=True)
+
+            p_er_ready = p_er.dropna(subset=['Date']).sort_values('Date').copy() if not p_er.empty else pd.DataFrame()
+
+            if not p_er_ready.empty and er_l_col and er_r_col and er_l_col in p_er_ready.columns and er_r_col in p_er_ready.columns:
+                p_er_ready[er_l_col] = pd.to_numeric(p_er_ready[er_l_col], errors='coerce').fillna(0)
+                p_er_ready[er_r_col] = pd.to_numeric(p_er_ready[er_r_col], errors='coerce').fillna(0)
+                p_er_ready = p_er_ready[(p_er_ready[er_l_col] > 0) | (p_er_ready[er_r_col] > 0)]
+
+                if not p_er_ready.empty:
+                    lat_er = p_er_ready.iloc[-1]
+                    latest_er_l = lat_er[er_l_col]
+                    latest_er_r = lat_er[er_r_col]
+
+                    base_er_l = p_er_ready[er_l_col].replace(0, np.nan).mean()
+                    base_er_r = p_er_ready[er_r_col].replace(0, np.nan).mean()
+                    base_er_l = base_er_l if pd.notnull(base_er_l) else 0
+                    base_er_r = base_er_r if pd.notnull(base_er_r) else 0
+
+                    chg_er_l = ((latest_er_l - base_er_l) / base_er_l * 100) if base_er_l > 0 else 0
+                    chg_er_r = ((latest_er_r - base_er_r) / base_er_r * 100) if base_er_r > 0 else 0
+
+                    if er_asym_col and er_asym_col in lat_er and pd.notnull(lat_er[er_asym_col]):
+                        er_asym_val = float(lat_er[er_asym_col])
+                    else:
+                        er_asym_val = (abs(latest_er_l - latest_er_r) / max(latest_er_l, latest_er_r) * 100) if max(latest_er_l, latest_r) > 0 else 0.0
+
+                    l_er_cls = "tile-red" if er_asym_val > 10 else "tile-green"
+                    r_er_cls = "tile-red" if er_asym_val > 10 else "tile-green"
+
+                    er_left, er_right = st.columns([1.1, 2])
+                    with er_left:
+                        erb1, erb2 = st.columns(2)
+                        with erb1:
+                            st.markdown(f"""
+                                <div class="kpi-tile {l_er_cls}">
+                                    <h1>{int(latest_er_l)} N</h1>
+                                    <p>LEFT</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with erb2:
+                            st.markdown(f"""
+                                <div class="kpi-tile {r_er_cls}">
+                                    <h1>{int(latest_er_r)} N</h1>
+                                    <p>RIGHT</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        st.markdown(f"""
+                            <div class="detail-box">
+                                <div><b>Asymmetry:</b> {er_asym_val:+.1f}%</div>
+                                <div><b>% Change from Base:</b> L: {chg_er_l:+.1f}% | R: {chg_er_r:+.1f}%</div>
+                                <div><b>Base Force:</b> L: {int(base_er_l)} N | R: {int(base_er_r)} N</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                    with er_right:
+                        fig_er_p = go.Figure()
+                        fig_er_p.add_trace(
+                            go.Scatter(
+                                x=p_er_ready['Date'], y=p_er_ready[er_l_col],
+                                name="Left Peak Force", mode="lines+markers",
+                                line=dict(color="#2F80ED", width=3),
+                                marker=dict(size=6, color="#2F80ED")
+                            )
+                        )
+                        fig_er_p.add_trace(
+                            go.Scatter(
+                                x=p_er_ready['Date'], y=p_er_ready[er_r_col],
+                                name="Right Peak Force", mode="lines+markers",
+                                line=dict(color="#FF8200", width=3, dash="dash"),
+                                marker=dict(size=6, color="#FF8200")
+                            )
+                        )
+                        fig_er_p.update_layout(
+                            template="plotly_white", height=230,
+                            margin=dict(l=10, r=10, t=25, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
+                            yaxis=dict(showgrid=True, gridcolor="#F0F2F6")
+                        )
+                        st.plotly_chart(fig_er_p, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No External Rotation records available for this selection.")
+            else:
+                st.info("No External Rotation records found. (Add ER_URL to secrets when available).")
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW)
