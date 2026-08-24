@@ -106,7 +106,7 @@ if check_password():
             lambda x: re.findall(r"[-+]?\d*\.?\d+", x)[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan
         ).astype(float)
 
-    # --- 4. SAFE DATA LOADING & PHOTO MAPPER ---
+    # --- 4. SAFE DATA LOADING & MERGING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         def safe_read_csv(secret_key):
@@ -124,12 +124,13 @@ if check_password():
         ash_df = safe_read_csv("ASH_URL")
         cmj_df = safe_read_csv("CMJ_URL")
         er_df = safe_read_csv("ER_URL")
+        grip_df = safe_read_csv("GRIP_URL")
         roster_df = safe_read_csv("ROSTER_URL")
         swing_df = safe_read_csv("SWING_URL")
         throw_df = safe_read_csv("THROW_URL")
 
         # Standardize athlete name column
-        for df in [ash_df, cmj_df, er_df, roster_df, swing_df, throw_df]:
+        for df in [ash_df, cmj_df, er_df, grip_df, roster_df, swing_df, throw_df]:
             if not df.empty:
                 if 'Name' in df.columns and 'Player Name' not in df.columns:
                     df.rename(columns={'Name': 'Player Name'}, inplace=True)
@@ -167,9 +168,15 @@ if check_password():
                 if any(k in col.lower() for k in ['rom', 'asymmetry', 'asym']):
                     er_df[col] = clean_num_series(er_df[col])
 
-        return ash_df, cmj_df, er_df, swing_df, throw_df, photo_dict
+        # Clean Grip Squeeze Force numeric columns
+        if not grip_df.empty:
+            for col in grip_df.columns:
+                if any(k in col.lower() for k in ['force', 'asymmetry', 'asym']):
+                    grip_df[col] = clean_num_series(grip_df[col])
 
-    ash_df, cmj_df, er_df, swing_df, throw_df, photo_dict = load_all_data()
+        return ash_df, cmj_df, er_df, grip_df, swing_df, throw_df, photo_dict
+
+    ash_df, cmj_df, er_df, grip_df, swing_df, throw_df, photo_dict = load_all_data()
 
     def find_col(df, options):
         if df.empty:
@@ -183,7 +190,7 @@ if check_password():
                 return match_part[0]
         return None
 
-    if not ash_df.empty or not cmj_df.empty or not er_df.empty:
+    if not ash_df.empty or not cmj_df.empty or not er_df.empty or not grip_df.empty:
         # --- 5. SEASON SETUP ---
         TODAY = pd.to_datetime(date.today())
         SPRING_START = pd.to_datetime("2026-01-01")
@@ -193,14 +200,14 @@ if check_password():
         all_athletes = sorted(list(set(
             list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
             list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else []) +
-            list(er_df['Player Name'].dropna().unique() if 'Player Name' in er_df.columns else [])
+            list(er_df['Player Name'].dropna().unique() if 'Player Name' in er_df.columns else []) +
+            list(grip_df['Player Name'].dropna().unique() if 'Player Name' in grip_df.columns else [])
         )))
 
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             selected = st.selectbox("Select Athlete", all_athletes)
         with f_col2:
-            # Fall 2026 (Current Season) is now indexed first (default)
             season_option = st.selectbox("Select Season", ["Fall 2026 (Current)", "Spring 2026", "All Time"], index=0)
 
         def filter_season(df):
@@ -216,12 +223,14 @@ if check_password():
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
         raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
+        raw_grip = grip_df[grip_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in grip_df.columns else pd.DataFrame()
         raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
         raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
 
         p_ash = filter_season(raw_ash).copy()
         p_cmj = filter_season(raw_cmj).copy()
         p_er = filter_season(raw_er).copy()
+        p_grip = filter_season(raw_grip).copy()
         p_swing = filter_season(raw_swing).copy()
         p_throw = filter_season(raw_throw).copy()
 
@@ -236,6 +245,10 @@ if check_password():
         er_l_col = find_col(er_df, ['L Max ROM (°)', 'L Max ROM', 'Left Max ROM', 'L ROM'])
         er_r_col = find_col(er_df, ['R Max ROM (°)', 'R Max ROM', 'Right Max ROM', 'R ROM'])
         er_asym_col = find_col(er_df, ['ROM Asymmetry (%)', 'ROM Asymmetry', 'Asymmetry (%)', 'Asym (%)'])
+
+        grip_l_col = find_col(grip_df, ['L Max Force (N)', 'L Max Force', 'Left Max Force (N)', 'Force (L)', 'L Grip'])
+        grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
+        grip_asym_col = find_col(grip_df, ['Force Asymmetry (%)', 'Force Asymmetry', 'Asymmetry (%)', 'Asym (%)'])
 
         # Robust Direct Photo Lookup
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
@@ -278,6 +291,8 @@ if check_password():
             b_ash_r, b_ash_r_date = get_best_record(raw_ash, ash_r_col)
             b_er_l, b_er_l_date = get_best_record(raw_er, er_l_col)
             b_er_r, b_er_r_date = get_best_record(raw_er, er_r_col)
+            b_grip_l, b_grip_l_date = get_best_record(raw_grip, grip_l_col)
+            b_grip_r, b_grip_r_date = get_best_record(raw_grip, grip_r_col)
 
             # Row 1: CMJ & ASH Best Cards
             b1, b2, b3, b4 = st.columns(4)
@@ -298,16 +313,24 @@ if check_password():
                 d_str = f"Set on {b_ash_r_date}" if b_ash_r_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best ASH Force (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
 
-            # Row 2: ER ROM Best Cards
-            er_b1, er_b2, _, _ = st.columns(4)
-            with er_b1:
+            # Row 2: ER ROM & Grip Squeeze Best Cards
+            b5, b6, b7, b8 = st.columns(4)
+            with b5:
                 val = f"{int(b_er_l)}°" if b_er_l is not None else "N/A"
                 d_str = f"Set on {b_er_l_date}" if b_er_l_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best ER ROM (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with er_b2:
+            with b6:
                 val = f"{int(b_er_r)}°" if b_er_r is not None else "N/A"
                 d_str = f"Set on {b_er_r_date}" if b_er_r_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best ER ROM (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b7:
+                val = f"{int(b_grip_l)} N" if b_grip_l is not None else "N/A"
+                d_str = f"Set on {b_grip_l_date}" if b_grip_l_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best Grip (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b8:
+                val = f"{int(b_grip_r)} N" if b_grip_r is not None else "N/A"
+                d_str = f"Set on {b_grip_r_date}" if b_grip_r_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best Grip (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
 
             st.markdown('<div class="section-header">WEEKLY READINESS PROFILE</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
@@ -342,15 +365,15 @@ if check_password():
 
                     c_left, c_right = st.columns([1.1, 2])
                     with c_left:
-                        b1, b2 = st.columns(2)
-                        with b1:
+                        cb1, cb2 = st.columns(2)
+                        with cb1:
                             st.markdown(f"""
                                 <div class="kpi-tile {h_tile_cls}">
                                     <h1>{latest_h:.1f}</h1>
                                     <p>CMJ HEIGHT</p>
                                 </div>
                             """, unsafe_allow_html=True)
-                        with b2:
+                        with cb2:
                             st.markdown(f"""
                                 <div class="kpi-tile {rsi_tile_cls}">
                                     <h1>{latest_rsi:.2f}</h1>
@@ -610,7 +633,99 @@ if check_password():
                 else:
                     st.info("No External Rotation records available for this selection.")
             else:
-                st.info("No External Rotation records found.")
+                st.info("No External Rotation records found. (Add ER_URL to secrets when available).")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # -------------------------------------------------------------
+            # SECTION 4: GRIP SQUEEZE TEST
+            # -------------------------------------------------------------
+            st.markdown('<div class="sub-header-title">GRIP SQUEEZE TEST</div>', unsafe_allow_html=True)
+
+            p_grip_ready = p_grip.dropna(subset=['Date']).sort_values('Date').copy() if not p_grip.empty else pd.DataFrame()
+
+            if not p_grip_ready.empty and grip_l_col and grip_r_col and grip_l_col in p_grip_ready.columns and grip_r_col in p_grip_ready.columns:
+                p_grip_ready[grip_l_col] = pd.to_numeric(p_grip_ready[grip_l_col], errors='coerce').fillna(0)
+                p_grip_ready[grip_r_col] = pd.to_numeric(p_grip_ready[grip_r_col], errors='coerce').fillna(0)
+                p_grip_ready = p_grip_ready[(p_grip_ready[grip_l_col] > 0) | (p_grip_ready[grip_r_col] > 0)]
+
+                if not p_grip_ready.empty:
+                    lat_grip = p_grip_ready.iloc[-1]
+                    latest_grip_l = lat_grip[grip_l_col]
+                    latest_grip_r = lat_grip[grip_r_col]
+
+                    base_grip_l = p_grip_ready[grip_l_col].replace(0, np.nan).mean()
+                    base_grip_r = p_grip_ready[grip_r_col].replace(0, np.nan).mean()
+                    base_grip_l = base_grip_l if pd.notnull(base_grip_l) else 0
+                    base_grip_r = base_grip_r if pd.notnull(base_grip_r) else 0
+
+                    chg_grip_l = ((latest_grip_l - base_grip_l) / base_grip_l * 100) if base_grip_l > 0 else 0
+                    chg_grip_r = ((latest_grip_r - base_grip_r) / base_grip_r * 100) if base_grip_r > 0 else 0
+
+                    if grip_asym_col and grip_asym_col in lat_grip and pd.notnull(lat_grip[grip_asym_col]):
+                        grip_asym_val = float(lat_grip[grip_asym_col])
+                    else:
+                        grip_asym_val = (abs(latest_grip_l - latest_grip_r) / max(latest_grip_l, latest_grip_r) * 100) if max(latest_grip_l, latest_grip_r) > 0 else 0.0
+
+                    l_grip_cls = "tile-red" if grip_asym_val > 10 else "tile-green"
+                    r_grip_cls = "tile-red" if grip_asym_val > 10 else "tile-green"
+
+                    g_left, g_right = st.columns([1.1, 2])
+                    with g_left:
+                        gb1, gb2 = st.columns(2)
+                        with gb1:
+                            st.markdown(f"""
+                                <div class="kpi-tile {l_grip_cls}">
+                                    <h1>{int(latest_grip_l)} N</h1>
+                                    <p>LEFT FORCE</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with gb2:
+                            st.markdown(f"""
+                                <div class="kpi-tile {r_grip_cls}">
+                                    <h1>{int(latest_grip_r)} N</h1>
+                                    <p>RIGHT FORCE</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        st.markdown(f"""
+                            <div class="detail-box">
+                                <div><b>Force Asymmetry:</b> {grip_asym_val:+.1f}%</div>
+                                <div><b>% Change from Base:</b> L: {chg_grip_l:+.1f}% | R: {chg_grip_r:+.1f}%</div>
+                                <div><b>Base Force:</b> L: {int(base_grip_l)} N | R: {int(base_grip_r)} N</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                    with g_right:
+                        fig_grip_p = go.Figure()
+                        fig_grip_p.add_trace(
+                            go.Scatter(
+                                x=p_grip_ready['Date'], y=p_grip_ready[grip_l_col],
+                                name="Left Max Force (N)", mode="lines+markers",
+                                line=dict(color="#2F80ED", width=3),
+                                marker=dict(size=6, color="#2F80ED")
+                            )
+                        )
+                        fig_grip_p.add_trace(
+                            go.Scatter(
+                                x=p_grip_ready['Date'], y=p_grip_ready[grip_r_col],
+                                name="Right Max Force (N)", mode="lines+markers",
+                                line=dict(color="#FF8200", width=3, dash="dash"),
+                                marker=dict(size=6, color="#FF8200")
+                            )
+                        )
+                        fig_grip_p.update_layout(
+                            template="plotly_white", height=230,
+                            margin=dict(l=10, r=10, t=25, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
+                            yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Force (N)")
+                        )
+                        st.plotly_chart(fig_grip_p, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No Grip Squeeze records available for this selection.")
+            else:
+                st.info("No Grip Squeeze records found. (Add GRIP_URL to secrets when available).")
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW)
