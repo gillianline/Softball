@@ -30,7 +30,7 @@ def check_password():
 # --- MAIN APP EXECUTION ---
 if check_password():
 
-    # --- 3. VOLLEYBALL / LADY VOL CSS THEME ---
+    # --- 3. CUSTOM LADY VOL & TESTING CSS ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -75,15 +75,6 @@ if check_password():
             padding: 10px 14px; border-radius: 4px; margin-top: 12px; font-size: 12px;
             color: #495057; font-weight: 600; line-height: 1.5;
         }
-
-        /* Best Hero Card */
-        .best-card {
-            background: #F8F9FA; border-top: 4px solid #FF8200;
-            border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 15px;
-        }
-        .best-card h4 { margin: 0; color: #6c757d; font-size: 11px; text-transform: uppercase; }
-        .best-card h2 { margin: 4px 0 2px 0; font-size: 24px; font-weight: 800; color: #FF8200; }
-        .best-card p { margin: 0; font-size: 11px; color: #2F80ED; font-weight: 700; }
 
         /* Tables */
         .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 10px; }
@@ -176,20 +167,8 @@ if check_password():
             </div>
         """, unsafe_allow_html=True)
 
-        def get_best_record(df, col_name, is_min=False):
-            if df.empty or col_name not in df.columns:
-                return None, None
-            temp = df.dropna(subset=[col_name, 'Date']).copy()
-            temp[col_name] = pd.to_numeric(temp[col_name], errors='coerce')
-            temp = temp.dropna(subset=[col_name])
-            if temp.empty:
-                return None, None
-            idx = temp[col_name].idxmin() if is_min else temp[col_name].idxmax()
-            best_row = temp.loc[idx]
-            return best_row[col_name], best_row['Date'].strftime('%m/%d/%Y')
-
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_profile, tab_catapult = st.tabs(["TESTING PROFILE", "INDIVIDUAL PROFILE", "CATAPULT PROFILE"])
+        tab_testing, tab_catapult = st.tabs(["TESTING PROFILE", "CATAPULT PROFILE"])
 
         # =========================================================================
         # TAB 1: TESTING PROFILE (WEEKLY READINESS PROFILE FORMAT)
@@ -367,91 +346,7 @@ if check_password():
                 st.info("No ASH Shoulder records available for this season.")
 
         # =========================================================================
-        # TAB 2: INDIVIDUAL PROFILE (OVERALL PERSONAL BESTS & SCOUTING)
-        # =========================================================================
-        with tab_profile:
-            st.subheader("ALL-TIME PERSONAL BESTS")
-            b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, 'Jump Height (Imp-Mom) [cm]')
-            b_rsi, b_rsi_date = get_best_record(raw_cmj, 'RSI-modified (Imp-Mom) [m/s]')
-            b_ash_f, b_ash_f_date = get_best_record(raw_ash, 'Peak Vertical Force [N]')
-            b_ash_rfd, b_ash_rfd_date = get_best_record(raw_ash, 'RFD - 200ms [N/s]')
-
-            b1, b2, b3, b4 = st.columns(4)
-            with b1:
-                val = f"{b_cmj_h:.1f} cm" if b_cmj_h is not None else "N/A"
-                d_str = f"Set on {b_cmj_h_date}" if b_cmj_h_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best Jump Height</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b2:
-                val = f"{b_rsi:.2f}" if b_rsi is not None else "N/A"
-                d_str = f"Set on {b_rsi_date}" if b_rsi_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best RSI-modified</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b3:
-                val = f"{int(b_ash_f)} N" if b_ash_f is not None else "N/A"
-                d_str = f"Set on {b_ash_f_date}" if b_ash_f_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best ASH Force</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b4:
-                val = f"{int(b_ash_rfd)} N/s" if b_ash_rfd is not None else "N/A"
-                d_str = f"Set on {b_ash_rfd_date}" if b_ash_rfd_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best ASH RFD</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-
-            st.divider()
-
-            all_dates = [df['Date'].max() for df in [p_ash, p_cmj, p_swing, p_throw] if not df.empty and 'Date' in df.columns]
-            max_p_date = max(all_dates).date() if all_dates and pd.notnull(max(all_dates)) else date.today()
-            min_p_date = max_p_date - pd.Timedelta(days=7)
-
-            p_dates = st.date_input("Scouting Window", value=(min_p_date, max_p_date), key="prof_scout_window")
-
-            if isinstance(p_dates, tuple) and len(p_dates) == 2:
-                start_p, end_p = p_dates
-                w_ash = p_ash[(p_ash['Date'].dt.date >= start_p) & (p_ash['Date'].dt.date <= end_p)]
-                w_cmj = p_cmj[(p_cmj['Date'].dt.date >= start_p) & (p_cmj['Date'].dt.date <= end_p)]
-                w_swing = p_swing[(p_swing['Date'].dt.date >= start_p) & (p_swing['Date'].dt.date <= end_p)]
-                w_throw = p_throw[(p_throw['Date'].dt.date >= start_p) & (p_throw['Date'].dt.date <= end_p)]
-
-                st.subheader("ATHLETE STATUS (WINDOW)")
-                s1, s2, s3, s4 = st.columns(4)
-
-                rsi_best = pd.to_numeric(p_cmj.get('RSI-modified (Imp-Mom) [m/s]', 0), errors='coerce').max() if not p_cmj.empty else 0
-                rsi_curr = pd.to_numeric(w_cmj.get('RSI-modified (Imp-Mom) [m/s]', 0), errors='coerce').mean() if not w_cmj.empty else 0
-                rsi_diff = rsi_curr - rsi_best
-                rsi_status = "PEAKING" if rsi_curr >= (rsi_best * 0.95 and rsi_best > 0) else "STABLE" if rsi_curr >= (rsi_best * 0.85 and rsi_best > 0) else "FATIGUED"
-                s1.metric("RSI-modified", rsi_status, delta=f"{rsi_diff:+.2f} vs Best" if rsi_best > 0 else "N/A")
-
-                l_avg = pd.to_numeric(w_ash.get('Peak Vertical Force [N] (L)', 0), errors='coerce').mean() if not w_ash.empty else 0
-                r_avg = pd.to_numeric(w_ash.get('Peak Vertical Force [N] (R)', 0), errors='coerce').mean() if not w_ash.empty else 0
-                asym = (abs(l_avg - r_avg) / max(l_avg, r_avg) * 100) if max(l_avg, r_avg) > 0 else 0
-                s2.metric("Asymmetry", f"{asym:.1f}%", delta="LOW" if asym < 10 else "HIGH", delta_color="inverse")
-
-                s_vol = pd.to_numeric(w_swing.get('Swing Count', 0), errors='coerce').sum() if not w_swing.empty else 0
-                t_vol = pd.to_numeric(w_throw.get('Total Throw Count', 0), errors='coerce').sum() if not w_throw.empty else 0
-                total_reps = int(s_vol + t_vol)
-                s3.metric("Load", "MODERATE" if 150 < total_reps < 300 else "HIGH" if total_reps >= 300 else "LOW")
-
-                s_int = pd.to_numeric(w_swing.get('Swing Max Rotation Band 3 Count', 0), errors='coerce').sum() if not w_swing.empty else 0
-                s_qual = (s_int / s_vol * 100) if s_vol > 0 else 0
-                s4.metric("Intent", "HIGH" if s_qual > 25 else "NORMAL")
-
-                st.divider()
-                n_col, a_col = st.columns(2)
-                with n_col:
-                    st.subheader("COACHING NOTES")
-                    st.markdown(f"""
-                    * **RSI**: {rsi_status} ({rsi_curr:.2f}).
-                    * **Symmetry**: {asym:.1f}% variance. {'✅ Normal' if asym < 10 else '⚠️ High - Check Lead Leg.'}
-                    * **Volume**: {int(total_reps)} reps in this window.
-                    """)
-                with a_col:
-                    st.subheader("RECENT ACTIVITY")
-                    st.markdown(f"""
-                    * **Hitting**: {int(s_vol)} Swings
-                    * **Throwing**: {int(t_vol)} Throws
-                    * **ASH Sessions**: {len(w_ash)}
-                    * **CMJ Sessions**: {len(w_cmj)}
-                    """)
-
-        # =========================================================================
-        # TAB 3: CATAPULT PROFILE (SWING & THROW)
+        # TAB 2: CATAPULT PROFILE (SWING & THROW)
         # =========================================================================
         with tab_catapult:
             sub_swing, sub_throw = st.tabs(["SWING", "THROW"])
