@@ -30,12 +30,12 @@ def check_password():
 # --- MAIN APP EXECUTION ---
 if check_password():
 
-    # --- 3. CUSTOM LADY VOL & TESTING CSS ---
+    # --- 3. CUSTOM CSS THEME ---
     st.markdown("""
         <style>
         .stApp { background-color: #FFFFFF; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
-        /* Top Banner & Header */
+        /* Banner */
         .athlete-banner {
             background-color: #F8F9FA; padding: 18px 24px; border-radius: 14px;
             border-left: 8px solid #FF8200; margin-bottom: 20px;
@@ -47,7 +47,7 @@ if check_password():
         .athlete-name { margin: 0; font-size: 26px; font-weight: 800; color: #1D1D1F; }
         .athlete-sub { margin: 2px 0 0 0; color: #2F80ED; font-weight: 700; font-size: 14px; }
         
-        /* Readiness Profile Typography */
+        /* Typography */
         .section-header {
             color: #2F80ED; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;
             text-transform: uppercase; margin-top: 10px; margin-bottom: 4px;
@@ -57,6 +57,17 @@ if check_password():
             color: #2F80ED; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;
             text-transform: uppercase; margin-bottom: 12px;
         }
+
+        /* Best Hero Cards */
+        .best-card {
+            background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
+            border: 1px solid #EAEAEA; border-top: 4px solid #FF8200;
+            border-radius: 10px; padding: 14px 10px; text-align: center; margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .best-card h4 { margin: 0; color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .best-card h2 { margin: 6px 0 2px 0; font-size: 24px; font-weight: 800; color: #FF8200; }
+        .best-card p { margin: 0; font-size: 11px; color: #2F80ED; font-weight: 700; }
 
         /* Metric Tile Badges */
         .kpi-tile {
@@ -85,7 +96,7 @@ if check_password():
         </style>
     """, unsafe_allow_html=True)
 
-    # --- 4. DATA LOADING & MERGING ---
+    # --- 4. DATA LOADING & FLEXIBLE COLUMN RESOLVER ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
@@ -119,6 +130,18 @@ if check_password():
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
+    # Column name resolver helper
+    def find_col(df, options):
+        for opt in options:
+            match = [c for c in df.columns if c.strip().lower() == opt.strip().lower()]
+            if match:
+                return match[0]
+            # Partial match fallback
+            match_part = [c for c in df.columns if opt.strip().lower() in c.strip().lower()]
+            if match_part:
+                return match_part[0]
+        return None
+
     if not ash_df.empty:
         # --- 5. SEASON SETUP ---
         TODAY = pd.to_datetime(date.today())
@@ -142,6 +165,7 @@ if check_password():
                 return df[df['Date'] >= FALL_START]
             return df
 
+        # Athlete raw and season slices
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
         raw_swing = swing_df[swing_df['Name'] == selected].sort_values('Date')
@@ -151,6 +175,16 @@ if check_password():
         p_cmj = filter_season(raw_cmj).copy()
         p_swing = filter_season(raw_swing).copy()
         p_throw = filter_season(raw_throw).copy()
+
+        # Dynamic ASH Column Identification
+        ash_f_col = find_col(ash_df, ['Peak Vertical Force [N]', 'Peak Force [N]', 'Peak Vertical Force'])
+        ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Peak Force (L)', 'Force (L)', 'Peak Vertical Force (L)'])
+        ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Peak Force (R)', 'Force (R)', 'Peak Vertical Force (R)'])
+        ash_asym_col = find_col(ash_df, ['Peak Vertical Force [N] (Asym)(%)', 'Peak Vertical Force (Asym)(%)', 'Asymmetry', 'Asym(%)'])
+
+        # Dynamic CMJ Column Identification
+        cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]', 'Jump Height (cm)'])
+        cmj_rsi_col = find_col(cmj_df, ['RSI-modified (Imp-Mom) [m/s]', 'RSI-modified', 'RSI-m', 'RSI-modified [m/s]'])
 
         latest_ash = p_ash.iloc[-1] if not p_ash.empty else (raw_ash.iloc[-1] if not raw_ash.empty else None)
         img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png') if latest_ash is not None else 'https://www.w3schools.com/howto/img_avatar.png'
@@ -167,35 +201,70 @@ if check_password():
             </div>
         """, unsafe_allow_html=True)
 
+        def get_best_record(df, col_name, is_min=False):
+            if df.empty or not col_name or col_name not in df.columns:
+                return None, None
+            temp = df.dropna(subset=[col_name, 'Date']).copy()
+            temp[col_name] = pd.to_numeric(temp[col_name], errors='coerce')
+            temp = temp.dropna(subset=[col_name])
+            if temp.empty:
+                return None, None
+            idx = temp[col_name].idxmin() if is_min else temp[col_name].idxmax()
+            best_row = temp.loc[idx]
+            return best_row[col_name], best_row['Date'].strftime('%m/%d/%Y')
+
         # --- 6. NAVIGATION TABS ---
         tab_testing, tab_catapult = st.tabs(["TESTING PROFILE", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: TESTING PROFILE (WEEKLY READINESS PROFILE FORMAT)
+        # TAB 1: TESTING PROFILE
         # =========================================================================
         with tab_testing:
+            # --- OVERALL BEST TEST HERO CARDS (WITH BOTH L & R SIDES) ---
+            st.subheader("ALL-TIME PERSONAL BESTS")
+            b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, cmj_h_col)
+            b_rsi, b_rsi_date = get_best_record(raw_cmj, cmj_rsi_col)
+            b_ash_l, b_ash_l_date = get_best_record(raw_ash, ash_l_col)
+            b_ash_r, b_ash_r_date = get_best_record(raw_ash, ash_r_col)
+
+            b1, b2, b3, b4 = st.columns(4)
+            with b1:
+                val = f"{b_cmj_h:.1f} cm" if b_cmj_h is not None else "N/A"
+                d_str = f"Set on {b_cmj_h_date}" if b_cmj_h_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best Jump Height</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b2:
+                val = f"{b_rsi:.2f}" if b_rsi is not None else "N/A"
+                d_str = f"Set on {b_rsi_date}" if b_rsi_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best RSI-modified</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b3:
+                val = f"{int(b_ash_l)} N" if b_ash_l is not None else "N/A"
+                d_str = f"Set on {b_ash_l_date}" if b_ash_l_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best ASH Force (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+            with b4:
+                val = f"{int(b_ash_r)} N" if b_ash_r is not None else "N/A"
+                d_str = f"Set on {b_ash_r_date}" if b_ash_r_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best ASH Force (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+
             st.markdown('<div class="section-header">WEEKLY READINESS PROFILE</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             # -------------------------------------------------------------
-            # COUNTERMOVEMENT JUMP
+            # SECTION 1: COUNTERMOVEMENT JUMP
             # -------------------------------------------------------------
             st.markdown('<div class="sub-header-title">COUNTERMOVEMENT JUMP</div>', unsafe_allow_html=True)
             
             p_cmj_ready = p_cmj.dropna(subset=['Date']).sort_values('Date').copy() if not p_cmj.empty else pd.DataFrame()
-            cmj_h_col = 'Jump Height (Imp-Mom) [cm]'
-            rsi_col = 'RSI-modified (Imp-Mom) [m/s]'
 
-            if not p_cmj_ready.empty and cmj_h_col in p_cmj_ready.columns and rsi_col in p_cmj_ready.columns:
+            if not p_cmj_ready.empty and cmj_h_col and cmj_rsi_col and cmj_h_col in p_cmj_ready.columns and cmj_rsi_col in p_cmj_ready.columns:
                 p_cmj_ready[cmj_h_col] = pd.to_numeric(p_cmj_ready[cmj_h_col], errors='coerce')
-                p_cmj_ready[rsi_col] = pd.to_numeric(p_cmj_ready[rsi_col], errors='coerce')
+                p_cmj_ready[cmj_rsi_col] = pd.to_numeric(p_cmj_ready[cmj_rsi_col], errors='coerce')
                 
                 lat_cmj = p_cmj_ready.iloc[-1]
                 latest_h = lat_cmj[cmj_h_col]
-                latest_rsi = lat_cmj[rsi_col]
+                latest_rsi = lat_cmj[cmj_rsi_col]
                 
                 base_h = p_cmj_ready[cmj_h_col].mean()
-                base_rsi = p_cmj_ready[rsi_col].mean()
+                base_rsi = p_cmj_ready[cmj_rsi_col].mean()
 
                 chg_h = ((latest_h - base_h) / base_h * 100) if base_h > 0 else 0
                 chg_rsi = ((latest_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
@@ -241,7 +310,7 @@ if check_password():
                     )
                     fig_cmj.add_trace(
                         go.Scatter(
-                            x=p_cmj_ready['Date'], y=p_cmj_ready[rsi_col],
+                            x=p_cmj_ready['Date'], y=p_cmj_ready[cmj_rsi_col],
                             name="RSI Modified", mode="lines+markers",
                             line=dict(color="#2F80ED", width=2.5, dash="dot"),
                             marker=dict(size=6, color="#2F80ED")
@@ -263,29 +332,34 @@ if check_password():
             st.markdown("<br>", unsafe_allow_html=True)
 
             # -------------------------------------------------------------
-            # ASH SHOULDER: ISO I
+            # SECTION 2: ASH SHOULDER: ISO I
             # -------------------------------------------------------------
             st.markdown('<div class="sub-header-title">ASH SHOULDER: ISO I</div>', unsafe_allow_html=True)
 
             p_ash_ready = p_ash.dropna(subset=['Date']).sort_values('Date').copy() if not p_ash.empty else pd.DataFrame()
-            f_l_col = 'Peak Vertical Force [N] (L)'
-            f_r_col = 'Peak Vertical Force [N] (R)'
 
-            if not p_ash_ready.empty and f_l_col in p_ash_ready.columns and f_r_col in p_ash_ready.columns:
-                p_ash_ready[f_l_col] = pd.to_numeric(p_ash_ready[f_l_col], errors='coerce').fillna(0)
-                p_ash_ready[f_r_col] = pd.to_numeric(p_ash_ready[f_r_col], errors='coerce').fillna(0)
+            if not p_ash_ready.empty and ash_l_col and ash_r_col and ash_l_col in p_ash_ready.columns and ash_r_col in p_ash_ready.columns:
+                p_ash_ready[ash_l_col] = pd.to_numeric(p_ash_ready[ash_l_col], errors='coerce').fillna(0)
+                p_ash_ready[ash_r_col] = pd.to_numeric(p_ash_ready[ash_r_col], errors='coerce').fillna(0)
 
                 lat_ash_r = p_ash_ready.iloc[-1]
-                latest_l = lat_ash_r[f_l_col]
-                latest_r = lat_ash_r[f_r_col]
+                latest_l = lat_ash_r[ash_l_col]
+                latest_r = lat_ash_r[ash_r_col]
 
-                base_l = p_ash_ready[f_l_col].mean()
-                base_r = p_ash_ready[f_r_col].mean()
+                base_l = p_ash_ready[ash_l_col].mean()
+                base_r = p_ash_ready[ash_r_col].mean()
 
                 chg_l = ((latest_l - base_l) / base_l * 100) if base_l > 0 else 0
                 chg_r = ((latest_r - base_r) / base_r * 100) if base_r > 0 else 0
 
-                asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0
+                # Use pre-calculated asymmetry column if present, otherwise compute
+                if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]):
+                    try:
+                        asym_val = float(str(lat_ash_r[ash_asym_col]).replace('%', ''))
+                    except:
+                        asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0
+                else:
+                    asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0
                 
                 l_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
                 r_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
@@ -320,7 +394,7 @@ if check_password():
                     fig_ash_p = go.Figure()
                     fig_ash_p.add_trace(
                         go.Scatter(
-                            x=p_ash_ready['Date'], y=p_ash_ready[f_l_col],
+                            x=p_ash_ready['Date'], y=p_ash_ready[ash_l_col],
                             name="Left Peak Force", mode="lines+markers",
                             line=dict(color="#2F80ED", width=3),
                             marker=dict(size=6, color="#2F80ED")
@@ -328,7 +402,7 @@ if check_password():
                     )
                     fig_ash_p.add_trace(
                         go.Scatter(
-                            x=p_ash_ready['Date'], y=p_ash_ready[f_r_col],
+                            x=p_ash_ready['Date'], y=p_ash_ready[ash_r_col],
                             name="Right Peak Force", mode="lines+markers",
                             line=dict(color="#FF8200", width=3, dash="dash"),
                             marker=dict(size=6, color="#FF8200")
