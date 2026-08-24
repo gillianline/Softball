@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import re
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
@@ -96,7 +98,13 @@ if check_password():
         </style>
     """, unsafe_allow_html=True)
 
-    # --- 4. DATA LOADING & FLEXIBLE COLUMN RESOLVER ---
+    # Clean numeric helper to extract float values even if followed by L, R, %, etc.
+    def clean_num_series(series):
+        if series is None:
+            return pd.Series(dtype=float)
+        return series.astype(str).apply(lambda x: re.findall(r"[-+]?\d*\.?\d+", x)[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan).astype(float)
+
+    # --- 4. DATA LOADING & MERGING ---
     @st.cache_data(ttl=300)
     def load_all_data():
         try:
@@ -110,6 +118,16 @@ if check_password():
                 df.columns = df.columns.str.strip()
                 if 'Date' in df.columns:
                     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+            # Clean ASH numbers
+            for col in ash_df.columns:
+                if any(k in col.lower() for k in ['force', 'asym', 'rfd']):
+                    ash_df[col] = clean_num_series(ash_df[col])
+
+            # Clean CMJ numbers
+            for col in cmj_df.columns:
+                if any(k in col.lower() for k in ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']):
+                    cmj_df[col] = clean_num_series(cmj_df[col])
 
             photo_col = [c for c in roster_df.columns if 'photo' in c.lower() or 'picture' in c.lower()]
             if photo_col:
@@ -130,28 +148,30 @@ if check_password():
 
     ash_df, cmj_df, swing_df, throw_df = load_all_data()
 
-    # Column name resolver helper
     def find_col(df, options):
         for opt in options:
             match = [c for c in df.columns if c.strip().lower() == opt.strip().lower()]
             if match:
                 return match[0]
-            # Partial match fallback
             match_part = [c for c in df.columns if opt.strip().lower() in c.strip().lower()]
             if match_part:
                 return match_part[0]
         return None
 
-    if not ash_df.empty:
+    if not ash_df.empty or not cmj_df.empty:
         # --- 5. SEASON SETUP ---
         TODAY = pd.to_datetime(date.today())
         SPRING_START = pd.to_datetime("2026-01-01")
         SPRING_END = pd.to_datetime("2026-05-31 23:59:59")
         FALL_START = TODAY
 
+        all_athletes = sorted(list(set(
+            list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
+            list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else [])
+        )))
+
         f_col1, f_col2 = st.columns(2)
         with f_col1:
-            all_athletes = sorted(list(set(ash_df['Player Name'].dropna().unique())))
             selected = st.selectbox("Select Athlete", all_athletes)
         with f_col2:
             season_option = st.selectbox("Select Season", ["Spring 2026", "Fall 2026 (Current)", "All Time"])
@@ -165,11 +185,11 @@ if check_password():
                 return df[df['Date'] >= FALL_START]
             return df
 
-        # Athlete raw and season slices
-        raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date')
-        raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date')
-        raw_swing = swing_df[swing_df['Name'] == selected].sort_values('Date')
-        raw_throw = throw_df[throw_df['Name'] == selected].sort_values('Date')
+        # Athlete raw and season filtered slices
+        raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
+        raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
+        raw_swing = swing_df[swing_df['Name'] == selected].sort_values('Date') if 'Name' in swing_df.columns else pd.DataFrame()
+        raw_throw = throw_df[throw_df['Name'] == selected].sort_values('Date') if 'Name' in throw_df.columns else pd.DataFrame()
 
         p_ash = filter_season(raw_ash).copy()
         p_cmj = filter_season(raw_cmj).copy()
@@ -177,17 +197,19 @@ if check_password():
         p_throw = filter_season(raw_throw).copy()
 
         # Dynamic ASH Column Identification
-        ash_f_col = find_col(ash_df, ['Peak Vertical Force [N]', 'Peak Force [N]', 'Peak Vertical Force'])
-        ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Peak Force (L)', 'Force (L)', 'Peak Vertical Force (L)'])
-        ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Peak Force (R)', 'Force (R)', 'Peak Vertical Force (R)'])
-        ash_asym_col = find_col(ash_df, ['Peak Vertical Force [N] (Asym)(%)', 'Peak Vertical Force (Asym)(%)', 'Asymmetry', 'Asym(%)'])
+        ash_f_col = find_col(ash_df, ['Peak Vertical Force [N]', 'Peak Force [N]'])
+        ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Force (L)'])
+        ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Force (R)'])
+        ash_asym_col = find_col(ash_df, ['Peak Vertical Force [N] (Asym)(%)', 'Asymmetry'])
 
         # Dynamic CMJ Column Identification
-        cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]', 'Jump Height (cm)'])
-        cmj_rsi_col = find_col(cmj_df, ['RSI-modified (Imp-Mom) [m/s]', 'RSI-modified', 'RSI-m', 'RSI-modified [m/s]'])
+        cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]'])
+        cmj_rsi_col = find_col(cmj_df, ['RSI-modified (Imp-Mom) [m/s]', 'RSI-modified'])
 
-        latest_ash = p_ash.iloc[-1] if not p_ash.empty else (raw_ash.iloc[-1] if not raw_ash.empty else None)
-        img_url = latest_ash.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png') if latest_ash is not None else 'https://www.w3schools.com/howto/img_avatar.png'
+        # Header Photo
+        photo_source = raw_ash if not raw_ash.empty else raw_cmj
+        latest_photo_rec = photo_source.iloc[-1] if not photo_source.empty else None
+        img_url = latest_photo_rec.get('Photo', 'https://www.w3schools.com/howto/img_avatar.png') if latest_photo_rec is not None else 'https://www.w3schools.com/howto/img_avatar.png'
 
         st.markdown(f"""
             <div class="athlete-banner">
@@ -258,74 +280,78 @@ if check_password():
             if not p_cmj_ready.empty and cmj_h_col and cmj_rsi_col and cmj_h_col in p_cmj_ready.columns and cmj_rsi_col in p_cmj_ready.columns:
                 p_cmj_ready[cmj_h_col] = pd.to_numeric(p_cmj_ready[cmj_h_col], errors='coerce')
                 p_cmj_ready[cmj_rsi_col] = pd.to_numeric(p_cmj_ready[cmj_rsi_col], errors='coerce')
+                p_cmj_ready = p_cmj_ready.dropna(subset=[cmj_h_col, cmj_rsi_col])
                 
-                lat_cmj = p_cmj_ready.iloc[-1]
-                latest_h = lat_cmj[cmj_h_col]
-                latest_rsi = lat_cmj[cmj_rsi_col]
-                
-                base_h = p_cmj_ready[cmj_h_col].mean()
-                base_rsi = p_cmj_ready[cmj_rsi_col].mean()
+                if not p_cmj_ready.empty:
+                    lat_cmj = p_cmj_ready.iloc[-1]
+                    latest_h = lat_cmj[cmj_h_col]
+                    latest_rsi = lat_cmj[cmj_rsi_col]
+                    
+                    base_h = p_cmj_ready[cmj_h_col].mean()
+                    base_rsi = p_cmj_ready[cmj_rsi_col].mean()
 
-                chg_h = ((latest_h - base_h) / base_h * 100) if base_h > 0 else 0
-                chg_rsi = ((latest_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
+                    chg_h = ((latest_h - base_h) / base_h * 100) if base_h > 0 else 0
+                    chg_rsi = ((latest_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
 
-                h_tile_cls = "tile-green" if chg_h >= -5 else "tile-red"
-                rsi_tile_cls = "tile-green" if chg_rsi >= -5 else "tile-red"
+                    h_tile_cls = "tile-green" if chg_h >= -5 else "tile-red"
+                    rsi_tile_cls = "tile-green" if chg_rsi >= -5 else "tile-red"
 
-                c_left, c_right = st.columns([1.1, 2])
-                with c_left:
-                    b1, b2 = st.columns(2)
-                    with b1:
+                    c_left, c_right = st.columns([1.1, 2])
+                    with c_left:
+                        b1, b2 = st.columns(2)
+                        with b1:
+                            st.markdown(f"""
+                                <div class="kpi-tile {h_tile_cls}">
+                                    <h1>{latest_h:.1f}</h1>
+                                    <p>CMJ HEIGHT</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with b2:
+                            st.markdown(f"""
+                                <div class="kpi-tile {rsi_tile_cls}">
+                                    <h1>{latest_rsi:.2f}</h1>
+                                    <p>RSI MOD</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+
                         st.markdown(f"""
-                            <div class="kpi-tile {h_tile_cls}">
-                                <h1>{latest_h:.1f}</h1>
-                                <p>CMJ HEIGHT</p>
+                            <div class="detail-box">
+                                <div><b>% Change from Base:</b> CMJ: {chg_h:+.1f}% | RSI: {chg_rsi:+.1f}%</div>
+                                <div><b>Base Values:</b> CMJ: {base_h:.1f} | RSI: {base_rsi:.2f}</div>
                             </div>
                         """, unsafe_allow_html=True)
-                    with b2:
-                        st.markdown(f"""
-                            <div class="kpi-tile {rsi_tile_cls}">
-                                <h1>{latest_rsi:.2f}</h1>
-                                <p>RSI MOD</p>
-                            </div>
-                        """, unsafe_allow_html=True)
 
-                    st.markdown(f"""
-                        <div class="detail-box">
-                            <div><b>% Change from Base:</b> CMJ: {chg_h:+.1f}% | RSI: {chg_rsi:+.1f}%</div>
-                            <div><b>Base Values:</b> CMJ: {base_h:.1f} | RSI: {base_rsi:.2f}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-                with c_right:
-                    fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig_cmj.add_trace(
-                        go.Scatter(
-                            x=p_cmj_ready['Date'], y=p_cmj_ready[cmj_h_col],
-                            name="Jump Height", mode="lines+markers",
-                            line=dict(color="#FF8200", width=3),
-                            marker=dict(size=6, color="#FF8200")
-                        ),
-                        secondary_y=False
-                    )
-                    fig_cmj.add_trace(
-                        go.Scatter(
-                            x=p_cmj_ready['Date'], y=p_cmj_ready[cmj_rsi_col],
-                            name="RSI Modified", mode="lines+markers",
-                            line=dict(color="#2F80ED", width=2.5, dash="dot"),
-                            marker=dict(size=6, color="#2F80ED")
-                        ),
-                        secondary_y=True
-                    )
-                    fig_cmj.update_layout(
-                        template="plotly_white", height=230,
-                        margin=dict(l=10, r=10, t=25, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                        xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y")
-                    )
-                    fig_cmj.update_yaxes(showgrid=True, gridcolor="#F0F2F6", secondary_y=False)
-                    fig_cmj.update_yaxes(showgrid=False, secondary_y=True)
-                    st.plotly_chart(fig_cmj, use_container_width=True, config={'displayModeBar': False})
+                    with c_right:
+                        fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig_cmj.add_trace(
+                            go.Scatter(
+                                x=p_cmj_ready['Date'], y=p_cmj_ready[cmj_h_col],
+                                name="Jump Height", mode="lines+markers",
+                                line=dict(color="#FF8200", width=3),
+                                marker=dict(size=6, color="#FF8200")
+                            ),
+                            secondary_y=False
+                        )
+                        fig_cmj.add_trace(
+                            go.Scatter(
+                                x=p_cmj_ready['Date'], y=p_cmj_ready[cmj_rsi_col],
+                                name="RSI Modified", mode="lines+markers",
+                                line=dict(color="#2F80ED", width=2.5, dash="dot"),
+                                marker=dict(size=6, color="#2F80ED")
+                            ),
+                            secondary_y=True
+                        )
+                        fig_cmj.update_layout(
+                            template="plotly_white", height=230,
+                            margin=dict(l=10, r=10, t=25, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y")
+                        )
+                        fig_cmj.update_yaxes(showgrid=True, gridcolor="#F0F2F6", secondary_y=False)
+                        fig_cmj.update_yaxes(showgrid=False, secondary_y=True)
+                        st.plotly_chart(fig_cmj, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No Countermovement Jump records available for this selection.")
             else:
                 st.info("No Countermovement Jump records available for this season.")
 
@@ -341,81 +367,86 @@ if check_password():
             if not p_ash_ready.empty and ash_l_col and ash_r_col and ash_l_col in p_ash_ready.columns and ash_r_col in p_ash_ready.columns:
                 p_ash_ready[ash_l_col] = pd.to_numeric(p_ash_ready[ash_l_col], errors='coerce').fillna(0)
                 p_ash_ready[ash_r_col] = pd.to_numeric(p_ash_ready[ash_r_col], errors='coerce').fillna(0)
-
-                lat_ash_r = p_ash_ready.iloc[-1]
-                latest_l = lat_ash_r[ash_l_col]
-                latest_r = lat_ash_r[ash_r_col]
-
-                base_l = p_ash_ready[ash_l_col].mean()
-                base_r = p_ash_ready[ash_r_col].mean()
-
-                chg_l = ((latest_l - base_l) / base_l * 100) if base_l > 0 else 0
-                chg_r = ((latest_r - base_r) / base_r * 100) if base_r > 0 else 0
-
-                # Use pre-calculated asymmetry column if present, otherwise compute
-                if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]):
-                    try:
-                        asym_val = float(str(lat_ash_r[ash_asym_col]).replace('%', ''))
-                    except:
-                        asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0
-                else:
-                    asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0
                 
-                l_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
-                r_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
+                # Filter rows where at least one side was recorded
+                p_ash_ready = p_ash_ready[(p_ash_ready[ash_l_col] > 0) | (p_ash_ready[ash_r_col] > 0)]
 
-                a_left, a_right = st.columns([1.1, 2])
-                with a_left:
-                    ab1, ab2 = st.columns(2)
-                    with ab1:
+                if not p_ash_ready.empty:
+                    lat_ash_r = p_ash_ready.iloc[-1]
+                    latest_l = lat_ash_r[ash_l_col]
+                    latest_r = lat_ash_r[ash_r_col]
+
+                    base_l = p_ash_ready[ash_l_col].replace(0, np.nan).mean()
+                    base_r = p_ash_ready[ash_r_col].replace(0, np.nan).mean()
+                    base_l = base_l if pd.notnull(base_l) else 0
+                    base_r = base_r if pd.notnull(base_r) else 0
+
+                    chg_l = ((latest_l - base_l) / base_l * 100) if base_l > 0 else 0
+                    chg_r = ((latest_r - base_r) / base_r * 100) if base_r > 0 else 0
+
+                    # Asymmetry logic: prefer precalculated or calculate dynamically
+                    if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]):
+                        asym_val = float(lat_ash_r[ash_asym_col])
+                    else:
+                        asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0.0
+                    
+                    l_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
+                    r_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
+
+                    a_left, a_right = st.columns([1.1, 2])
+                    with a_left:
+                        ab1, ab2 = st.columns(2)
+                        with ab1:
+                            st.markdown(f"""
+                                <div class="kpi-tile {l_tile_cls}">
+                                    <h1>{int(latest_l)} N</h1>
+                                    <p>LEFT</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with ab2:
+                            st.markdown(f"""
+                                <div class="kpi-tile {r_tile_cls}">
+                                    <h1>{int(latest_r)} N</h1>
+                                    <p>RIGHT</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+
                         st.markdown(f"""
-                            <div class="kpi-tile {l_tile_cls}">
-                                <h1>{int(latest_l)} N</h1>
-                                <p>LEFT</p>
+                            <div class="detail-box">
+                                <div><b>Asymmetry:</b> {asym_val:+.1f}%</div>
+                                <div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div>
+                                <div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div>
                             </div>
                         """, unsafe_allow_html=True)
-                    with ab2:
-                        st.markdown(f"""
-                            <div class="kpi-tile {r_tile_cls}">
-                                <h1>{int(latest_r)} N</h1>
-                                <p>RIGHT</p>
-                            </div>
-                        """, unsafe_allow_html=True)
 
-                    st.markdown(f"""
-                        <div class="detail-box">
-                            <div><b>Asymmetry:</b> {asym_val:+.1f}%</div>
-                            <div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div>
-                            <div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-                with a_right:
-                    fig_ash_p = go.Figure()
-                    fig_ash_p.add_trace(
-                        go.Scatter(
-                            x=p_ash_ready['Date'], y=p_ash_ready[ash_l_col],
-                            name="Left Peak Force", mode="lines+markers",
-                            line=dict(color="#2F80ED", width=3),
-                            marker=dict(size=6, color="#2F80ED")
+                    with a_right:
+                        fig_ash_p = go.Figure()
+                        fig_ash_p.add_trace(
+                            go.Scatter(
+                                x=p_ash_ready['Date'], y=p_ash_ready[ash_l_col],
+                                name="Left Peak Force", mode="lines+markers",
+                                line=dict(color="#2F80ED", width=3),
+                                marker=dict(size=6, color="#2F80ED")
+                            )
                         )
-                    )
-                    fig_ash_p.add_trace(
-                        go.Scatter(
-                            x=p_ash_ready['Date'], y=p_ash_ready[ash_r_col],
-                            name="Right Peak Force", mode="lines+markers",
-                            line=dict(color="#FF8200", width=3, dash="dash"),
-                            marker=dict(size=6, color="#FF8200")
+                        fig_ash_p.add_trace(
+                            go.Scatter(
+                                x=p_ash_ready['Date'], y=p_ash_ready[ash_r_col],
+                                name="Right Peak Force", mode="lines+markers",
+                                line=dict(color="#FF8200", width=3, dash="dash"),
+                                marker=dict(size=6, color="#FF8200")
+                            )
                         )
-                    )
-                    fig_ash_p.update_layout(
-                        template="plotly_white", height=230,
-                        margin=dict(l=10, r=10, t=25, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                        xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
-                        yaxis=dict(showgrid=True, gridcolor="#F0F2F6")
-                    )
-                    st.plotly_chart(fig_ash_p, use_container_width=True, config={'displayModeBar': False})
+                        fig_ash_p.update_layout(
+                            template="plotly_white", height=230,
+                            margin=dict(l=10, r=10, t=25, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
+                            yaxis=dict(showgrid=True, gridcolor="#F0F2F6")
+                        )
+                        st.plotly_chart(fig_ash_p, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No ASH Shoulder records available for this selection.")
             else:
                 st.info("No ASH Shoulder records available for this season.")
 
