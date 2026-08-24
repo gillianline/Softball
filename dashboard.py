@@ -610,7 +610,7 @@ if check_password():
                 else:
                     st.info("No External Rotation records available for this selection.")
             else:
-                st.info("No External Rotation records found. (Add ER_URL to secrets when available).")
+                st.info("No External Rotation records found.")
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW)
