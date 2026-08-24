@@ -633,7 +633,7 @@ if check_password():
                 else:
                     st.info("No External Rotation records available for this selection.")
             else:
-                st.info("No External Rotation records found. (Add ER_URL to secrets when available).")
+                st.info("No External Rotation records found.")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
@@ -725,7 +725,7 @@ if check_password():
                 else:
                     st.info("No Grip Squeeze records available for this selection.")
             else:
-                st.info("No Grip Squeeze records found. (Add GRIP_URL to secrets when available).")
+                st.info("No Grip Squeeze records found.")
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW)
