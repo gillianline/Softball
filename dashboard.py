@@ -283,7 +283,7 @@ if check_password():
                 p_cmj_ready = p_cmj_ready.dropna(subset=[cmj_h_col, cmj_rsi_col])
                 
                 if not p_cmj_ready.empty:
-                    # Group by Date to handle multiple daily trials cleanly
+                    # Group by Date to average multiple reps on the same day
                     cmj_plot_df = p_cmj_ready.groupby('Date', as_index=False)[[cmj_h_col, cmj_rsi_col]].mean()
 
                     lat_cmj = cmj_plot_df.iloc[-1]
@@ -325,50 +325,68 @@ if check_password():
                         """, unsafe_allow_html=True)
 
                     with c_right:
-                        fig_cmj = make_subplots(specs=[[{"secondary_y": True}]])
-                        
-                        # Jump Height (Orange - Larger marker with border)
+                        fig_cmj = go.Figure()
+
+                        # 1. JUMP HEIGHT TRACE (Left Axis: yaxis)
                         fig_cmj.add_trace(
                             go.Scatter(
-                                x=cmj_plot_df['Date'], 
+                                x=cmj_plot_df['Date'],
                                 y=cmj_plot_df[cmj_h_col],
-                                name="Jump Height", 
+                                name="Jump Height",
                                 mode="lines+markers",
+                                yaxis="y1",
                                 line=dict(color="#FF8200", width=3.5),
-                                marker=dict(size=10, color="#FF8200", line=dict(width=2, color="#FFFFFF"))
-                            ),
-                            secondary_y=False
+                                marker=dict(size=9, color="#FF8200", symbol="circle")
+                            )
                         )
-                        
-                        # RSI Modified (Blue - Dot Dash)
+
+                        # 2. RSI MODIFIED TRACE (Right Axis: yaxis2)
                         fig_cmj.add_trace(
                             go.Scatter(
-                                x=cmj_plot_df['Date'], 
+                                x=cmj_plot_df['Date'],
                                 y=cmj_plot_df[cmj_rsi_col],
-                                name="RSI Modified", 
+                                name="RSI Modified",
                                 mode="lines+markers",
+                                yaxis="y2",
                                 line=dict(color="#2F80ED", width=2.5, dash="dot"),
-                                marker=dict(size=7, color="#2F80ED")
-                            ),
-                            secondary_y=True
+                                marker=dict(size=8, color="#2F80ED", symbol="circle")
+                            )
                         )
-                        
-                        # Dynamic padded axis ranges for 1 data point or flat trends
-                        h_min, h_max = cmj_plot_df[cmj_h_col].min(), cmj_plot_df[cmj_h_col].max()
-                        r_min, r_max = cmj_plot_df[cmj_rsi_col].min(), cmj_plot_df[cmj_rsi_col].max()
-                        
+
+                        # Explicit dual axis ranges to prevent overlay collapsing
+                        h_val = float(latest_h)
+                        rsi_val = float(latest_rsi)
+
+                        h_min = cmj_plot_df[cmj_h_col].min()
+                        h_max = cmj_plot_df[cmj_h_col].max()
+                        r_min = cmj_plot_df[cmj_rsi_col].min()
+                        r_max = cmj_plot_df[cmj_rsi_col].max()
+
                         y1_range = [h_min - 2, h_max + 2] if h_min == h_max else [h_min * 0.95, h_max * 1.05]
                         y2_range = [r_min - 0.05, r_max + 0.05] if r_min == r_max else [r_min * 0.9, r_max * 1.1]
 
                         fig_cmj.update_layout(
-                            template="plotly_white", 
-                            height=240,
+                            template="plotly_white",
+                            height=230,
                             margin=dict(l=10, r=10, t=25, b=10),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y")
+                            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0),
+                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
+                            yaxis=dict(
+                                title=None,
+                                showgrid=True,
+                                gridcolor="#F0F2F6",
+                                range=y1_range,
+                                side="left"
+                            ),
+                            yaxis2=dict(
+                                title=None,
+                                showgrid=False,
+                                range=y2_range,
+                                overlaying="y",
+                                side="right"
+                            )
                         )
-                        fig_cmj.update_yaxes(range=y1_range, showgrid=True, gridcolor="#F0F2F6", secondary_y=False)
-                        fig_cmj.update_yaxes(range=y2_range, showgrid=False, secondary_y=True)
+
                         st.plotly_chart(fig_cmj, use_container_width=True, config={'displayModeBar': False})
                 else:
                     st.info("No Countermovement Jump records available for this selection.")
