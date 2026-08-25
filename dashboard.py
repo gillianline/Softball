@@ -323,7 +323,7 @@ if check_password():
             return f'<table class="coach-table"><thead><tr>{headers}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
 
         # --- 6. NAVIGATION TABS ---
-        tab_intake, tab_profile, tab_catapult = st.tabs(["INTAKE ASSESSMENT", "TESTING PROFILE", "CATAPULT PROFILE"])
+        tab_intake, tab_profile, tab_catapult = st.tabs(["TESTING", "INDIVIDUAL PROFILE", "CATAPULT PROFILE"])
 
         # =========================================================================
         # TAB 1: INTAKE ASSESSMENT (ANATOMY HUD + ASSESSMENT CARDS + DROPDOWN LOGS)
@@ -518,7 +518,7 @@ if check_password():
 
             # --- BOTTOM: RAW LOGS IN COLLAPSIBLE DROPDOWNS ---
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f'<h3 style="font-weight:800; font-size:22px; color:#1D1D1F; margin-bottom:14px;">Intake Assessment Raw Logs for {selected} ({season_option})</h3>', unsafe_allow_html=True)
+            st.markdown(f'<h3 style="font-weight:800; font-size:22px; color:#1D1D1F; margin-bottom:14px;">Assessment Raw Logs for {selected} ({season_option})</h3>', unsafe_allow_html=True)
 
             with st.expander("ASH Shoulder Test Log", expanded=False):
                 if not raw_ash.empty and ash_l_col in raw_ash.columns and ash_r_col in raw_ash.columns:
