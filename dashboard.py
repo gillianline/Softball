@@ -192,10 +192,9 @@ if check_password():
 
     if not ash_df.empty or not cmj_df.empty or not er_df.empty or not grip_df.empty:
         # --- 5. SEASON SETUP ---
-        TODAY = pd.to_datetime(date.today())
         SPRING_START = pd.to_datetime("2026-01-01")
         SPRING_END = pd.to_datetime("2026-05-31 23:59:59")
-        FALL_START = TODAY
+        FALL_START = pd.to_datetime("2026-08-24")  
 
         all_athletes = sorted(list(set(
             list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
