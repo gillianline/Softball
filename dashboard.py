@@ -639,92 +639,177 @@ if check_password():
             # -------------------------------------------------------------
             # SECTION 4: GRIP SQUEEZE TEST
             # -------------------------------------------------------------
-            st.markdown('<div class="sub-header-title">GRIP SQUEEZE TEST</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="sub-header-title">GRIP SQUEEZE TEST</div>',
+                unsafe_allow_html=True,
+            )
 
-            p_grip_ready = p_grip.dropna(subset=['Date']).sort_values('Date').copy() if not p_grip.empty else pd.DataFrame()
+            p_grip_ready = (
+                p_grip.dropna(subset=["Date"]).sort_values("Date").copy()
+                if not p_grip.empty
+                else pd.DataFrame()
+            )
 
-            if not p_grip_ready.empty and grip_l_col and grip_r_col and grip_l_col in p_grip_ready.columns and grip_r_col in p_grip_ready.columns:
-                p_grip_ready[grip_l_col] = pd.to_numeric(p_grip_ready[grip_l_col], errors='coerce').fillna(0)
-                p_grip_ready[grip_r_col] = pd.to_numeric(p_grip_ready[grip_r_col], errors='coerce').fillna(0)
-                p_grip_ready = p_grip_ready[(p_grip_ready[grip_l_col] > 0) | (p_grip_ready[grip_r_col] > 0)]
+            if (
+                not p_grip_ready.empty
+                and grip_l_col
+                and grip_r_col
+                and grip_l_col in p_grip_ready.columns
+                and grip_r_col in p_grip_ready.columns
+            ):
+              p_grip_ready[grip_l_col] = pd.to_numeric(
+                  p_grip_ready[grip_l_col], errors="coerce"
+              ).fillna(0)
+              p_grip_ready[grip_r_col] = pd.to_numeric(
+                  p_grip_ready[grip_r_col], errors="coerce"
+              ).fillna(0)
+              p_grip_ready = p_grip_ready[
+                  (p_grip_ready[grip_l_col] > 0) | (p_grip_ready[grip_r_col] > 0)
+              ]
 
-                if not p_grip_ready.empty:
-                    lat_grip = p_grip_ready.iloc[-1]
-                    latest_grip_l = lat_grip[grip_l_col]
-                    latest_grip_r = lat_grip[grip_r_col]
+              if not p_grip_ready.empty:
+                lat_grip = p_grip_ready.iloc[-1]
+                latest_grip_l = lat_grip[grip_l_col]
+                latest_grip_r = lat_grip[grip_r_col]
 
-                    base_grip_l = p_grip_ready[grip_l_col].replace(0, np.nan).mean()
-                    base_grip_r = p_grip_ready[grip_r_col].replace(0, np.nan).mean()
-                    base_grip_l = base_grip_l if pd.notnull(base_grip_l) else 0
-                    base_grip_r = base_grip_r if pd.notnull(base_grip_r) else 0
+                base_grip_l = p_grip_ready[grip_l_col].replace(0, np.nan).mean()
+                base_grip_r = p_grip_ready[grip_r_col].replace(0, np.nan).mean()
+                base_grip_l = base_grip_l if pd.notnull(base_grip_l) else 0
+                base_grip_r = base_grip_r if pd.notnull(base_grip_r) else 0
 
-                    chg_grip_l = ((latest_grip_l - base_grip_l) / base_grip_l * 100) if base_grip_l > 0 else 0
-                    chg_grip_r = ((latest_grip_r - base_grip_r) / base_grip_r * 100) if base_grip_r > 0 else 0
+                chg_grip_l = (
+                    ((latest_grip_l - base_grip_l) / base_grip_l * 100)
+                    if base_grip_l > 0
+                    else 0
+                )
+                chg_grip_r = (
+                    ((latest_grip_r - base_grip_r) / base_grip_r * 100)
+                    if base_grip_r > 0
+                    else 0
+                )
 
-                    if grip_asym_col and grip_asym_col in lat_grip and pd.notnull(lat_grip[grip_asym_col]):
-                        grip_asym_val = float(lat_grip[grip_asym_col])
-                    else:
-                        grip_asym_val = (abs(latest_grip_l - latest_grip_r) / max(latest_grip_l, latest_grip_r) * 100) if max(latest_grip_l, latest_grip_r) > 0 else 0.0
+                if (
+                    grip_asym_col
+                    and grip_asym_col in lat_grip
+                    and pd.notnull(lat_grip[grip_asym_col])
+                ):
+                  grip_asym_val = float(lat_grip[grip_asym_col])
+                else:
+                  grip_asym_val = (
+                      (
+                          abs(latest_grip_l - latest_grip_r)
+                          / max(latest_grip_l, latest_grip_r)
+                          * 100
+                      )
+                      if max(latest_grip_l, latest_grip_r) > 0
+                      else 0.0
+                  )
 
-                    l_grip_cls = "tile-red" if grip_asym_val > 10 else "tile-green"
-                    r_grip_cls = "tile-red" if grip_asym_val > 10 else "tile-green"
+                # Normative Cutoffs: Avg ~432.69 | SD ~66.78
+                UPPER_THRESH = 499.47
+                LOWER_THRESH = 365.91
 
-                    g_left, g_right = st.columns([1.1, 2])
-                    with g_left:
-                        gb1, gb2 = st.columns(2)
-                        with gb1:
-                            st.markdown(f"""
+                def get_grip_color(val):
+                  if val >= UPPER_THRESH:
+                    return "tile-green"
+                  elif val >= LOWER_THRESH:
+                    return "tile-orange"
+                  return "tile-red"
+
+                l_grip_cls = get_grip_color(latest_grip_l)
+                r_grip_cls = get_grip_color(latest_grip_r)
+
+                g_left, g_right = st.columns([1.1, 2])
+                with g_left:
+                  gb1, gb2 = st.columns(2)
+                  with gb1:
+                    st.markdown(
+                        f"""
                                 <div class="kpi-tile {l_grip_cls}">
                                     <h1>{int(latest_grip_l)} N</h1>
                                     <p>LEFT FORCE</p>
                                 </div>
-                            """, unsafe_allow_html=True)
-                        with gb2:
-                            st.markdown(f"""
+                            """,
+                        unsafe_allow_html=True,
+                    )
+                  with gb2:
+                    st.markdown(
+                        f"""
                                 <div class="kpi-tile {r_grip_cls}">
                                     <h1>{int(latest_grip_r)} N</h1>
                                     <p>RIGHT FORCE</p>
                                 </div>
-                            """, unsafe_allow_html=True)
+                            """,
+                        unsafe_allow_html=True,
+                    )
 
-                        st.markdown(f"""
+                  st.markdown(
+                      f"""
                             <div class="detail-box">
                                 <div><b>Force Asymmetry:</b> {grip_asym_val:+.1f}%</div>
                                 <div><b>% Change from Base:</b> L: {chg_grip_l:+.1f}% | R: {chg_grip_r:+.1f}%</div>
                                 <div><b>Base Force:</b> L: {int(base_grip_l)} N | R: {int(base_grip_r)} N</div>
                             </div>
-                        """, unsafe_allow_html=True)
+                        """,
+                      unsafe_allow_html=True,
+                  )
 
-                    with g_right:
-                        fig_grip_p = go.Figure()
-                        fig_grip_p.add_trace(
-                            go.Scatter(
-                                x=p_grip_ready['Date'], y=p_grip_ready[grip_l_col],
-                                name="Left Max Force (N)", mode="lines+markers",
-                                line=dict(color="#2F80ED", width=3),
-                                marker=dict(size=6, color="#2F80ED")
-                            )
-                        )
-                        fig_grip_p.add_trace(
-                            go.Scatter(
-                                x=p_grip_ready['Date'], y=p_grip_ready[grip_r_col],
-                                name="Right Max Force (N)", mode="lines+markers",
-                                line=dict(color="#FF8200", width=3, dash="dash"),
-                                marker=dict(size=6, color="#FF8200")
-                            )
-                        )
-                        fig_grip_p.update_layout(
-                            template="plotly_white", height=230,
-                            margin=dict(l=10, r=10, t=25, b=10),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
-                            yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Force (N)")
-                        )
-                        st.plotly_chart(fig_grip_p, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("No Grip Squeeze records available for this selection.")
+                with g_right:
+                  fig_grip_p = go.Figure()
+                  fig_grip_p.add_trace(
+                      go.Scatter(
+                          x=p_grip_ready["Date"],
+                          y=p_grip_ready[grip_l_col],
+                          name="Left Max Force (N)",
+                          mode="lines+markers",
+                          line=dict(color="#2F80ED", width=3),
+                          marker=dict(size=6, color="#2F80ED"),
+                      )
+                  )
+                  fig_grip_p.add_trace(
+                      go.Scatter(
+                          x=p_grip_ready["Date"],
+                          y=p_grip_ready[grip_r_col],
+                          name="Right Max Force (N)",
+                          mode="lines+markers",
+                          line=dict(color="#FF8200", width=3, dash="dash"),
+                          marker=dict(size=6, color="#FF8200"),
+                      )
+                  )
+                  fig_grip_p.update_layout(
+                      template="plotly_white",
+                      height=230,
+                      margin=dict(l=10, r=10, t=25, b=10),
+                      legend=dict(
+                          orientation="h",
+                          yanchor="bottom",
+                          y=1.02,
+                          xanchor="left",
+                          x=0,
+                      ),
+                      xaxis=dict(
+                          showgrid=True,
+                          gridcolor="#F0F2F6",
+                          tickformat="%b %d<br>%Y",
+                      ),
+                      yaxis=dict(
+                          showgrid=True,
+                          gridcolor="#F0F2F6",
+                          title="Force (N)",
+                          range=[184 * 0.9, 612 * 1.05],
+                      ),
+                  )
+                  st.plotly_chart(
+                      fig_grip_p,
+                      use_container_width=True,
+                      config={"displayModeBar": False},
+                  )
+              else:
+                st.info(
+                    "No Grip Squeeze records available for this selection."
+                )
             else:
-                st.info("No Grip Squeeze records found.")
+              st.info("No Grip Squeeze records found.")
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW)
