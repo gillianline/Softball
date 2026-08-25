@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import re
@@ -51,50 +52,50 @@ if check_password():
         
         /* Section Headers */
         .section-header {
-            color: #2F80ED; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
-            text-transform: uppercase; margin-top: 10px; margin-bottom: 6px;
-        }
-        .section-divider { height: 3px; background-color: #FF8200; margin-bottom: 20px; border-radius: 2px; }
-        
-        /* Anatomy Map Container */
-        .anatomy-container {
-            background: #FAFAFA; border: 1px solid #ECECEC; border-radius: 12px;
-            padding: 16px; text-align: center; height: 100%; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
+            color: #1D1D1F; font-weight: 800; font-size: 13px; letter-spacing: 1px;
+            text-transform: uppercase; border-bottom: 2px solid #FF8200;
+            padding-bottom: 6px; margin-bottom: 12px;
         }
 
         /* Assessment Cards */
         .assessment-card {
             background: #FFFFFF; border: 1px solid #EAEAEA; border-radius: 10px;
-            padding: 14px 18px; margin-bottom: 12px; position: relative;
+            padding: 12px 16px; margin-bottom: 10px; position: relative;
             box-shadow: 0 1px 3px rgba(0,0,0,0.03);
         }
         .border-orange { border-left: 6px solid #FF8200; }
-        .border-blue { border-left: 6px solid #2F80ED; }
+        .border-blue { border-left: 6px solid #4895DB; }
 
-        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .card-title-wrap { display: flex; align-items: center; gap: 10px; }
         .badge-num {
-            width: 24px; height: 24px; border-radius: 6px; color: #FFFFFF;
-            font-weight: 800; font-size: 13px; display: inline-flex;
+            width: 22px; height: 22px; border-radius: 6px; color: #FFFFFF;
+            font-weight: 800; font-size: 12px; display: inline-flex;
             align-items: center; justify-content: center;
         }
         .badge-orange { background-color: #FF8200; }
-        .badge-blue { background-color: #2F80ED; }
+        .badge-blue { background-color: #4895DB; }
 
-        .card-title { font-weight: 800; font-size: 14px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
-        .card-date { font-size: 12px; color: #6C757D; font-weight: 600; }
-        .card-metrics { font-size: 13px; color: #333333; line-height: 1.6; }
+        .card-title { font-weight: 800; font-size: 13px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+        .card-date { font-size: 11px; color: #6C757D; font-weight: 600; }
+        .card-metrics { font-size: 12.5px; color: #333333; line-height: 1.5; }
         .card-metrics b { color: #1D1D1F; }
 
         .pct-up { color: #28a745; font-weight: 700; }
         .pct-down { color: #dc3545; font-weight: 700; }
         .pct-flat { color: #6c757d; font-weight: 700; }
 
-        /* Tables */
-        .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 10px; margin-bottom: 20px; }
-        .coach-table th { background-color: #F8F9FA; padding: 10px; border-bottom: 2px solid #DEE2E6; color: #495057; font-weight: 700; font-size: 12px; }
-        .coach-table td { padding: 10px; border-bottom: 1px solid #EEEEEE; font-size: 13px; }
+        /* Expander & Tables */
+        .streamlit-expanderHeader {
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            color: #1D1D1F !important;
+            background-color: #F8F9FA !important;
+            border-radius: 8px !important;
+        }
+        .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 8px; margin-bottom: 12px; }
+        .coach-table th { background-color: #F0F4F8; padding: 10px; border-bottom: 2px solid #D0D7DE; color: #334155; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .coach-table td { padding: 9px 10px; border-bottom: 1px solid #EEEEEE; font-size: 12.5px; color: #1D1D1F; }
         
         #MainMenu, footer, header { visibility: hidden; }
         </style>
@@ -220,7 +221,7 @@ if check_password():
                 return df[df['Date'] >= FALL_START]
             return df
 
-        # Athlete raw and season filtered slices
+        # Slices
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
         raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
@@ -235,7 +236,7 @@ if check_password():
         p_swing = filter_season(raw_swing).copy()
         p_throw = filter_season(raw_throw).copy()
 
-        # Dynamic Column Identification
+        # Dynamic Columns
         ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Force (L)', 'Peak Force (L)'])
         ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Force (R)', 'Peak Force (R)'])
         ash_asym_col = find_col(ash_df, ['Peak Vertical Force [N] (Asym)(%)', 'Asymmetry'])
@@ -265,7 +266,6 @@ if check_password():
             </div>
         """, unsafe_allow_html=True)
 
-        # Helper for % delta formatting
         def fmt_pct(chg):
             if np.isnan(chg):
                 return ""
@@ -275,88 +275,89 @@ if check_password():
                 return f'<span class="pct-down">(↓{abs(chg):.1f}%)</span>'
             return '<span class="pct-flat">(0.0%)</span>'
 
+        # Helper to render clean coach tables inside expanders
+        def render_table_html(df):
+            if df.empty:
+                return "<p style='color:#6C757D; font-size:13px; margin:8px 0;'>No records found.</p>"
+            headers = "".join([f"<th>{col}</th>" for col in df.columns])
+            rows = []
+            for _, r in df.iterrows():
+                tds = "".join([f"<td>{r[col]}</td>" for col in df.columns])
+                rows.append(f"<tr>{tds}</tr>")
+            return f'<table class="coach-table"><thead><tr>{headers}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult = st.tabs(["INTAKE TESTS & ANATOMY", "CATAPULT PROFILE"])
+        tab_testing, tab_catapult = st.tabs(["INTAKE / TESTING", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: INTAKE TESTS & ANATOMY LOCATION MAP
+        # TAB 1: INTAKE / TESTING (ANATOMY MAP + ASSESSMENT CARDS + EXPANDER LOGS)
         # =========================================================================
         with tab_testing:
-            col_map, col_assessment = st.columns([1.1, 1.9], gap="large")
+            hud_col1, hud_col2 = st.columns([1.15, 1.85], gap="large")
 
             # --- LEFT: ANATOMY LOCATION MAP ---
-            with col_map:
-                st.markdown('<div class="section-header">ANATOMY LOCATION MAP</div>', unsafe_allow_html=True)
-                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-                svg_anatomy = """
-                <div class="anatomy-container">
-                    <svg viewBox="0 0 340 500" width="100%" height="450" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Head -->
-                        <ellipse cx="170" cy="45" rx="20" ry="26" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2.5"/>
-                        <!-- Neck -->
-                        <rect x="163" y="70" width="14" height="15" fill="#CBD5E1"/>
-                        <!-- Center Midline Axis -->
-                        <line x1="170" y1="20" x2="170" y2="470" stroke="#FF8200" stroke-width="2.5" stroke-linecap="round"/>
-                        
-                        <!-- Torso & Body Outline -->
-                        <path d="M 125,85 L 215,85 L 205,190 L 170,205 L 135,190 Z" fill="#F1F5F9" stroke="#94A3B8" stroke-width="2.5"/>
-                        <path d="M 135,190 L 205,190 L 210,240 L 170,250 L 130,240 Z" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2.5"/>
-
-                        <!-- Left Arm (Viewer's Left) -->
-                        <path d="M 125,85 L 85,150 L 70,240 L 82,242 L 98,160 L 135,100 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
-                        <!-- Left Hand -->
-                        <ellipse cx="68" cy="255" rx="8" ry="12" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
-
-                        <!-- Right Arm (Viewer's Right) -->
-                        <path d="M 215,85 L 255,150 L 270,240 L 258,242 L 242,160 L 205,100 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
-                        <!-- Right Hand -->
-                        <ellipse cx="272" cy="255" rx="8" ry="12" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
-
-                        <!-- Left Leg -->
-                        <path d="M 135,245 L 125,350 L 130,450 L 155,450 L 165,350 L 168,250 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
-                        <!-- Left Foot -->
-                        <ellipse cx="138" cy="460" rx="14" ry="7" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
-
-                        <!-- Right Leg -->
-                        <path d="M 205,245 L 215,350 L 210,450 L 185,450 L 175,350 L 172,250 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
-                        <!-- Right Foot -->
-                        <ellipse cx="202" cy="460" rx="14" ry="7" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
-
-                        <!-- Test Marker 1: ASH Shoulder (Orange) -->
-                        <circle cx="190" cy="115" r="7" fill="#FF8200"/>
-                        <line x1="190" y1="115" x2="280" y2="115" stroke="#FF8200" stroke-width="2" stroke-dasharray="4,4"/>
-                        <rect x="275" y="103" width="24" height="24" rx="6" fill="#FF8200"/>
-                        <text x="287" y="120" fill="white" font-size="14" font-weight="bold" text-anchor="middle">1</text>
-
-                        <!-- Test Marker 2: ER ROM (Blue) -->
-                        <circle cx="105" cy="120" r="7" fill="#2F80ED"/>
-                        <line x1="105" y1="120" x2="35" y2="120" stroke="#2F80ED" stroke-width="2" stroke-dasharray="4,4"/>
-                        <rect x="23" y="108" width="24" height="24" rx="6" fill="#2F80ED"/>
-                        <text x="35" y="125" fill="white" font-size="14" font-weight="bold" text-anchor="middle">2</text>
-
-                        <!-- Test Marker 3: Grip Squeeze (Blue) -->
-                        <circle cx="68" cy="255" r="7" fill="#2F80ED"/>
-                        <line x1="68" y1="255" x2="35" y2="255" stroke="#2F80ED" stroke-width="2" stroke-dasharray="4,4"/>
-                        <rect x="23" y="243" width="24" height="24" rx="6" fill="#2F80ED"/>
-                        <text x="35" y="260" fill="white" font-size="14" font-weight="bold" text-anchor="middle">3</text>
-
-                        <!-- Test Marker 4: Countermovement Jump (CMJ) (Orange) -->
-                        <circle cx="170" cy="350" r="7" fill="#FF8200"/>
-                        <line x1="170" y1="350" x2="280" y2="350" stroke="#FF8200" stroke-width="2" stroke-dasharray="4,4"/>
-                        <rect x="275" y="338" width="24" height="24" rx="6" fill="#FF8200"/>
-                        <text x="287" y="355" fill="white" font-size="14" font-weight="bold" text-anchor="middle">4</text>
-                    </svg>
+            with hud_col1:
+                hud_svg_html = """
+                <div style="background:#FFFFFF; border-radius:16px; padding:16px; border:1px solid #E5E5E7; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
+                    <div style="color:#1D1D1F; font-weight:800; font-size:13px; letter-spacing:1px; text-transform:uppercase; border-bottom:2px solid #FF8200; padding-bottom:6px; margin-bottom:12px;">ANATOMY LOCATION MAP</div>
+                    <div style="position:relative; width:100%; height:460px; background:#FAFDFD; border-radius:12px; border:1px solid #D5E5E8; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                        <svg viewBox="0 0 160 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+                            <defs>
+                                <linearGradient id="anatomicalBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#C5CACC" />
+                                    <stop offset="25%" stop-color="#E8ECEE" />
+                                    <stop offset="50%" stop-color="#F2F5F7" />
+                                    <stop offset="75%" stop-color="#D0D5D8" />
+                                    <stop offset="100%" stop-color="#9AA0A6" />
+                                </linearGradient>
+                            </defs>
+                            <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
+                            <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
+                                <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
+                                <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
+                                <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
+                                <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
+                                <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
+                                <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
+                                <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
+                                <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                                <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                                <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
+                                <line x1="51" y1="116" x2="85" y2="116" stroke="#D32F2F" stroke-width="1.1" />
+                                <line x1="55" y1="168" x2="81" y2="168" stroke="#D32F2F" stroke-width="1.1" />
+                            </g>
+                            <line x1="82" y1="58" x2="112" y2="58" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="82" cy="58" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="112" y="50" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="120" y="62" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+                            <line x1="58" y1="116" x2="24" y2="116" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="58" cy="116" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="8" y="108" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="16" y="120" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+                            <line x1="74" y1="172" x2="112" y2="172" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="74" cy="172" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="112" y="164" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="120" y="176" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+                            <line x1="60" y1="140" x2="24" y2="140" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="60" cy="140" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="8" y="132" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="16" y="144" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+                            <line x1="68" y1="84" x2="112" y2="84" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="68" cy="84" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="112" y="76" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="120" y="88" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+                        </svg>
+                    </div>
                 </div>
                 """
-                st.markdown(svg_anatomy, unsafe_allow_html=True)
+                components.html(hud_svg_html, height=530)
 
             # --- RIGHT: LOCATION ASSESSMENT CARDS ---
-            with col_assessment:
+            with hud_col2:
                 st.markdown(f'<div class="section-header">LOCATION ASSESSMENT ({season_option.upper()})</div>', unsafe_allow_html=True)
-                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-                # ---------------- CARD 1: ASH SHOULDER ----------------
+                # 1. ASH Shoulder (Marker 1)
                 if not p_ash.empty and ash_l_col and ash_r_col and ash_l_col in p_ash.columns and ash_r_col in p_ash.columns:
                     p_ash_val = p_ash.dropna(subset=[ash_l_col, ash_r_col]).copy()
                     if not p_ash_val.empty:
@@ -365,7 +366,6 @@ if check_password():
                         ash_rec = p_ash_val.iloc[-1]
                         ash_rec_l, ash_rec_r = ash_rec[ash_l_col], ash_rec[ash_r_col]
                         ash_date = ash_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(ash_rec['Date']) else "N/A"
-
                         chg_l = ((ash_rec_l - ash_max_l) / ash_max_l * 100) if ash_max_l > 0 else 0
                         chg_r = ((ash_rec_r - ash_max_r) / ash_max_r * 100) if ash_max_r > 0 else 0
 
@@ -374,7 +374,7 @@ if check_password():
                                 <div class="card-top">
                                     <div class="card-title-wrap">
                                         <div class="badge-num badge-orange">1</div>
-                                        <span class="card-title">ASH Shoulder: ISO I</span>
+                                        <span class="card-title">ASH Shoulder (ISO I)</span>
                                     </div>
                                     <span class="card-date">Latest: {ash_date}</span>
                                 </div>
@@ -384,12 +384,10 @@ if check_password():
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
-                    else:
-                        st.info("Card 1: No ASH Shoulder data available for this season.")
                 else:
-                    st.info("Card 1: No ASH Shoulder data found.")
+                    st.info("No ASH Shoulder data available for this season.")
 
-                # ---------------- CARD 2: EXTERNAL ROTATION ----------------
+                # 2. External Rotation (Marker 2)
                 if not p_er.empty and er_l_col and er_r_col and er_l_col in p_er.columns and er_r_col in p_er.columns:
                     p_er_val = p_er.dropna(subset=[er_l_col, er_r_col]).copy()
                     if not p_er_val.empty:
@@ -398,7 +396,6 @@ if check_password():
                         er_rec = p_er_val.iloc[-1]
                         er_rec_l, er_rec_r = er_rec[er_l_col], er_rec[er_r_col]
                         er_date = er_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(er_rec['Date']) else "N/A"
-
                         chg_l = ((er_rec_l - er_max_l) / er_max_l * 100) if er_max_l > 0 else 0
                         chg_r = ((er_rec_r - er_max_r) / er_max_r * 100) if er_max_r > 0 else 0
 
@@ -417,45 +414,10 @@ if check_password():
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
-                    else:
-                        st.info("Card 2: No External Rotation data available for this season.")
                 else:
-                    st.info("Card 2: No External Rotation data found.")
+                    st.info("No External Rotation data available for this season.")
 
-                # ---------------- CARD 3: GRIP SQUEEZE ----------------
-                if not p_grip.empty and grip_l_col and grip_r_col and grip_l_col in p_grip.columns and grip_r_col in p_grip.columns:
-                    p_grip_val = p_grip.dropna(subset=[grip_l_col, grip_r_col]).copy()
-                    if not p_grip_val.empty:
-                        grip_max_l = p_grip_val[grip_l_col].max()
-                        grip_max_r = p_grip_val[grip_r_col].max()
-                        grip_rec = p_grip_val.iloc[-1]
-                        grip_rec_l, grip_rec_r = grip_rec[grip_l_col], grip_rec[grip_r_col]
-                        grip_date = grip_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(grip_rec['Date']) else "N/A"
-
-                        chg_l = ((grip_rec_l - grip_max_l) / grip_max_l * 100) if grip_max_l > 0 else 0
-                        chg_r = ((grip_rec_r - grip_max_r) / grip_max_r * 100) if grip_max_r > 0 else 0
-
-                        st.markdown(f"""
-                            <div class="assessment-card border-blue">
-                                <div class="card-top">
-                                    <div class="card-title-wrap">
-                                        <div class="badge-num badge-blue">3</div>
-                                        <span class="card-title">Grip Squeeze Test</span>
-                                    </div>
-                                    <span class="card-date">Latest: {grip_date}</span>
-                                </div>
-                                <div class="card-metrics">
-                                    <b>Max Force:</b> Max L {int(grip_max_l)}N | R {int(grip_max_r)}N &nbsp;→&nbsp; 
-                                    <b>Recent:</b> L {int(grip_rec_l)}N {fmt_pct(chg_l)} | R {int(grip_rec_r)}N {fmt_pct(chg_r)}
-                                </div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.info("Card 3: No Grip Squeeze data available for this season.")
-                else:
-                    st.info("Card 3: No Grip Squeeze data found.")
-
-                # ---------------- CARD 4: COUNTERMOVEMENT JUMP ----------------
+                # 3. Countermovement Jump (Marker 3)
                 if not p_cmj.empty and cmj_h_col and cmj_h_col in p_cmj.columns:
                     p_cmj_val = p_cmj.dropna(subset=[cmj_h_col]).copy()
                     if not p_cmj_val.empty:
@@ -465,17 +427,15 @@ if check_password():
                         cmj_rec_h = cmj_rec[cmj_h_col]
                         cmj_rec_rsi = cmj_rec[cmj_rsi_col] if cmj_rsi_col and cmj_rsi_col in p_cmj_val.columns else np.nan
                         cmj_date = cmj_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(cmj_rec['Date']) else "N/A"
-
                         chg_h = ((cmj_rec_h - cmj_max_h) / cmj_max_h * 100) if cmj_max_h > 0 else 0
                         chg_rsi = ((cmj_rec_rsi - cmj_max_rsi) / cmj_max_rsi * 100) if pd.notnull(cmj_max_rsi) and cmj_max_rsi > 0 else np.nan
-
                         rsi_str = f" | RSI-mod: Max {cmj_max_rsi:.2f} → Recent {cmj_rec_rsi:.2f} {fmt_pct(chg_rsi)}" if pd.notnull(cmj_rec_rsi) else ""
 
                         st.markdown(f"""
-                            <div class="assessment-card border-orange">
+                            <div class="assessment-card border-blue">
                                 <div class="card-top">
                                     <div class="card-title-wrap">
-                                        <div class="badge-num badge-orange">4</div>
+                                        <div class="badge-num badge-blue">3</div>
                                         <span class="card-title">Countermovement Jump (CMJ)</span>
                                     </div>
                                     <span class="card-date">Latest: {cmj_date}</span>
@@ -486,62 +446,113 @@ if check_password():
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
-                    else:
-                        st.info("Card 4: No CMJ data available for this season.")
                 else:
-                    st.info("Card 4: No CMJ data found.")
+                    st.info("No Countermovement Jump data available for this season.")
 
-            # --- BOTTOM: INTAKE ASSESSMENT RAW LOGS ---
+                # 4. Grip Squeeze (Marker 4)
+                if not p_grip.empty and grip_l_col and grip_r_col and grip_l_col in p_grip.columns and grip_r_col in p_grip.columns:
+                    p_grip_val = p_grip.dropna(subset=[grip_l_col, grip_r_col]).copy()
+                    if not p_grip_val.empty:
+                        grip_max_l = p_grip_val[grip_l_col].max()
+                        grip_max_r = p_grip_val[grip_r_col].max()
+                        grip_rec = p_grip_val.iloc[-1]
+                        grip_rec_l, grip_rec_r = grip_rec[grip_l_col], grip_rec[grip_r_col]
+                        grip_date = grip_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(grip_rec['Date']) else "N/A"
+                        chg_l = ((grip_rec_l - grip_max_l) / grip_max_l * 100) if grip_max_l > 0 else 0
+                        chg_r = ((grip_rec_r - grip_max_r) / grip_max_r * 100) if grip_max_r > 0 else 0
+
+                        st.markdown(f"""
+                            <div class="assessment-card border-orange">
+                                <div class="card-top">
+                                    <div class="card-title-wrap">
+                                        <div class="badge-num badge-orange">4</div>
+                                        <span class="card-title">Grip Squeeze Test</span>
+                                    </div>
+                                    <span class="card-date">Latest: {grip_date}</span>
+                                </div>
+                                <div class="card-metrics">
+                                    <b>Max Force:</b> Max L {int(grip_max_l)}N | R {int(grip_max_r)}N &nbsp;→&nbsp; 
+                                    <b>Recent:</b> L {int(grip_rec_l)}N {fmt_pct(chg_l)} | R {int(grip_rec_r)}N {fmt_pct(chg_r)}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("No Grip Squeeze data available for this season.")
+
+            # --- BOTTOM: INTAKE RAW LOGS (COLLAPSIBLE DROPDOWNS) ---
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f'<div class="section-header">Intake Assessment Raw Logs for {selected} ({season_option})</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(f'<h3 style="font-weight:800; font-size:22px; color:#1D1D1F; margin-bottom:14px;">Intake Assessment Raw Logs for {selected} ({season_option})</h3>', unsafe_allow_html=True)
 
-            # Combined Unified Table Log
-            hist_dfs = []
+            # 1. ASH Test Log Expander
+            with st.expander("ASH Shoulder Test Log", expanded=False):
+                if not raw_ash.empty and ash_l_col in raw_ash.columns and ash_r_col in raw_ash.columns:
+                    t_ash = raw_ash.dropna(subset=['Date', ash_l_col, ash_r_col]).sort_values('Date', ascending=False).copy()
+                    t_ash['DATE'] = t_ash['Date'].dt.strftime('%Y-%m-%d')
+                    t_ash['TEST'] = 'ISO I'
+                    t_ash['L MAX FORCE (N)'] = t_ash[ash_l_col].apply(lambda x: f"{x:.2f}")
+                    t_ash['R MAX FORCE (N)'] = t_ash[ash_r_col].apply(lambda x: f"{x:.2f}")
+                    
+                    if ash_asym_col and ash_asym_col in t_ash.columns:
+                        t_ash['MAX IMBALANCE (%)'] = t_ash[ash_asym_col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
+                    else:
+                        t_ash['MAX IMBALANCE (%)'] = ((t_ash[ash_l_col] - t_ash[ash_r_col]).abs() / t_ash[[ash_l_col, ash_r_col]].max(axis=1) * 100).apply(lambda x: f"{x:.2f}")
+                    
+                    disp_ash = t_ash[['DATE', 'TEST', 'L MAX FORCE (N)', 'R MAX FORCE (N)', 'MAX IMBALANCE (%)']]
+                    st.markdown(render_table_html(disp_ash), unsafe_allow_html=True)
+                else:
+                    st.info("No ASH Shoulder records available.")
 
-            if not raw_cmj.empty and cmj_h_col in raw_cmj.columns:
-                cols = ['Date', cmj_h_col] + ([cmj_rsi_col] if cmj_rsi_col and cmj_rsi_col in raw_cmj.columns else [])
-                c_slice = raw_cmj[cols].copy().dropna(subset=['Date'])
-                rename_dict = {cmj_h_col: 'CMJ Height (cm)'}
-                if cmj_rsi_col and cmj_rsi_col in raw_cmj.columns:
-                    rename_dict[cmj_rsi_col] = 'CMJ RSI-mod'
-                c_slice = c_slice.rename(columns=rename_dict)
-                hist_dfs.append(c_slice)
+            # 2. External Rotation (ER) Test Log Expander
+            with st.expander("External Rotation (ER) Test Log", expanded=False):
+                if not raw_er.empty and er_l_col in raw_er.columns and er_r_col in raw_er.columns:
+                    t_er = raw_er.dropna(subset=['Date', er_l_col, er_r_col]).sort_values('Date', ascending=False).copy()
+                    t_er['DATE'] = t_er['Date'].dt.strftime('%Y-%m-%d')
+                    t_er['TEST'] = 'Max ER ROM'
+                    t_er['L MAX ROM (°)'] = t_er[er_l_col].apply(lambda x: f"{int(x)}°" if pd.notnull(x) else "-")
+                    t_er['R MAX ROM (°)'] = t_er[er_r_col].apply(lambda x: f"{int(x)}°" if pd.notnull(x) else "-")
 
-            if not raw_ash.empty and ash_l_col in raw_ash.columns and ash_r_col in raw_ash.columns:
-                a_slice = raw_ash[['Date', ash_l_col, ash_r_col]].copy().dropna(subset=['Date'])
-                a_slice = a_slice.rename(columns={ash_l_col: 'ASH Left (N)', ash_r_col: 'ASH Right (N)'})
-                hist_dfs.append(a_slice)
+                    if er_asym_col and er_asym_col in t_er.columns:
+                        t_er['MAX IMBALANCE (%)'] = t_er[er_asym_col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
+                    else:
+                        t_er['MAX IMBALANCE (%)'] = ((t_er[er_l_col] - t_er[er_r_col]).abs() / t_er[[er_l_col, er_r_col]].max(axis=1) * 100).apply(lambda x: f"{x:.2f}")
 
-            if not raw_er.empty and er_l_col in raw_er.columns and er_r_col in raw_er.columns:
-                e_slice = raw_er[['Date', er_l_col, er_r_col]].copy().dropna(subset=['Date'])
-                e_slice = e_slice.rename(columns={er_l_col: 'ER Left (°)', er_r_col: 'ER Right (°)'})
-                hist_dfs.append(e_slice)
+                    disp_er = t_er[['DATE', 'TEST', 'L MAX ROM (°)', 'R MAX ROM (°)', 'MAX IMBALANCE (%)']]
+                    st.markdown(render_table_html(disp_er), unsafe_allow_html=True)
+                else:
+                    st.info("No External Rotation records available.")
 
-            if not raw_grip.empty and grip_l_col in raw_grip.columns and grip_r_col in raw_grip.columns:
-                g_slice = raw_grip[['Date', grip_l_col, grip_r_col]].copy().dropna(subset=['Date'])
-                g_slice = g_slice.rename(columns={grip_l_col: 'Grip Left (N)', grip_r_col: 'Grip Right (N)'})
-                hist_dfs.append(g_slice)
+            # 3. Grip Squeeze Test Log Expander
+            with st.expander("Grip Squeeze Test Log", expanded=False):
+                if not raw_grip.empty and grip_l_col in raw_grip.columns and grip_r_col in raw_grip.columns:
+                    t_grip = raw_grip.dropna(subset=['Date', grip_l_col, grip_r_col]).sort_values('Date', ascending=False).copy()
+                    t_grip['DATE'] = t_grip['Date'].dt.strftime('%Y-%m-%d')
+                    t_grip['TEST'] = 'Grip Squeeze'
+                    t_grip['L MAX FORCE (N)'] = t_grip[grip_l_col].apply(lambda x: f"{x:.2f}")
+                    t_grip['R MAX FORCE (N)'] = t_grip[grip_r_col].apply(lambda x: f"{x:.2f}")
 
-            if hist_dfs:
-                full_history = hist_dfs[0]
-                for df_next in hist_dfs[1:]:
-                    full_history = pd.merge(full_history, df_next, on='Date', how='outer')
+                    if grip_asym_col and grip_asym_col in t_grip.columns:
+                        t_grip['MAX IMBALANCE (%)'] = t_grip[grip_asym_col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
+                    else:
+                        t_grip['MAX IMBALANCE (%)'] = ((t_grip[grip_l_col] - t_grip[grip_r_col]).abs() / t_grip[[grip_l_col, grip_r_col]].max(axis=1) * 100).apply(lambda x: f"{x:.2f}")
 
-                full_history = full_history.sort_values('Date', ascending=False)
-                full_history['Date'] = pd.to_datetime(full_history['Date']).dt.strftime('%m/%d/%Y')
+                    disp_grip = t_grip[['DATE', 'TEST', 'L MAX FORCE (N)', 'R MAX FORCE (N)', 'MAX IMBALANCE (%)']]
+                    st.markdown(render_table_html(disp_grip), unsafe_allow_html=True)
+                else:
+                    st.info("No Grip Squeeze records available.")
 
-                for col in full_history.columns:
-                    if col != 'Date':
-                        full_history[col] = full_history[col].apply(
-                            lambda x: f"{x:.2f}" if pd.notnull(x) and isinstance(x, float) and (x % 1 != 0) else (f"{int(x)}" if pd.notnull(x) else "-")
-                        )
+            # 4. Countermovement Jump (CMJ) Test Log Expander
+            with st.expander("Countermovement Jump (CMJ) Test Log", expanded=False):
+                if not raw_cmj.empty and cmj_h_col in raw_cmj.columns:
+                    t_cmj = raw_cmj.dropna(subset=['Date', cmj_h_col]).sort_values('Date', ascending=False).copy()
+                    t_cmj['DATE'] = t_cmj['Date'].dt.strftime('%Y-%m-%d')
+                    t_cmj['TEST'] = 'CMJ'
+                    t_cmj['JUMP HEIGHT (cm)'] = t_cmj[cmj_h_col].apply(lambda x: f"{x:.2f}")
+                    t_cmj['RSI-MODIFIED'] = t_cmj[cmj_rsi_col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-") if cmj_rsi_col and cmj_rsi_col in t_cmj.columns else "-"
 
-                table_headers = "".join([f"<th>{c}</th>" for c in full_history.columns])
-                table_rows = "".join([f"<tr>{''.join([f'<td>{val}</td>' for val in row])}</tr>" for _, row in full_history.iterrows()])
-                st.markdown(f'<table class="coach-table"><thead><tr>{table_headers}</tr></thead><tbody>{table_rows}</tbody></table>', unsafe_allow_html=True)
-            else:
-                st.info("No raw intake testing records found.")
+                    disp_cmj = t_cmj[['DATE', 'TEST', 'JUMP HEIGHT (cm)', 'RSI-MODIFIED']]
+                    st.markdown(render_table_html(disp_cmj), unsafe_allow_html=True)
+                else:
+                    st.info("No Countermovement Jump records available.")
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW)
