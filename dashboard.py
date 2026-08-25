@@ -312,41 +312,60 @@ if check_password():
                                 </linearGradient>
                             </defs>
                             <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
+            
+                            <!-- Anatomical Body Figure -->
                             <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                                <!-- Head & Neck -->
                                 <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
                                 <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
+                
+                                <!-- Shoulders & Upper Chest -->
                                 <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
+                
+                                <!-- Left Arm (Viewer's Left) -->
                                 <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
                                 <path d="M 22 104 C 20 106, 18 108, 17 110 M 23 105 C 21 108, 20 110, 19 112 M 24 105 C 23 108, 22 110, 21 112 M 25 104 C 25 107, 24 109, 23 111" fill="none" stroke-width="0.8" />
+                
+                                <!-- Right Arm (Viewer's Right) -->
                                 <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
                                 <path d="M 114 104 C 116 106, 118 108, 119 110 M 113 105 C 115 108, 116 110, 117 112 M 112 105 C 113 108, 114 110, 115 112 M 111 104 C 111 107, 112 109, 113 111" fill="none" stroke-width="0.8" />
+                
+                                <!-- Torso & Hips -->
                                 <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
+                
+                                <!-- Left Leg -->
                                 <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                
+                                <!-- Right Leg -->
                                 <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
+                
+                                <!-- Center Midline Axis -->
                                 <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
-                                <line x1="51" y1="116" x2="85" y2="116" stroke="#D32F2F" stroke-width="1.1" />
-                                <line x1="55" y1="168" x2="81" y2="168" stroke="#D32F2F" stroke-width="1.1" />
                             </g>
-                            <line x1="82" y1="58" x2="112" y2="58" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
-                            <circle cx="82" cy="58" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
-                            <rect x="112" y="50" width="16" height="16" rx="4" fill="#FF8200" />
-                            <text x="120" y="62" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
-                            <line x1="58" y1="116" x2="24" y2="116" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
-                            <circle cx="58" cy="116" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
-                            <rect x="8" y="108" width="16" height="16" rx="4" fill="#4895DB" />
-                            <text x="16" y="120" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
-                            <line x1="74" y1="172" x2="112" y2="172" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
-                            <circle cx="74" cy="172" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
-                            <rect x="112" y="164" width="16" height="16" rx="4" fill="#4895DB" />
-                            <text x="120" y="176" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
-                            <line x1="60" y1="140" x2="24" y2="140" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
-                            <circle cx="60" cy="140" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
-                            <rect x="8" y="132" width="16" height="16" rx="4" fill="#FF8200" />
-                            <text x="16" y="144" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
-                            <line x1="68" y1="84" x2="112" y2="84" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
-                            <circle cx="68" cy="84" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
-                            <rect x="112" y="76" width="16" height="16" rx="4" fill="#4895DB" />
-                            <text x="120" y="88" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
+            
+                            <!-- 1: ASH Shoulder (Right Shoulder) -->
+                            <line x1="88" y1="44" x2="118" y2="44" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="88" cy="44" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="118" y="36" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="126" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+            
+                            <!-- 2: External Rotation (Left Shoulder) -->
+                            <line x1="48" y1="44" x2="18" y2="44" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="48" cy="44" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="2" y="36" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="10" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+            
+                            <!-- 3: Grip Squeeze (Hand) -->
+                            <line x1="24" y1="106" x2="2" y2="106" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="24" cy="106" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="2" y="112" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="10" y="124" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+            
+                            <!-- 4: Countermovement Jump / Lower Body (Knees/Legs) -->
+                            <line x1="68" y1="162" x2="118" y2="162" stroke="#4895DB" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="68" cy="162" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="118" y="154" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="126" y="166" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
                         </svg>
                     </div>
                 </div>
