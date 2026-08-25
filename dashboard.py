@@ -49,45 +49,47 @@ if check_password():
         .athlete-name { margin: 0; font-size: 26px; font-weight: 800; color: #1D1D1F; }
         .athlete-sub { margin: 2px 0 0 0; color: #2F80ED; font-weight: 700; font-size: 14px; }
         
-        /* Typography */
+        /* Section Headers */
         .section-header {
-            color: #2F80ED; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;
-            text-transform: uppercase; margin-top: 10px; margin-bottom: 4px;
+            color: #2F80ED; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
+            text-transform: uppercase; margin-top: 10px; margin-bottom: 6px;
         }
-        .section-divider { height: 3px; background-color: #FF8200; margin-bottom: 22px; border-radius: 2px; }
-        .sub-header-title {
-            color: #2F80ED; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;
-            text-transform: uppercase; margin-bottom: 12px;
+        .section-divider { height: 3px; background-color: #FF8200; margin-bottom: 20px; border-radius: 2px; }
+        
+        /* Anatomy Map Container */
+        .anatomy-container {
+            background: #FAFAFA; border: 1px solid #ECECEC; border-radius: 12px;
+            padding: 16px; text-align: center; height: 100%; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
         }
 
-        /* Best Hero Cards */
-        .best-card {
-            background: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
-            border: 1px solid #EAEAEA; border-top: 4px solid #FF8200;
-            border-radius: 10px; padding: 14px 10px; text-align: center; margin-bottom: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        /* Assessment Cards */
+        .assessment-card {
+            background: #FFFFFF; border: 1px solid #EAEAEA; border-radius: 10px;
+            padding: 14px 18px; margin-bottom: 12px; position: relative;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
         }
-        .best-card h4 { margin: 0; color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .best-card h2 { margin: 6px 0 2px 0; font-size: 22px; font-weight: 800; color: #FF8200; }
-        .best-card p { margin: 0; font-size: 11px; color: #2F80ED; font-weight: 700; }
+        .border-orange { border-left: 6px solid #FF8200; }
+        .border-blue { border-left: 6px solid #2F80ED; }
 
-        /* Metric Tile Badges */
-        .kpi-tile {
-            border-radius: 12px; padding: 16px 8px; text-align: center; color: #FFFFFF;
-            display: flex; flex-direction: column; justify-content: center; height: 90px;
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-title-wrap { display: flex; align-items: center; gap: 10px; }
+        .badge-num {
+            width: 24px; height: 24px; border-radius: 6px; color: #FFFFFF;
+            font-weight: 800; font-size: 13px; display: inline-flex;
+            align-items: center; justify-content: center;
         }
-        .tile-green { background-color: #28a745; }
-        .tile-red { background-color: #dc3545; }
-        .tile-orange { background-color: #FF8200; }
-        .kpi-tile h1 { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.1; }
-        .kpi-tile p { margin: 4px 0 0 0; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+        .badge-orange { background-color: #FF8200; }
+        .badge-blue { background-color: #2F80ED; }
 
-        /* Detail Callout Box */
-        .detail-box {
-            background-color: #F8F9FA; border-left: 4px solid #FF8200;
-            padding: 10px 14px; border-radius: 4px; margin-top: 12px; font-size: 12px;
-            color: #495057; font-weight: 600; line-height: 1.5;
-        }
+        .card-title { font-weight: 800; font-size: 14px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+        .card-date { font-size: 12px; color: #6C757D; font-weight: 600; }
+        .card-metrics { font-size: 13px; color: #333333; line-height: 1.6; }
+        .card-metrics b { color: #1D1D1F; }
+
+        .pct-up { color: #28a745; font-weight: 700; }
+        .pct-down { color: #dc3545; font-weight: 700; }
+        .pct-flat { color: #6c757d; font-weight: 700; }
 
         /* Tables */
         .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 10px; margin-bottom: 20px; }
@@ -263,121 +265,247 @@ if check_password():
             </div>
         """, unsafe_allow_html=True)
 
-        def get_best_record(df, col_name, is_min=False):
-            if df.empty or not col_name or col_name not in df.columns:
-                return None, None
-            temp = df.dropna(subset=[col_name, 'Date']).copy()
-            temp[col_name] = pd.to_numeric(temp[col_name], errors='coerce')
-            temp = temp.dropna(subset=[col_name])
-            if temp.empty:
-                return None, None
-            idx = temp[col_name].idxmin() if is_min else temp[col_name].idxmax()
-            best_row = temp.loc[idx]
-            return best_row[col_name], best_row['Date'].strftime('%m/%d/%Y')
+        # Helper for % delta formatting
+        def fmt_pct(chg):
+            if np.isnan(chg):
+                return ""
+            if chg > 0:
+                return f'<span class="pct-up">(↑{chg:.1f}%)</span>'
+            elif chg < 0:
+                return f'<span class="pct-down">(↓{abs(chg):.1f}%)</span>'
+            return '<span class="pct-flat">(0.0%)</span>'
 
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_readiness, tab_catapult = st.tabs(["INTAKE / TESTING", "READINESS TRENDS", "CATAPULT PROFILE"])
+        tab_testing, tab_catapult = st.tabs(["INTAKE TESTS & ANATOMY", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: INTAKE / TESTING (INTAKE TESTS & FULL HISTORY TABLE)
+        # TAB 1: INTAKE TESTS & ANATOMY LOCATION MAP
         # =========================================================================
         with tab_testing:
-            st.markdown('<div class="section-header">PHYSICAL TESTING & INTAKE PROFILE</div>', unsafe_allow_html=True)
+            col_map, col_assessment = st.columns([1.1, 1.9], gap="large")
+
+            # --- LEFT: ANATOMY LOCATION MAP ---
+            with col_map:
+                st.markdown('<div class="section-header">ANATOMY LOCATION MAP</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                svg_anatomy = """
+                <div class="anatomy-container">
+                    <svg viewBox="0 0 340 500" width="100%" height="450" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Head -->
+                        <ellipse cx="170" cy="45" rx="20" ry="26" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2.5"/>
+                        <!-- Neck -->
+                        <rect x="163" y="70" width="14" height="15" fill="#CBD5E1"/>
+                        <!-- Center Midline Axis -->
+                        <line x1="170" y1="20" x2="170" y2="470" stroke="#FF8200" stroke-width="2.5" stroke-linecap="round"/>
+                        
+                        <!-- Torso & Body Outline -->
+                        <path d="M 125,85 L 215,85 L 205,190 L 170,205 L 135,190 Z" fill="#F1F5F9" stroke="#94A3B8" stroke-width="2.5"/>
+                        <path d="M 135,190 L 205,190 L 210,240 L 170,250 L 130,240 Z" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2.5"/>
+
+                        <!-- Left Arm (Viewer's Left) -->
+                        <path d="M 125,85 L 85,150 L 70,240 L 82,242 L 98,160 L 135,100 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
+                        <!-- Left Hand -->
+                        <ellipse cx="68" cy="255" rx="8" ry="12" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
+
+                        <!-- Right Arm (Viewer's Right) -->
+                        <path d="M 215,85 L 255,150 L 270,240 L 258,242 L 242,160 L 205,100 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
+                        <!-- Right Hand -->
+                        <ellipse cx="272" cy="255" rx="8" ry="12" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
+
+                        <!-- Left Leg -->
+                        <path d="M 135,245 L 125,350 L 130,450 L 155,450 L 165,350 L 168,250 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
+                        <!-- Left Foot -->
+                        <ellipse cx="138" cy="460" rx="14" ry="7" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
+
+                        <!-- Right Leg -->
+                        <path d="M 205,245 L 215,350 L 210,450 L 185,450 L 175,350 L 172,250 Z" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2"/>
+                        <!-- Right Foot -->
+                        <ellipse cx="202" cy="460" rx="14" ry="7" fill="#E2E8F0" stroke="#94A3B8" stroke-width="2"/>
+
+                        <!-- Test Marker 1: ASH Shoulder (Orange) -->
+                        <circle cx="190" cy="115" r="7" fill="#FF8200"/>
+                        <line x1="190" y1="115" x2="280" y2="115" stroke="#FF8200" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="275" y="103" width="24" height="24" rx="6" fill="#FF8200"/>
+                        <text x="287" y="120" fill="white" font-size="14" font-weight="bold" text-anchor="middle">1</text>
+
+                        <!-- Test Marker 2: ER ROM (Blue) -->
+                        <circle cx="105" cy="120" r="7" fill="#2F80ED"/>
+                        <line x1="105" y1="120" x2="35" y2="120" stroke="#2F80ED" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="23" y="108" width="24" height="24" rx="6" fill="#2F80ED"/>
+                        <text x="35" y="125" fill="white" font-size="14" font-weight="bold" text-anchor="middle">2</text>
+
+                        <!-- Test Marker 3: Grip Squeeze (Blue) -->
+                        <circle cx="68" cy="255" r="7" fill="#2F80ED"/>
+                        <line x1="68" y1="255" x2="35" y2="255" stroke="#2F80ED" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="23" y="243" width="24" height="24" rx="6" fill="#2F80ED"/>
+                        <text x="35" y="260" fill="white" font-size="14" font-weight="bold" text-anchor="middle">3</text>
+
+                        <!-- Test Marker 4: Countermovement Jump (CMJ) (Orange) -->
+                        <circle cx="170" cy="350" r="7" fill="#FF8200"/>
+                        <line x1="170" y1="350" x2="280" y2="350" stroke="#FF8200" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="275" y="338" width="24" height="24" rx="6" fill="#FF8200"/>
+                        <text x="287" y="355" fill="white" font-size="14" font-weight="bold" text-anchor="middle">4</text>
+                    </svg>
+                </div>
+                """
+                st.markdown(svg_anatomy, unsafe_allow_html=True)
+
+            # --- RIGHT: LOCATION ASSESSMENT CARDS ---
+            with col_assessment:
+                st.markdown(f'<div class="section-header">LOCATION ASSESSMENT ({season_option.upper()})</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                # ---------------- CARD 1: ASH SHOULDER ----------------
+                if not p_ash.empty and ash_l_col and ash_r_col and ash_l_col in p_ash.columns and ash_r_col in p_ash.columns:
+                    p_ash_val = p_ash.dropna(subset=[ash_l_col, ash_r_col]).copy()
+                    if not p_ash_val.empty:
+                        ash_max_l = p_ash_val[ash_l_col].max()
+                        ash_max_r = p_ash_val[ash_r_col].max()
+                        ash_rec = p_ash_val.iloc[-1]
+                        ash_rec_l, ash_rec_r = ash_rec[ash_l_col], ash_rec[ash_r_col]
+                        ash_date = ash_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(ash_rec['Date']) else "N/A"
+
+                        chg_l = ((ash_rec_l - ash_max_l) / ash_max_l * 100) if ash_max_l > 0 else 0
+                        chg_r = ((ash_rec_r - ash_max_r) / ash_max_r * 100) if ash_max_r > 0 else 0
+
+                        st.markdown(f"""
+                            <div class="assessment-card border-orange">
+                                <div class="card-top">
+                                    <div class="card-title-wrap">
+                                        <div class="badge-num badge-orange">1</div>
+                                        <span class="card-title">ASH Shoulder: ISO I</span>
+                                    </div>
+                                    <span class="card-date">Latest: {ash_date}</span>
+                                </div>
+                                <div class="card-metrics">
+                                    <b>Peak Vertical Force:</b> Max L {int(ash_max_l)}N | R {int(ash_max_r)}N &nbsp;→&nbsp; 
+                                    <b>Recent:</b> L {int(ash_rec_l)}N {fmt_pct(chg_l)} | R {int(ash_rec_r)}N {fmt_pct(chg_r)}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.info("Card 1: No ASH Shoulder data available for this season.")
+                else:
+                    st.info("Card 1: No ASH Shoulder data found.")
+
+                # ---------------- CARD 2: EXTERNAL ROTATION ----------------
+                if not p_er.empty and er_l_col and er_r_col and er_l_col in p_er.columns and er_r_col in p_er.columns:
+                    p_er_val = p_er.dropna(subset=[er_l_col, er_r_col]).copy()
+                    if not p_er_val.empty:
+                        er_max_l = p_er_val[er_l_col].max()
+                        er_max_r = p_er_val[er_r_col].max()
+                        er_rec = p_er_val.iloc[-1]
+                        er_rec_l, er_rec_r = er_rec[er_l_col], er_rec[er_r_col]
+                        er_date = er_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(er_rec['Date']) else "N/A"
+
+                        chg_l = ((er_rec_l - er_max_l) / er_max_l * 100) if er_max_l > 0 else 0
+                        chg_r = ((er_rec_r - er_max_r) / er_max_r * 100) if er_max_r > 0 else 0
+
+                        st.markdown(f"""
+                            <div class="assessment-card border-blue">
+                                <div class="card-top">
+                                    <div class="card-title-wrap">
+                                        <div class="badge-num badge-blue">2</div>
+                                        <span class="card-title">External Rotation (ER) ROM</span>
+                                    </div>
+                                    <span class="card-date">Latest: {er_date}</span>
+                                </div>
+                                <div class="card-metrics">
+                                    <b>Max ROM:</b> Max L {int(er_max_l)}° | R {int(er_max_r)}° &nbsp;→&nbsp; 
+                                    <b>Recent:</b> L {int(er_rec_l)}° {fmt_pct(chg_l)} | R {int(er_rec_r)}° {fmt_pct(chg_r)}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.info("Card 2: No External Rotation data available for this season.")
+                else:
+                    st.info("Card 2: No External Rotation data found.")
+
+                # ---------------- CARD 3: GRIP SQUEEZE ----------------
+                if not p_grip.empty and grip_l_col and grip_r_col and grip_l_col in p_grip.columns and grip_r_col in p_grip.columns:
+                    p_grip_val = p_grip.dropna(subset=[grip_l_col, grip_r_col]).copy()
+                    if not p_grip_val.empty:
+                        grip_max_l = p_grip_val[grip_l_col].max()
+                        grip_max_r = p_grip_val[grip_r_col].max()
+                        grip_rec = p_grip_val.iloc[-1]
+                        grip_rec_l, grip_rec_r = grip_rec[grip_l_col], grip_rec[grip_r_col]
+                        grip_date = grip_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(grip_rec['Date']) else "N/A"
+
+                        chg_l = ((grip_rec_l - grip_max_l) / grip_max_l * 100) if grip_max_l > 0 else 0
+                        chg_r = ((grip_rec_r - grip_max_r) / grip_max_r * 100) if grip_max_r > 0 else 0
+
+                        st.markdown(f"""
+                            <div class="assessment-card border-blue">
+                                <div class="card-top">
+                                    <div class="card-title-wrap">
+                                        <div class="badge-num badge-blue">3</div>
+                                        <span class="card-title">Grip Squeeze Test</span>
+                                    </div>
+                                    <span class="card-date">Latest: {grip_date}</span>
+                                </div>
+                                <div class="card-metrics">
+                                    <b>Max Force:</b> Max L {int(grip_max_l)}N | R {int(grip_max_r)}N &nbsp;→&nbsp; 
+                                    <b>Recent:</b> L {int(grip_rec_l)}N {fmt_pct(chg_l)} | R {int(grip_rec_r)}N {fmt_pct(chg_r)}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.info("Card 3: No Grip Squeeze data available for this season.")
+                else:
+                    st.info("Card 3: No Grip Squeeze data found.")
+
+                # ---------------- CARD 4: COUNTERMOVEMENT JUMP ----------------
+                if not p_cmj.empty and cmj_h_col and cmj_h_col in p_cmj.columns:
+                    p_cmj_val = p_cmj.dropna(subset=[cmj_h_col]).copy()
+                    if not p_cmj_val.empty:
+                        cmj_max_h = p_cmj_val[cmj_h_col].max()
+                        cmj_max_rsi = p_cmj_val[cmj_rsi_col].max() if cmj_rsi_col and cmj_rsi_col in p_cmj_val.columns else np.nan
+                        cmj_rec = p_cmj_val.iloc[-1]
+                        cmj_rec_h = cmj_rec[cmj_h_col]
+                        cmj_rec_rsi = cmj_rec[cmj_rsi_col] if cmj_rsi_col and cmj_rsi_col in p_cmj_val.columns else np.nan
+                        cmj_date = cmj_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(cmj_rec['Date']) else "N/A"
+
+                        chg_h = ((cmj_rec_h - cmj_max_h) / cmj_max_h * 100) if cmj_max_h > 0 else 0
+                        chg_rsi = ((cmj_rec_rsi - cmj_max_rsi) / cmj_max_rsi * 100) if pd.notnull(cmj_max_rsi) and cmj_max_rsi > 0 else np.nan
+
+                        rsi_str = f" | RSI-mod: Max {cmj_max_rsi:.2f} → Recent {cmj_rec_rsi:.2f} {fmt_pct(chg_rsi)}" if pd.notnull(cmj_rec_rsi) else ""
+
+                        st.markdown(f"""
+                            <div class="assessment-card border-orange">
+                                <div class="card-top">
+                                    <div class="card-title-wrap">
+                                        <div class="badge-num badge-orange">4</div>
+                                        <span class="card-title">Countermovement Jump (CMJ)</span>
+                                    </div>
+                                    <span class="card-date">Latest: {cmj_date}</span>
+                                </div>
+                                <div class="card-metrics">
+                                    <b>Jump Height:</b> Max {cmj_max_h:.1f}cm &nbsp;→&nbsp; 
+                                    <b>Recent:</b> {cmj_rec_h:.1f}cm {fmt_pct(chg_h)}{rsi_str}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.info("Card 4: No CMJ data available for this season.")
+                else:
+                    st.info("Card 4: No CMJ data found.")
+
+            # --- BOTTOM: INTAKE ASSESSMENT RAW LOGS ---
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f'<div class="section-header">Intake Assessment Raw Logs for {selected} ({season_option})</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            # --- Row 1: CMJ & ASH Intake Summary ---
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown('<div class="sub-header-title">Countermovement Jump (CMJ)</div>', unsafe_allow_html=True)
-                if not raw_cmj.empty and cmj_h_col and cmj_h_col in raw_cmj.columns:
-                    lat_cmj_intake = raw_cmj.dropna(subset=[cmj_h_col]).iloc[-1]
-                    h_val = lat_cmj_intake[cmj_h_col]
-                    rsi_val = lat_cmj_intake[cmj_rsi_col] if cmj_rsi_col and cmj_rsi_col in raw_cmj.columns else np.nan
-                    d_val = lat_cmj_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_cmj_intake['Date']) else "N/A"
-                    
-                    tc1, tc2 = st.columns(2)
-                    with tc1:
-                        st.markdown(f'<div class="kpi-tile tile-green"><h1>{h_val:.1f} cm</h1><p>Jump Height</p></div>', unsafe_allow_html=True)
-                    with tc2:
-                        st.markdown(f'<div class="kpi-tile tile-green"><h1>{rsi_val:.2f}</h1><p>RSI Modified</p></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {d_val}</div>', unsafe_allow_html=True)
-                else:
-                    st.info("No CMJ intake records found.")
-
-            with c2:
-                st.markdown('<div class="sub-header-title">ASH Shoulder Test (ISO I)</div>', unsafe_allow_html=True)
-                if not raw_ash.empty and ash_l_col and ash_r_col and ash_l_col in raw_ash.columns:
-                    lat_ash_intake = raw_ash.dropna(subset=[ash_l_col, ash_r_col]).iloc[-1]
-                    ash_l = lat_ash_intake[ash_l_col]
-                    ash_r = lat_ash_intake[ash_r_col]
-                    ash_asym = lat_ash_intake[ash_asym_col] if ash_asym_col and ash_asym_col in raw_ash.columns else ((abs(ash_l - ash_r)/max(ash_l, ash_r)*100) if max(ash_l, ash_r) > 0 else 0)
-                    ash_d = lat_ash_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_ash_intake['Date']) else "N/A"
-                    ash_cls = "tile-red" if ash_asym > 10 else "tile-green"
-
-                    tc1, tc2 = st.columns(2)
-                    with tc1:
-                        st.markdown(f'<div class="kpi-tile {ash_cls}"><h1>{int(ash_l)} N</h1><p>Left Peak Force</p></div>', unsafe_allow_html=True)
-                    with tc2:
-                        st.markdown(f'<div class="kpi-tile {ash_cls}"><h1>{int(ash_r)} N</h1><p>Right Peak Force</p></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {ash_d} | <b>Asymmetry:</b> {ash_asym:.1f}%</div>', unsafe_allow_html=True)
-                else:
-                    st.info("No ASH Shoulder intake records found.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- Row 2: ER & Grip Squeeze Intake Summary ---
-            c3, c4 = st.columns(2)
-            with c3:
-                st.markdown('<div class="sub-header-title">External Rotation (ER) ROM</div>', unsafe_allow_html=True)
-                if not raw_er.empty and er_l_col and er_r_col and er_l_col in raw_er.columns:
-                    lat_er_intake = raw_er.dropna(subset=[er_l_col, er_r_col]).iloc[-1]
-                    er_l = lat_er_intake[er_l_col]
-                    er_r = lat_er_intake[er_r_col]
-                    er_asym = lat_er_intake[er_asym_col] if er_asym_col and er_asym_col in raw_er.columns else ((abs(er_l - er_r)/max(er_l, er_r)*100) if max(er_l, er_r) > 0 else 0)
-                    er_d = lat_er_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_er_intake['Date']) else "N/A"
-                    er_cls = "tile-red" if er_asym > 10 else "tile-green"
-
-                    tc1, tc2 = st.columns(2)
-                    with tc1:
-                        st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(er_l)}°</h1><p>Left Max ROM</p></div>', unsafe_allow_html=True)
-                    with tc2:
-                        st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(er_r)}°</h1><p>Right Max ROM</p></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {er_d} | <b>ROM Asymmetry:</b> {er_asym:.1f}%</div>', unsafe_allow_html=True)
-                else:
-                    st.info("No External Rotation intake records found.")
-
-            with c4:
-                st.markdown('<div class="sub-header-title">Grip Squeeze Force</div>', unsafe_allow_html=True)
-                if not raw_grip.empty and grip_l_col and grip_r_col and grip_l_col in raw_grip.columns:
-                    lat_grip_intake = raw_grip.dropna(subset=[grip_l_col, grip_r_col]).iloc[-1]
-                    grip_l = lat_grip_intake[grip_l_col]
-                    grip_r = lat_grip_intake[grip_r_col]
-                    grip_asym = lat_grip_intake[grip_asym_col] if grip_asym_col and grip_asym_col in raw_grip.columns else ((abs(grip_l - grip_r)/max(grip_l, grip_r)*100) if max(grip_l, grip_r) > 0 else 0)
-                    grip_d = lat_grip_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_grip_intake['Date']) else "N/A"
-
-                    UPPER_THRESH, LOWER_THRESH = 499.47, 365.91
-                    def get_grip_tile_cls(v):
-                        return "tile-green" if v >= UPPER_THRESH else ("tile-orange" if v >= LOWER_THRESH else "tile-red")
-
-                    tc1, tc2 = st.columns(2)
-                    with tc1:
-                        st.markdown(f'<div class="kpi-tile {get_grip_tile_cls(grip_l)}"><h1>{int(grip_l)} N</h1><p>Left Grip Force</p></div>', unsafe_allow_html=True)
-                    with tc2:
-                        st.markdown(f'<div class="kpi-tile {get_grip_tile_cls(grip_r)}"><h1>{int(grip_r)} N</h1><p>Right Grip Force</p></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {grip_d} | <b>Force Asymmetry:</b> {grip_asym:.1f}%</div>', unsafe_allow_html=True)
-                else:
-                    st.info("No Grip Squeeze intake records found.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown('<div class="section-header">COMPLETE TESTING HISTORY</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            # --- Combined Multi-Test History Table ---
+            # Combined Unified Table Log
             hist_dfs = []
 
             if not raw_cmj.empty and cmj_h_col in raw_cmj.columns:
-                c_slice = raw_cmj[['Date', cmj_h_col, cmj_rsi_col]].copy().dropna(subset=['Date'])
-                c_slice = c_slice.rename(columns={cmj_h_col: 'CMJ Height (cm)', cmj_rsi_col: 'CMJ RSI-mod'})
+                cols = ['Date', cmj_h_col] + ([cmj_rsi_col] if cmj_rsi_col and cmj_rsi_col in raw_cmj.columns else [])
+                c_slice = raw_cmj[cols].copy().dropna(subset=['Date'])
+                rename_dict = {cmj_h_col: 'CMJ Height (cm)'}
+                if cmj_rsi_col and cmj_rsi_col in raw_cmj.columns:
+                    rename_dict[cmj_rsi_col] = 'CMJ RSI-mod'
+                c_slice = c_slice.rename(columns=rename_dict)
                 hist_dfs.append(c_slice)
 
             if not raw_ash.empty and ash_l_col in raw_ash.columns and ash_r_col in raw_ash.columns:
@@ -403,258 +531,20 @@ if check_password():
                 full_history = full_history.sort_values('Date', ascending=False)
                 full_history['Date'] = pd.to_datetime(full_history['Date']).dt.strftime('%m/%d/%Y')
 
-                # Formatting numeric values cleanly
                 for col in full_history.columns:
                     if col != 'Date':
-                        full_history[col] = full_history[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) and isinstance(x, float) and (x % 1 != 0) else (f"{int(x)}" if pd.notnull(x) else "-"))
+                        full_history[col] = full_history[col].apply(
+                            lambda x: f"{x:.2f}" if pd.notnull(x) and isinstance(x, float) and (x % 1 != 0) else (f"{int(x)}" if pd.notnull(x) else "-")
+                        )
 
                 table_headers = "".join([f"<th>{c}</th>" for c in full_history.columns])
                 table_rows = "".join([f"<tr>{''.join([f'<td>{val}</td>' for val in row])}</tr>" for _, row in full_history.iterrows()])
                 st.markdown(f'<table class="coach-table"><thead><tr>{table_headers}</tr></thead><tbody>{table_rows}</tbody></table>', unsafe_allow_html=True)
             else:
-                st.info("No testing history records available for this athlete.")
+                st.info("No raw intake testing records found.")
 
         # =========================================================================
-        # TAB 2: READINESS TRENDS
-        # =========================================================================
-        with tab_readiness:
-            st.subheader("ALL-TIME PERSONAL BESTS")
-            b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, cmj_h_col)
-            b_rsi, b_rsi_date = get_best_record(raw_cmj, cmj_rsi_col)
-            b_ash_l, b_ash_l_date = get_best_record(raw_ash, ash_l_col)
-            b_ash_r, b_ash_r_date = get_best_record(raw_ash, ash_r_col)
-            b_er_l, b_er_l_date = get_best_record(raw_er, er_l_col)
-            b_er_r, b_er_r_date = get_best_record(raw_er, er_r_col)
-            b_grip_l, b_grip_l_date = get_best_record(raw_grip, grip_l_col)
-            b_grip_r, b_grip_r_date = get_best_record(raw_grip, grip_r_col)
-
-            # Row 1: CMJ & ASH Best Cards
-            b1, b2, b3, b4 = st.columns(4)
-            with b1:
-                val = f"{b_cmj_h:.1f} cm" if b_cmj_h is not None else "N/A"
-                d_str = f"Set on {b_cmj_h_date}" if b_cmj_h_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best Jump Height</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b2:
-                val = f"{b_rsi:.2f}" if b_rsi is not None else "N/A"
-                d_str = f"Set on {b_rsi_date}" if b_rsi_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best RSI-modified</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b3:
-                val = f"{int(b_ash_l)} N" if b_ash_l is not None else "N/A"
-                d_str = f"Set on {b_ash_l_date}" if b_ash_l_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best ASH Force (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b4:
-                val = f"{int(b_ash_r)} N" if b_ash_r is not None else "N/A"
-                d_str = f"Set on {b_ash_r_date}" if b_ash_r_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best ASH Force (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-
-            # Row 2: ER ROM & Grip Squeeze Best Cards
-            b5, b6, b7, b8 = st.columns(4)
-            with b5:
-                val = f"{int(b_er_l)}°" if b_er_l is not None else "N/A"
-                d_str = f"Set on {b_er_l_date}" if b_er_l_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best ER ROM (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b6:
-                val = f"{int(b_er_r)}°" if b_er_r is not None else "N/A"
-                d_str = f"Set on {b_er_r_date}" if b_er_r_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best ER ROM (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b7:
-                val = f"{int(b_grip_l)} N" if b_grip_l is not None else "N/A"
-                d_str = f"Set on {b_grip_l_date}" if b_grip_l_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best Grip (Left)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-            with b8:
-                val = f"{int(b_grip_r)} N" if b_grip_r is not None else "N/A"
-                d_str = f"Set on {b_grip_r_date}" if b_grip_r_date else "No Record"
-                st.markdown(f'<div class="best-card"><h4>Best Grip (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-
-            st.markdown('<div class="section-header">WEEKLY READINESS PROFILE</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            # --- SECTION 1: COUNTERMOVEMENT JUMP ---
-            st.markdown('<div class="sub-header-title">COUNTERMOVEMENT JUMP</div>', unsafe_allow_html=True)
-            p_cmj_ready = p_cmj.dropna(subset=['Date']).sort_values('Date').copy() if not p_cmj.empty else pd.DataFrame()
-
-            if not p_cmj_ready.empty and cmj_h_col and cmj_rsi_col and cmj_h_col in p_cmj_ready.columns and cmj_rsi_col in p_cmj_ready.columns:
-                p_cmj_ready[cmj_h_col] = pd.to_numeric(p_cmj_ready[cmj_h_col], errors='coerce')
-                p_cmj_ready[cmj_rsi_col] = pd.to_numeric(p_cmj_ready[cmj_rsi_col], errors='coerce')
-                p_cmj_ready = p_cmj_ready.dropna(subset=[cmj_h_col, cmj_rsi_col])
-                
-                if not p_cmj_ready.empty:
-                    cmj_plot_df = p_cmj_ready.groupby('Date', as_index=False)[[cmj_h_col, cmj_rsi_col]].mean()
-                    lat_cmj = cmj_plot_df.iloc[-1]
-                    latest_h = lat_cmj[cmj_h_col]
-                    latest_rsi = lat_cmj[cmj_rsi_col]
-                    base_h = cmj_plot_df[cmj_h_col].mean()
-                    base_rsi = cmj_plot_df[cmj_rsi_col].mean()
-
-                    chg_h = ((latest_h - base_h) / base_h * 100) if base_h > 0 else 0
-                    chg_rsi = ((latest_rsi - base_rsi) / base_rsi * 100) if base_rsi > 0 else 0
-
-                    h_tile_cls = "tile-green" if chg_h >= -5 else "tile-red"
-                    rsi_tile_cls = "tile-green" if chg_rsi >= -5 else "tile-red"
-
-                    c_left, c_right = st.columns([1.1, 2])
-                    with c_left:
-                        cb1, cb2 = st.columns(2)
-                        with cb1:
-                            st.markdown(f'<div class="kpi-tile {h_tile_cls}"><h1>{latest_h:.1f}</h1><p>CMJ HEIGHT</p></div>', unsafe_allow_html=True)
-                        with cb2:
-                            st.markdown(f'<div class="kpi-tile {rsi_tile_cls}"><h1>{latest_rsi:.2f}</h1><p>RSI MOD</p></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="detail-box"><div><b>% Change from Base:</b> CMJ: {chg_h:+.1f}% | RSI: {chg_rsi:+.1f}%</div><div><b>Base Values:</b> CMJ: {base_h:.1f} | RSI: {base_rsi:.2f}</div></div>', unsafe_allow_html=True)
-
-                    with c_right:
-                        fig_cmj = go.Figure()
-                        fig_cmj.add_trace(go.Scatter(x=cmj_plot_df['Date'], y=cmj_plot_df[cmj_h_col], name="Jump Height", mode="lines+markers", line=dict(color="#FF8200", width=3.5), marker=dict(size=9, color="#FF8200")))
-                        fig_cmj.add_trace(go.Scatter(x=cmj_plot_df['Date'], y=cmj_plot_df[cmj_rsi_col], name="RSI Modified", mode="lines+markers", yaxis="y2", line=dict(color="#2F80ED", width=2.5, dash="dot"), marker=dict(size=8, color="#2F80ED")))
-                        h_min, h_max = cmj_plot_df[cmj_h_col].min(), cmj_plot_df[cmj_h_col].max()
-                        r_min, r_max = cmj_plot_df[cmj_rsi_col].min(), cmj_plot_df[cmj_rsi_col].max()
-                        fig_cmj.update_layout(
-                            template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0),
-                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
-                            yaxis=dict(title=None, showgrid=True, gridcolor="#F0F2F6", range=[h_min - 2, h_max + 2] if h_min == h_max else [h_min * 0.95, h_max * 1.05]),
-                            yaxis2=dict(title=None, showgrid=False, range=[r_min - 0.05, r_max + 0.05] if r_min == r_max else [r_min * 0.9, r_max * 1.1], overlaying="y", side="right")
-                        )
-                        st.plotly_chart(fig_cmj, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("No Countermovement Jump records available for this selection.")
-            else:
-                st.info("No Countermovement Jump records available for this season.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- SECTION 2: ASH SHOULDER: ISO I ---
-            st.markdown('<div class="sub-header-title">ASH SHOULDER: ISO I</div>', unsafe_allow_html=True)
-            p_ash_ready = p_ash.dropna(subset=['Date']).sort_values('Date').copy() if not p_ash.empty else pd.DataFrame()
-
-            if not p_ash_ready.empty and ash_l_col and ash_r_col and ash_l_col in p_ash_ready.columns and ash_r_col in p_ash_ready.columns:
-                p_ash_ready[ash_l_col] = pd.to_numeric(p_ash_ready[ash_l_col], errors='coerce').fillna(0)
-                p_ash_ready[ash_r_col] = pd.to_numeric(p_ash_ready[ash_r_col], errors='coerce').fillna(0)
-                p_ash_ready = p_ash_ready[(p_ash_ready[ash_l_col] > 0) | (p_ash_ready[ash_r_col] > 0)]
-
-                if not p_ash_ready.empty:
-                    lat_ash_r = p_ash_ready.iloc[-1]
-                    latest_l, latest_r = lat_ash_r[ash_l_col], lat_ash_r[ash_r_col]
-                    base_l = p_ash_ready[ash_l_col].replace(0, np.nan).mean() or 0
-                    base_r = p_ash_ready[ash_r_col].replace(0, np.nan).mean() or 0
-                    chg_l = ((latest_l - base_l) / base_l * 100) if base_l > 0 else 0
-                    chg_r = ((latest_r - base_r) / base_r * 100) if base_r > 0 else 0
-
-                    asym_val = float(lat_ash_r[ash_asym_col]) if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]) else ((abs(latest_l - latest_r)/max(latest_l, latest_r)*100) if max(latest_l, latest_r) > 0 else 0.0)
-                    ash_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
-
-                    a_left, a_right = st.columns([1.1, 2])
-                    with a_left:
-                        ab1, ab2 = st.columns(2)
-                        with ab1:
-                            st.markdown(f'<div class="kpi-tile {ash_tile_cls}"><h1>{int(latest_l)} N</h1><p>LEFT</p></div>', unsafe_allow_html=True)
-                        with ab2:
-                            st.markdown(f'<div class="kpi-tile {ash_tile_cls}"><h1>{int(latest_r)} N</h1><p>RIGHT</p></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="detail-box"><div><b>Asymmetry:</b> {asym_val:+.1f}%</div><div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div><div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div></div>', unsafe_allow_html=True)
-
-                    with a_right:
-                        fig_ash_p = go.Figure()
-                        fig_ash_p.add_trace(go.Scatter(x=p_ash_ready['Date'], y=p_ash_ready[ash_l_col], name="Left Peak Force", mode="lines+markers", line=dict(color="#2F80ED", width=3), marker=dict(size=6, color="#2F80ED")))
-                        fig_ash_p.add_trace(go.Scatter(x=p_ash_ready['Date'], y=p_ash_ready[ash_r_col], name="Right Peak Force", mode="lines+markers", line=dict(color="#FF8200", width=3, dash="dash"), marker=dict(size=6, color="#FF8200")))
-                        fig_ash_p.update_layout(template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"), yaxis=dict(showgrid=True, gridcolor="#F0F2F6"))
-                        st.plotly_chart(fig_ash_p, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("No ASH Shoulder records available for this selection.")
-            else:
-                st.info("No ASH Shoulder records available for this season.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- SECTION 3: EXTERNAL ROTATION (ER) TEST ---
-            st.markdown('<div class="sub-header-title">EXTERNAL ROTATION (ER) TEST</div>', unsafe_allow_html=True)
-            p_er_ready = p_er.dropna(subset=['Date']).sort_values('Date').copy() if not p_er.empty else pd.DataFrame()
-
-            if not p_er_ready.empty and er_l_col and er_r_col and er_l_col in p_er_ready.columns and er_r_col in p_er_ready.columns:
-                p_er_ready[er_l_col] = pd.to_numeric(p_er_ready[er_l_col], errors='coerce').fillna(0)
-                p_er_ready[er_r_col] = pd.to_numeric(p_er_ready[er_r_col], errors='coerce').fillna(0)
-                p_er_ready = p_er_ready[(p_er_ready[er_l_col] > 0) | (p_er_ready[er_r_col] > 0)]
-
-                if not p_er_ready.empty:
-                    lat_er = p_er_ready.iloc[-1]
-                    latest_er_l, latest_er_r = lat_er[er_l_col], lat_er[er_r_col]
-                    base_er_l = p_er_ready[er_l_col].replace(0, np.nan).mean() or 0
-                    base_er_r = p_er_ready[er_r_col].replace(0, np.nan).mean() or 0
-                    chg_er_l = ((latest_er_l - base_er_l) / base_er_l * 100) if base_er_l > 0 else 0
-                    chg_er_r = ((latest_er_r - base_er_r) / base_er_r * 100) if base_er_r > 0 else 0
-
-                    er_asym_val = float(lat_er[er_asym_col]) if er_asym_col and er_asym_col in lat_er and pd.notnull(lat_er[er_asym_col]) else ((abs(latest_er_l - latest_er_r)/max(latest_er_l, latest_er_r)*100) if max(latest_er_l, latest_er_r) > 0 else 0.0)
-                    er_cls = "tile-red" if er_asym_val > 10 else "tile-green"
-
-                    er_left, er_right = st.columns([1.1, 2])
-                    with er_left:
-                        erb1, erb2 = st.columns(2)
-                        with erb1:
-                            st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(latest_er_l)}°</h1><p>LEFT MAX ROM</p></div>', unsafe_allow_html=True)
-                        with erb2:
-                            st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(latest_er_r)}°</h1><p>RIGHT MAX ROM</p></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="detail-box"><div><b>ROM Asymmetry:</b> {er_asym_val:+.1f}%</div><div><b>% Change from Base:</b> L: {chg_er_l:+.1f}% | R: {chg_er_r:+.1f}%</div><div><b>Base ROM:</b> L: {int(base_er_l)}° | R: {int(base_er_r)}°</div></div>', unsafe_allow_html=True)
-
-                    with er_right:
-                        fig_er_p = go.Figure()
-                        fig_er_p.add_trace(go.Scatter(x=p_er_ready['Date'], y=p_er_ready[er_l_col], name="Left Max ROM (°)", mode="lines+markers", line=dict(color="#2F80ED", width=3), marker=dict(size=6, color="#2F80ED")))
-                        fig_er_p.add_trace(go.Scatter(x=p_er_ready['Date'], y=p_er_ready[er_r_col], name="Right Max ROM (°)", mode="lines+markers", line=dict(color="#FF8200", width=3, dash="dash"), marker=dict(size=6, color="#FF8200")))
-                        fig_er_p.update_layout(template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"), yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Degrees (°)"))
-                        st.plotly_chart(fig_er_p, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("No External Rotation records available for this selection.")
-            else:
-                st.info("No External Rotation records found.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- SECTION 4: GRIP SQUEEZE TEST ---
-            st.markdown('<div class="sub-header-title">GRIP SQUEEZE TEST</div>', unsafe_allow_html=True)
-            p_grip_ready = p_grip.dropna(subset=["Date"]).sort_values("Date").copy() if not p_grip.empty else pd.DataFrame()
-
-            if not p_grip_ready.empty and grip_l_col and grip_r_col and grip_l_col in p_grip_ready.columns and grip_r_col in p_grip_ready.columns:
-                p_grip_ready[grip_l_col] = pd.to_numeric(p_grip_ready[grip_l_col], errors="coerce").fillna(0)
-                p_grip_ready[grip_r_col] = pd.to_numeric(p_grip_ready[grip_r_col], errors="coerce").fillna(0)
-                p_grip_ready = p_grip_ready[(p_grip_ready[grip_l_col] > 0) | (p_grip_ready[grip_r_col] > 0)]
-
-                if not p_grip_ready.empty:
-                    lat_grip = p_grip_ready.iloc[-1]
-                    latest_grip_l, latest_grip_r = lat_grip[grip_l_col], lat_grip[grip_r_col]
-                    base_grip_l = p_grip_ready[grip_l_col].replace(0, np.nan).mean() or 0
-                    base_grip_r = p_grip_ready[grip_r_col].replace(0, np.nan).mean() or 0
-
-                    chg_grip_l = ((latest_grip_l - base_grip_l) / base_grip_l * 100) if base_grip_l > 0 else 0
-                    chg_grip_r = ((latest_grip_r - base_grip_r) / base_grip_r * 100) if base_grip_r > 0 else 0
-
-                    grip_asym_val = float(lat_grip[grip_asym_col]) if grip_asym_col and grip_asym_col in lat_grip and pd.notnull(lat_grip[grip_asym_col]) else ((abs(latest_grip_l - latest_grip_r) / max(latest_grip_l, latest_grip_r) * 100) if max(latest_grip_l, latest_grip_r) > 0 else 0.0)
-
-                    UPPER_THRESH, LOWER_THRESH = 499.47, 365.91
-                    def get_grip_color(val):
-                        return "tile-green" if val >= UPPER_THRESH else ("tile-orange" if val >= LOWER_THRESH else "tile-red")
-
-                    l_grip_cls = get_grip_color(latest_grip_l)
-                    r_grip_cls = get_grip_color(latest_grip_r)
-
-                    g_left, g_right = st.columns([1.1, 2])
-                    with g_left:
-                        gb1, gb2 = st.columns(2)
-                        with gb1:
-                            st.markdown(f'<div class="kpi-tile {l_grip_cls}"><h1>{int(latest_grip_l)} N</h1><p>LEFT FORCE</p></div>', unsafe_allow_html=True)
-                        with gb2:
-                            st.markdown(f'<div class="kpi-tile {r_grip_cls}"><h1>{int(latest_grip_r)} N</h1><p>RIGHT FORCE</p></div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="detail-box"><div><b>Force Asymmetry:</b> {grip_asym_val:+.1f}%</div><div><b>% Change from Base:</b> L: {chg_grip_l:+.1f}% | R: {chg_grip_r:+.1f}%</div><div><b>Base Force:</b> L: {int(base_grip_l)} N | R: {int(base_grip_r)} N</div></div>', unsafe_allow_html=True)
-
-                    with g_right:
-                        fig_grip_p = go.Figure()
-                        fig_grip_p.add_trace(go.Scatter(x=p_grip_ready["Date"], y=p_grip_ready[grip_l_col], name="Left Max Force (N)", mode="lines+markers", line=dict(color="#2F80ED", width=3), marker=dict(size=6, color="#2F80ED")))
-                        fig_grip_p.add_trace(go.Scatter(x=p_grip_ready["Date"], y=p_grip_ready[grip_r_col], name="Right Max Force (N)", mode="lines+markers", line=dict(color="#FF8200", width=3, dash="dash"), marker=dict(size=6, color="#FF8200")))
-                        fig_grip_p.update_layout(template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"), yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Force (N)", range=[184 * 0.9, 612 * 1.05]))
-                        st.plotly_chart(fig_grip_p, use_container_width=True, config={"displayModeBar": False})
-                else:
-                    st.info("No Grip Squeeze records available for this selection.")
-            else:
-                st.info("No Grip Squeeze records found.")
-
-        # =========================================================================
-        # TAB 3: CATAPULT PROFILE (SWING & THROW)
+        # TAB 2: CATAPULT PROFILE (SWING & THROW)
         # =========================================================================
         with tab_catapult:
             sub_swing, sub_throw = st.tabs(["SWING", "THROW"])
