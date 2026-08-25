@@ -90,7 +90,7 @@ if check_password():
         }
 
         /* Tables */
-        .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 10px; }
+        .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 10px; margin-bottom: 20px; }
         .coach-table th { background-color: #F8F9FA; padding: 10px; border-bottom: 2px solid #DEE2E6; color: #495057; font-weight: 700; font-size: 12px; }
         .coach-table td { padding: 10px; border-bottom: 1px solid #EEEEEE; font-size: 13px; }
         
@@ -249,7 +249,6 @@ if check_password():
         grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
         grip_asym_col = find_col(grip_df, ['Force Asymmetry (%)', 'Force Asymmetry', 'Asymmetry (%)', 'Asym (%)'])
 
-        # Robust Direct Photo Lookup
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
         st.markdown(f"""
@@ -277,12 +276,148 @@ if check_password():
             return best_row[col_name], best_row['Date'].strftime('%m/%d/%Y')
 
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult = st.tabs(["TESTING PROFILE", "CATAPULT PROFILE"])
+        tab_testing, tab_readiness, tab_catapult = st.tabs(["INTAKE / TESTING", "READINESS TRENDS", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: TESTING PROFILE
+        # TAB 1: INTAKE / TESTING (INTAKE TESTS & FULL HISTORY TABLE)
         # =========================================================================
         with tab_testing:
+            st.markdown('<div class="section-header">PHYSICAL TESTING & INTAKE PROFILE</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # --- Row 1: CMJ & ASH Intake Summary ---
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown('<div class="sub-header-title">Countermovement Jump (CMJ)</div>', unsafe_allow_html=True)
+                if not raw_cmj.empty and cmj_h_col and cmj_h_col in raw_cmj.columns:
+                    lat_cmj_intake = raw_cmj.dropna(subset=[cmj_h_col]).iloc[-1]
+                    h_val = lat_cmj_intake[cmj_h_col]
+                    rsi_val = lat_cmj_intake[cmj_rsi_col] if cmj_rsi_col and cmj_rsi_col in raw_cmj.columns else np.nan
+                    d_val = lat_cmj_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_cmj_intake['Date']) else "N/A"
+                    
+                    tc1, tc2 = st.columns(2)
+                    with tc1:
+                        st.markdown(f'<div class="kpi-tile tile-green"><h1>{h_val:.1f} cm</h1><p>Jump Height</p></div>', unsafe_allow_html=True)
+                    with tc2:
+                        st.markdown(f'<div class="kpi-tile tile-green"><h1>{rsi_val:.2f}</h1><p>RSI Modified</p></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {d_val}</div>', unsafe_allow_html=True)
+                else:
+                    st.info("No CMJ intake records found.")
+
+            with c2:
+                st.markdown('<div class="sub-header-title">ASH Shoulder Test (ISO I)</div>', unsafe_allow_html=True)
+                if not raw_ash.empty and ash_l_col and ash_r_col and ash_l_col in raw_ash.columns:
+                    lat_ash_intake = raw_ash.dropna(subset=[ash_l_col, ash_r_col]).iloc[-1]
+                    ash_l = lat_ash_intake[ash_l_col]
+                    ash_r = lat_ash_intake[ash_r_col]
+                    ash_asym = lat_ash_intake[ash_asym_col] if ash_asym_col and ash_asym_col in raw_ash.columns else ((abs(ash_l - ash_r)/max(ash_l, ash_r)*100) if max(ash_l, ash_r) > 0 else 0)
+                    ash_d = lat_ash_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_ash_intake['Date']) else "N/A"
+                    ash_cls = "tile-red" if ash_asym > 10 else "tile-green"
+
+                    tc1, tc2 = st.columns(2)
+                    with tc1:
+                        st.markdown(f'<div class="kpi-tile {ash_cls}"><h1>{int(ash_l)} N</h1><p>Left Peak Force</p></div>', unsafe_allow_html=True)
+                    with tc2:
+                        st.markdown(f'<div class="kpi-tile {ash_cls}"><h1>{int(ash_r)} N</h1><p>Right Peak Force</p></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {ash_d} | <b>Asymmetry:</b> {ash_asym:.1f}%</div>', unsafe_allow_html=True)
+                else:
+                    st.info("No ASH Shoulder intake records found.")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- Row 2: ER & Grip Squeeze Intake Summary ---
+            c3, c4 = st.columns(2)
+            with c3:
+                st.markdown('<div class="sub-header-title">External Rotation (ER) ROM</div>', unsafe_allow_html=True)
+                if not raw_er.empty and er_l_col and er_r_col and er_l_col in raw_er.columns:
+                    lat_er_intake = raw_er.dropna(subset=[er_l_col, er_r_col]).iloc[-1]
+                    er_l = lat_er_intake[er_l_col]
+                    er_r = lat_er_intake[er_r_col]
+                    er_asym = lat_er_intake[er_asym_col] if er_asym_col and er_asym_col in raw_er.columns else ((abs(er_l - er_r)/max(er_l, er_r)*100) if max(er_l, er_r) > 0 else 0)
+                    er_d = lat_er_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_er_intake['Date']) else "N/A"
+                    er_cls = "tile-red" if er_asym > 10 else "tile-green"
+
+                    tc1, tc2 = st.columns(2)
+                    with tc1:
+                        st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(er_l)}°</h1><p>Left Max ROM</p></div>', unsafe_allow_html=True)
+                    with tc2:
+                        st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(er_r)}°</h1><p>Right Max ROM</p></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {er_d} | <b>ROM Asymmetry:</b> {er_asym:.1f}%</div>', unsafe_allow_html=True)
+                else:
+                    st.info("No External Rotation intake records found.")
+
+            with c4:
+                st.markdown('<div class="sub-header-title">Grip Squeeze Force</div>', unsafe_allow_html=True)
+                if not raw_grip.empty and grip_l_col and grip_r_col and grip_l_col in raw_grip.columns:
+                    lat_grip_intake = raw_grip.dropna(subset=[grip_l_col, grip_r_col]).iloc[-1]
+                    grip_l = lat_grip_intake[grip_l_col]
+                    grip_r = lat_grip_intake[grip_r_col]
+                    grip_asym = lat_grip_intake[grip_asym_col] if grip_asym_col and grip_asym_col in raw_grip.columns else ((abs(grip_l - grip_r)/max(grip_l, grip_r)*100) if max(grip_l, grip_r) > 0 else 0)
+                    grip_d = lat_grip_intake['Date'].strftime('%m/%d/%Y') if pd.notnull(lat_grip_intake['Date']) else "N/A"
+
+                    UPPER_THRESH, LOWER_THRESH = 499.47, 365.91
+                    def get_grip_tile_cls(v):
+                        return "tile-green" if v >= UPPER_THRESH else ("tile-orange" if v >= LOWER_THRESH else "tile-red")
+
+                    tc1, tc2 = st.columns(2)
+                    with tc1:
+                        st.markdown(f'<div class="kpi-tile {get_grip_tile_cls(grip_l)}"><h1>{int(grip_l)} N</h1><p>Left Grip Force</p></div>', unsafe_allow_html=True)
+                    with tc2:
+                        st.markdown(f'<div class="kpi-tile {get_grip_tile_cls(grip_r)}"><h1>{int(grip_r)} N</h1><p>Right Grip Force</p></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="detail-box"><b>Latest Intake Date:</b> {grip_d} | <b>Force Asymmetry:</b> {grip_asym:.1f}%</div>', unsafe_allow_html=True)
+                else:
+                    st.info("No Grip Squeeze intake records found.")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('<div class="section-header">COMPLETE TESTING HISTORY</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # --- Combined Multi-Test History Table ---
+            hist_dfs = []
+
+            if not raw_cmj.empty and cmj_h_col in raw_cmj.columns:
+                c_slice = raw_cmj[['Date', cmj_h_col, cmj_rsi_col]].copy().dropna(subset=['Date'])
+                c_slice = c_slice.rename(columns={cmj_h_col: 'CMJ Height (cm)', cmj_rsi_col: 'CMJ RSI-mod'})
+                hist_dfs.append(c_slice)
+
+            if not raw_ash.empty and ash_l_col in raw_ash.columns and ash_r_col in raw_ash.columns:
+                a_slice = raw_ash[['Date', ash_l_col, ash_r_col]].copy().dropna(subset=['Date'])
+                a_slice = a_slice.rename(columns={ash_l_col: 'ASH Left (N)', ash_r_col: 'ASH Right (N)'})
+                hist_dfs.append(a_slice)
+
+            if not raw_er.empty and er_l_col in raw_er.columns and er_r_col in raw_er.columns:
+                e_slice = raw_er[['Date', er_l_col, er_r_col]].copy().dropna(subset=['Date'])
+                e_slice = e_slice.rename(columns={er_l_col: 'ER Left (°)', er_r_col: 'ER Right (°)'})
+                hist_dfs.append(e_slice)
+
+            if not raw_grip.empty and grip_l_col in raw_grip.columns and grip_r_col in raw_grip.columns:
+                g_slice = raw_grip[['Date', grip_l_col, grip_r_col]].copy().dropna(subset=['Date'])
+                g_slice = g_slice.rename(columns={grip_l_col: 'Grip Left (N)', grip_r_col: 'Grip Right (N)'})
+                hist_dfs.append(g_slice)
+
+            if hist_dfs:
+                full_history = hist_dfs[0]
+                for df_next in hist_dfs[1:]:
+                    full_history = pd.merge(full_history, df_next, on='Date', how='outer')
+
+                full_history = full_history.sort_values('Date', ascending=False)
+                full_history['Date'] = pd.to_datetime(full_history['Date']).dt.strftime('%m/%d/%Y')
+
+                # Formatting numeric values cleanly
+                for col in full_history.columns:
+                    if col != 'Date':
+                        full_history[col] = full_history[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) and isinstance(x, float) and (x % 1 != 0) else (f"{int(x)}" if pd.notnull(x) else "-"))
+
+                table_headers = "".join([f"<th>{c}</th>" for c in full_history.columns])
+                table_rows = "".join([f"<tr>{''.join([f'<td>{val}</td>' for val in row])}</tr>" for _, row in full_history.iterrows()])
+                st.markdown(f'<table class="coach-table"><thead><tr>{table_headers}</tr></thead><tbody>{table_rows}</tbody></table>', unsafe_allow_html=True)
+            else:
+                st.info("No testing history records available for this athlete.")
+
+        # =========================================================================
+        # TAB 2: READINESS TRENDS
+        # =========================================================================
+        with tab_readiness:
             st.subheader("ALL-TIME PERSONAL BESTS")
             b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, cmj_h_col)
             b_rsi, b_rsi_date = get_best_record(raw_cmj, cmj_rsi_col)
@@ -334,11 +469,8 @@ if check_password():
             st.markdown('<div class="section-header">WEEKLY READINESS PROFILE</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            # -------------------------------------------------------------
-            # SECTION 1: COUNTERMOVEMENT JUMP
-            # -------------------------------------------------------------
+            # --- SECTION 1: COUNTERMOVEMENT JUMP ---
             st.markdown('<div class="sub-header-title">COUNTERMOVEMENT JUMP</div>', unsafe_allow_html=True)
-            
             p_cmj_ready = p_cmj.dropna(subset=['Date']).sort_values('Date').copy() if not p_cmj.empty else pd.DataFrame()
 
             if not p_cmj_ready.empty and cmj_h_col and cmj_rsi_col and cmj_h_col in p_cmj_ready.columns and cmj_rsi_col in p_cmj_ready.columns:
@@ -348,11 +480,9 @@ if check_password():
                 
                 if not p_cmj_ready.empty:
                     cmj_plot_df = p_cmj_ready.groupby('Date', as_index=False)[[cmj_h_col, cmj_rsi_col]].mean()
-
                     lat_cmj = cmj_plot_df.iloc[-1]
                     latest_h = lat_cmj[cmj_h_col]
                     latest_rsi = lat_cmj[cmj_rsi_col]
-                    
                     base_h = cmj_plot_df[cmj_h_col].mean()
                     base_rsi = cmj_plot_df[cmj_rsi_col].mean()
 
@@ -366,84 +496,24 @@ if check_password():
                     with c_left:
                         cb1, cb2 = st.columns(2)
                         with cb1:
-                            st.markdown(f"""
-                                <div class="kpi-tile {h_tile_cls}">
-                                    <h1>{latest_h:.1f}</h1>
-                                    <p>CMJ HEIGHT</p>
-                                </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f'<div class="kpi-tile {h_tile_cls}"><h1>{latest_h:.1f}</h1><p>CMJ HEIGHT</p></div>', unsafe_allow_html=True)
                         with cb2:
-                            st.markdown(f"""
-                                <div class="kpi-tile {rsi_tile_cls}">
-                                    <h1>{latest_rsi:.2f}</h1>
-                                    <p>RSI MOD</p>
-                                </div>
-                            """, unsafe_allow_html=True)
-
-                        st.markdown(f"""
-                            <div class="detail-box">
-                                <div><b>% Change from Base:</b> CMJ: {chg_h:+.1f}% | RSI: {chg_rsi:+.1f}%</div>
-                                <div><b>Base Values:</b> CMJ: {base_h:.1f} | RSI: {base_rsi:.2f}</div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                            st.markdown(f'<div class="kpi-tile {rsi_tile_cls}"><h1>{latest_rsi:.2f}</h1><p>RSI MOD</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="detail-box"><div><b>% Change from Base:</b> CMJ: {chg_h:+.1f}% | RSI: {chg_rsi:+.1f}%</div><div><b>Base Values:</b> CMJ: {base_h:.1f} | RSI: {base_rsi:.2f}</div></div>', unsafe_allow_html=True)
 
                     with c_right:
                         fig_cmj = go.Figure()
-
-                        fig_cmj.add_trace(
-                            go.Scatter(
-                                x=cmj_plot_df['Date'],
-                                y=cmj_plot_df[cmj_h_col],
-                                name="Jump Height",
-                                mode="lines+markers",
-                                yaxis="y1",
-                                line=dict(color="#FF8200", width=3.5),
-                                marker=dict(size=9, color="#FF8200", symbol="circle")
-                            )
-                        )
-
-                        fig_cmj.add_trace(
-                            go.Scatter(
-                                x=cmj_plot_df['Date'],
-                                y=cmj_plot_df[cmj_rsi_col],
-                                name="RSI Modified",
-                                mode="lines+markers",
-                                yaxis="y2",
-                                line=dict(color="#2F80ED", width=2.5, dash="dot"),
-                                marker=dict(size=8, color="#2F80ED", symbol="circle")
-                            )
-                        )
-
-                        h_min = cmj_plot_df[cmj_h_col].min()
-                        h_max = cmj_plot_df[cmj_h_col].max()
-                        r_min = cmj_plot_df[cmj_rsi_col].min()
-                        r_max = cmj_plot_df[cmj_rsi_col].max()
-
-                        y1_range = [h_min - 2, h_max + 2] if h_min == h_max else [h_min * 0.95, h_max * 1.05]
-                        y2_range = [r_min - 0.05, r_max + 0.05] if r_min == r_max else [r_min * 0.9, r_max * 1.1]
-
+                        fig_cmj.add_trace(go.Scatter(x=cmj_plot_df['Date'], y=cmj_plot_df[cmj_h_col], name="Jump Height", mode="lines+markers", line=dict(color="#FF8200", width=3.5), marker=dict(size=9, color="#FF8200")))
+                        fig_cmj.add_trace(go.Scatter(x=cmj_plot_df['Date'], y=cmj_plot_df[cmj_rsi_col], name="RSI Modified", mode="lines+markers", yaxis="y2", line=dict(color="#2F80ED", width=2.5, dash="dot"), marker=dict(size=8, color="#2F80ED")))
+                        h_min, h_max = cmj_plot_df[cmj_h_col].min(), cmj_plot_df[cmj_h_col].max()
+                        r_min, r_max = cmj_plot_df[cmj_rsi_col].min(), cmj_plot_df[cmj_rsi_col].max()
                         fig_cmj.update_layout(
-                            template="plotly_white",
-                            height=230,
-                            margin=dict(l=10, r=10, t=25, b=10),
+                            template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10),
                             legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0),
                             xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
-                            yaxis=dict(
-                                title=None,
-                                showgrid=True,
-                                gridcolor="#F0F2F6",
-                                range=y1_range,
-                                side="left"
-                            ),
-                            yaxis2=dict(
-                                title=None,
-                                showgrid=False,
-                                range=y2_range,
-                                overlaying="y",
-                                side="right"
-                            )
+                            yaxis=dict(title=None, showgrid=True, gridcolor="#F0F2F6", range=[h_min - 2, h_max + 2] if h_min == h_max else [h_min * 0.95, h_max * 1.05]),
+                            yaxis2=dict(title=None, showgrid=False, range=[r_min - 0.05, r_max + 0.05] if r_min == r_max else [r_min * 0.9, r_max * 1.1], overlaying="y", side="right")
                         )
-
                         st.plotly_chart(fig_cmj, use_container_width=True, config={'displayModeBar': False})
                 else:
                     st.info("No Countermovement Jump records available for this selection.")
@@ -452,11 +522,8 @@ if check_password():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # -------------------------------------------------------------
-            # SECTION 2: ASH SHOULDER: ISO I
-            # -------------------------------------------------------------
+            # --- SECTION 2: ASH SHOULDER: ISO I ---
             st.markdown('<div class="sub-header-title">ASH SHOULDER: ISO I</div>', unsafe_allow_html=True)
-
             p_ash_ready = p_ash.dropna(subset=['Date']).sort_values('Date').copy() if not p_ash.empty else pd.DataFrame()
 
             if not p_ash_ready.empty and ash_l_col and ash_r_col and ash_l_col in p_ash_ready.columns and ash_r_col in p_ash_ready.columns:
@@ -466,76 +533,29 @@ if check_password():
 
                 if not p_ash_ready.empty:
                     lat_ash_r = p_ash_ready.iloc[-1]
-                    latest_l = lat_ash_r[ash_l_col]
-                    latest_r = lat_ash_r[ash_r_col]
-
-                    base_l = p_ash_ready[ash_l_col].replace(0, np.nan).mean()
-                    base_r = p_ash_ready[ash_r_col].replace(0, np.nan).mean()
-                    base_l = base_l if pd.notnull(base_l) else 0
-                    base_r = base_r if pd.notnull(base_r) else 0
-
+                    latest_l, latest_r = lat_ash_r[ash_l_col], lat_ash_r[ash_r_col]
+                    base_l = p_ash_ready[ash_l_col].replace(0, np.nan).mean() or 0
+                    base_r = p_ash_ready[ash_r_col].replace(0, np.nan).mean() or 0
                     chg_l = ((latest_l - base_l) / base_l * 100) if base_l > 0 else 0
                     chg_r = ((latest_r - base_r) / base_r * 100) if base_r > 0 else 0
 
-                    if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]):
-                        asym_val = float(lat_ash_r[ash_asym_col])
-                    else:
-                        asym_val = (abs(latest_l - latest_r) / max(latest_l, latest_r) * 100) if max(latest_l, latest_r) > 0 else 0.0
-                    
-                    l_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
-                    r_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
+                    asym_val = float(lat_ash_r[ash_asym_col]) if ash_asym_col and ash_asym_col in lat_ash_r and pd.notnull(lat_ash_r[ash_asym_col]) else ((abs(latest_l - latest_r)/max(latest_l, latest_r)*100) if max(latest_l, latest_r) > 0 else 0.0)
+                    ash_tile_cls = "tile-red" if asym_val > 10 else "tile-green"
 
                     a_left, a_right = st.columns([1.1, 2])
                     with a_left:
                         ab1, ab2 = st.columns(2)
                         with ab1:
-                            st.markdown(f"""
-                                <div class="kpi-tile {l_tile_cls}">
-                                    <h1>{int(latest_l)} N</h1>
-                                    <p>LEFT</p>
-                                </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f'<div class="kpi-tile {ash_tile_cls}"><h1>{int(latest_l)} N</h1><p>LEFT</p></div>', unsafe_allow_html=True)
                         with ab2:
-                            st.markdown(f"""
-                                <div class="kpi-tile {r_tile_cls}">
-                                    <h1>{int(latest_r)} N</h1>
-                                    <p>RIGHT</p>
-                                </div>
-                            """, unsafe_allow_html=True)
-
-                        st.markdown(f"""
-                            <div class="detail-box">
-                                <div><b>Asymmetry:</b> {asym_val:+.1f}%</div>
-                                <div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div>
-                                <div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                            st.markdown(f'<div class="kpi-tile {ash_tile_cls}"><h1>{int(latest_r)} N</h1><p>RIGHT</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="detail-box"><div><b>Asymmetry:</b> {asym_val:+.1f}%</div><div><b>% Change from Base:</b> L: {chg_l:+.1f}% | R: {chg_r:+.1f}%</div><div><b>Base Force:</b> L: {int(base_l)} N | R: {int(base_r)} N</div></div>', unsafe_allow_html=True)
 
                     with a_right:
                         fig_ash_p = go.Figure()
-                        fig_ash_p.add_trace(
-                            go.Scatter(
-                                x=p_ash_ready['Date'], y=p_ash_ready[ash_l_col],
-                                name="Left Peak Force", mode="lines+markers",
-                                line=dict(color="#2F80ED", width=3),
-                                marker=dict(size=6, color="#2F80ED")
-                            )
-                        )
-                        fig_ash_p.add_trace(
-                            go.Scatter(
-                                x=p_ash_ready['Date'], y=p_ash_ready[ash_r_col],
-                                name="Right Peak Force", mode="lines+markers",
-                                line=dict(color="#FF8200", width=3, dash="dash"),
-                                marker=dict(size=6, color="#FF8200")
-                            )
-                        )
-                        fig_ash_p.update_layout(
-                            template="plotly_white", height=230,
-                            margin=dict(l=10, r=10, t=25, b=10),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
-                            yaxis=dict(showgrid=True, gridcolor="#F0F2F6")
-                        )
+                        fig_ash_p.add_trace(go.Scatter(x=p_ash_ready['Date'], y=p_ash_ready[ash_l_col], name="Left Peak Force", mode="lines+markers", line=dict(color="#2F80ED", width=3), marker=dict(size=6, color="#2F80ED")))
+                        fig_ash_p.add_trace(go.Scatter(x=p_ash_ready['Date'], y=p_ash_ready[ash_r_col], name="Right Peak Force", mode="lines+markers", line=dict(color="#FF8200", width=3, dash="dash"), marker=dict(size=6, color="#FF8200")))
+                        fig_ash_p.update_layout(template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"), yaxis=dict(showgrid=True, gridcolor="#F0F2F6"))
                         st.plotly_chart(fig_ash_p, use_container_width=True, config={'displayModeBar': False})
                 else:
                     st.info("No ASH Shoulder records available for this selection.")
@@ -544,11 +564,8 @@ if check_password():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # -------------------------------------------------------------
-            # SECTION 3: EXTERNAL ROTATION (ER) TEST
-            # -------------------------------------------------------------
+            # --- SECTION 3: EXTERNAL ROTATION (ER) TEST ---
             st.markdown('<div class="sub-header-title">EXTERNAL ROTATION (ER) TEST</div>', unsafe_allow_html=True)
-
             p_er_ready = p_er.dropna(subset=['Date']).sort_values('Date').copy() if not p_er.empty else pd.DataFrame()
 
             if not p_er_ready.empty and er_l_col and er_r_col and er_l_col in p_er_ready.columns and er_r_col in p_er_ready.columns:
@@ -558,76 +575,29 @@ if check_password():
 
                 if not p_er_ready.empty:
                     lat_er = p_er_ready.iloc[-1]
-                    latest_er_l = lat_er[er_l_col]
-                    latest_er_r = lat_er[er_r_col]
-
-                    base_er_l = p_er_ready[er_l_col].replace(0, np.nan).mean()
-                    base_er_r = p_er_ready[er_r_col].replace(0, np.nan).mean()
-                    base_er_l = base_er_l if pd.notnull(base_er_l) else 0
-                    base_er_r = base_er_r if pd.notnull(base_er_r) else 0
-
+                    latest_er_l, latest_er_r = lat_er[er_l_col], lat_er[er_r_col]
+                    base_er_l = p_er_ready[er_l_col].replace(0, np.nan).mean() or 0
+                    base_er_r = p_er_ready[er_r_col].replace(0, np.nan).mean() or 0
                     chg_er_l = ((latest_er_l - base_er_l) / base_er_l * 100) if base_er_l > 0 else 0
                     chg_er_r = ((latest_er_r - base_er_r) / base_er_r * 100) if base_er_r > 0 else 0
 
-                    if er_asym_col and er_asym_col in lat_er and pd.notnull(lat_er[er_asym_col]):
-                        er_asym_val = float(lat_er[er_asym_col])
-                    else:
-                        er_asym_val = (abs(latest_er_l - latest_er_r) / max(latest_er_l, latest_er_r) * 100) if max(latest_er_l, latest_er_r) > 0 else 0.0
-
-                    l_er_cls = "tile-red" if er_asym_val > 10 else "tile-green"
-                    r_er_cls = "tile-red" if er_asym_val > 10 else "tile-green"
+                    er_asym_val = float(lat_er[er_asym_col]) if er_asym_col and er_asym_col in lat_er and pd.notnull(lat_er[er_asym_col]) else ((abs(latest_er_l - latest_er_r)/max(latest_er_l, latest_er_r)*100) if max(latest_er_l, latest_er_r) > 0 else 0.0)
+                    er_cls = "tile-red" if er_asym_val > 10 else "tile-green"
 
                     er_left, er_right = st.columns([1.1, 2])
                     with er_left:
                         erb1, erb2 = st.columns(2)
                         with erb1:
-                            st.markdown(f"""
-                                <div class="kpi-tile {l_er_cls}">
-                                    <h1>{int(latest_er_l)}°</h1>
-                                    <p>LEFT MAX ROM</p>
-                                </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(latest_er_l)}°</h1><p>LEFT MAX ROM</p></div>', unsafe_allow_html=True)
                         with erb2:
-                            st.markdown(f"""
-                                <div class="kpi-tile {r_er_cls}">
-                                    <h1>{int(latest_er_r)}°</h1>
-                                    <p>RIGHT MAX ROM</p>
-                                </div>
-                            """, unsafe_allow_html=True)
-
-                        st.markdown(f"""
-                            <div class="detail-box">
-                                <div><b>ROM Asymmetry:</b> {er_asym_val:+.1f}%</div>
-                                <div><b>% Change from Base:</b> L: {chg_er_l:+.1f}% | R: {chg_er_r:+.1f}%</div>
-                                <div><b>Base ROM:</b> L: {int(base_er_l)}° | R: {int(base_er_r)}°</div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                            st.markdown(f'<div class="kpi-tile {er_cls}"><h1>{int(latest_er_r)}°</h1><p>RIGHT MAX ROM</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="detail-box"><div><b>ROM Asymmetry:</b> {er_asym_val:+.1f}%</div><div><b>% Change from Base:</b> L: {chg_er_l:+.1f}% | R: {chg_er_r:+.1f}%</div><div><b>Base ROM:</b> L: {int(base_er_l)}° | R: {int(base_er_r)}°</div></div>', unsafe_allow_html=True)
 
                     with er_right:
                         fig_er_p = go.Figure()
-                        fig_er_p.add_trace(
-                            go.Scatter(
-                                x=p_er_ready['Date'], y=p_er_ready[er_l_col],
-                                name="Left Max ROM (°)", mode="lines+markers",
-                                line=dict(color="#2F80ED", width=3),
-                                marker=dict(size=6, color="#2F80ED")
-                            )
-                        )
-                        fig_er_p.add_trace(
-                            go.Scatter(
-                                x=p_er_ready['Date'], y=p_er_ready[er_r_col],
-                                name="Right Max ROM (°)", mode="lines+markers",
-                                line=dict(color="#FF8200", width=3, dash="dash"),
-                                marker=dict(size=6, color="#FF8200")
-                            )
-                        )
-                        fig_er_p.update_layout(
-                            template="plotly_white", height=230,
-                            margin=dict(l=10, r=10, t=25, b=10),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
-                            yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Degrees (°)")
-                        )
+                        fig_er_p.add_trace(go.Scatter(x=p_er_ready['Date'], y=p_er_ready[er_l_col], name="Left Max ROM (°)", mode="lines+markers", line=dict(color="#2F80ED", width=3), marker=dict(size=6, color="#2F80ED")))
+                        fig_er_p.add_trace(go.Scatter(x=p_er_ready['Date'], y=p_er_ready[er_r_col], name="Right Max ROM (°)", mode="lines+markers", line=dict(color="#FF8200", width=3, dash="dash"), marker=dict(size=6, color="#FF8200")))
+                        fig_er_p.update_layout(template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"), yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Degrees (°)"))
                         st.plotly_chart(fig_er_p, use_container_width=True, config={'displayModeBar': False})
                 else:
                     st.info("No External Rotation records available for this selection.")
@@ -636,183 +606,55 @@ if check_password():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # -------------------------------------------------------------
-            # SECTION 4: GRIP SQUEEZE TEST
-            # -------------------------------------------------------------
-            st.markdown(
-                '<div class="sub-header-title">GRIP SQUEEZE TEST</div>',
-                unsafe_allow_html=True,
-            )
+            # --- SECTION 4: GRIP SQUEEZE TEST ---
+            st.markdown('<div class="sub-header-title">GRIP SQUEEZE TEST</div>', unsafe_allow_html=True)
+            p_grip_ready = p_grip.dropna(subset=["Date"]).sort_values("Date").copy() if not p_grip.empty else pd.DataFrame()
 
-            p_grip_ready = (
-                p_grip.dropna(subset=["Date"]).sort_values("Date").copy()
-                if not p_grip.empty
-                else pd.DataFrame()
-            )
+            if not p_grip_ready.empty and grip_l_col and grip_r_col and grip_l_col in p_grip_ready.columns and grip_r_col in p_grip_ready.columns:
+                p_grip_ready[grip_l_col] = pd.to_numeric(p_grip_ready[grip_l_col], errors="coerce").fillna(0)
+                p_grip_ready[grip_r_col] = pd.to_numeric(p_grip_ready[grip_r_col], errors="coerce").fillna(0)
+                p_grip_ready = p_grip_ready[(p_grip_ready[grip_l_col] > 0) | (p_grip_ready[grip_r_col] > 0)]
 
-            if (
-                not p_grip_ready.empty
-                and grip_l_col
-                and grip_r_col
-                and grip_l_col in p_grip_ready.columns
-                and grip_r_col in p_grip_ready.columns
-            ):
-              p_grip_ready[grip_l_col] = pd.to_numeric(
-                  p_grip_ready[grip_l_col], errors="coerce"
-              ).fillna(0)
-              p_grip_ready[grip_r_col] = pd.to_numeric(
-                  p_grip_ready[grip_r_col], errors="coerce"
-              ).fillna(0)
-              p_grip_ready = p_grip_ready[
-                  (p_grip_ready[grip_l_col] > 0) | (p_grip_ready[grip_r_col] > 0)
-              ]
+                if not p_grip_ready.empty:
+                    lat_grip = p_grip_ready.iloc[-1]
+                    latest_grip_l, latest_grip_r = lat_grip[grip_l_col], lat_grip[grip_r_col]
+                    base_grip_l = p_grip_ready[grip_l_col].replace(0, np.nan).mean() or 0
+                    base_grip_r = p_grip_ready[grip_r_col].replace(0, np.nan).mean() or 0
 
-              if not p_grip_ready.empty:
-                lat_grip = p_grip_ready.iloc[-1]
-                latest_grip_l = lat_grip[grip_l_col]
-                latest_grip_r = lat_grip[grip_r_col]
+                    chg_grip_l = ((latest_grip_l - base_grip_l) / base_grip_l * 100) if base_grip_l > 0 else 0
+                    chg_grip_r = ((latest_grip_r - base_grip_r) / base_grip_r * 100) if base_grip_r > 0 else 0
 
-                base_grip_l = p_grip_ready[grip_l_col].replace(0, np.nan).mean()
-                base_grip_r = p_grip_ready[grip_r_col].replace(0, np.nan).mean()
-                base_grip_l = base_grip_l if pd.notnull(base_grip_l) else 0
-                base_grip_r = base_grip_r if pd.notnull(base_grip_r) else 0
+                    grip_asym_val = float(lat_grip[grip_asym_col]) if grip_asym_col and grip_asym_col in lat_grip and pd.notnull(lat_grip[grip_asym_col]) else ((abs(latest_grip_l - latest_grip_r) / max(latest_grip_l, latest_grip_r) * 100) if max(latest_grip_l, latest_grip_r) > 0 else 0.0)
 
-                chg_grip_l = (
-                    ((latest_grip_l - base_grip_l) / base_grip_l * 100)
-                    if base_grip_l > 0
-                    else 0
-                )
-                chg_grip_r = (
-                    ((latest_grip_r - base_grip_r) / base_grip_r * 100)
-                    if base_grip_r > 0
-                    else 0
-                )
+                    UPPER_THRESH, LOWER_THRESH = 499.47, 365.91
+                    def get_grip_color(val):
+                        return "tile-green" if val >= UPPER_THRESH else ("tile-orange" if val >= LOWER_THRESH else "tile-red")
 
-                if (
-                    grip_asym_col
-                    and grip_asym_col in lat_grip
-                    and pd.notnull(lat_grip[grip_asym_col])
-                ):
-                  grip_asym_val = float(lat_grip[grip_asym_col])
+                    l_grip_cls = get_grip_color(latest_grip_l)
+                    r_grip_cls = get_grip_color(latest_grip_r)
+
+                    g_left, g_right = st.columns([1.1, 2])
+                    with g_left:
+                        gb1, gb2 = st.columns(2)
+                        with gb1:
+                            st.markdown(f'<div class="kpi-tile {l_grip_cls}"><h1>{int(latest_grip_l)} N</h1><p>LEFT FORCE</p></div>', unsafe_allow_html=True)
+                        with gb2:
+                            st.markdown(f'<div class="kpi-tile {r_grip_cls}"><h1>{int(latest_grip_r)} N</h1><p>RIGHT FORCE</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="detail-box"><div><b>Force Asymmetry:</b> {grip_asym_val:+.1f}%</div><div><b>% Change from Base:</b> L: {chg_grip_l:+.1f}% | R: {chg_grip_r:+.1f}%</div><div><b>Base Force:</b> L: {int(base_grip_l)} N | R: {int(base_grip_r)} N</div></div>', unsafe_allow_html=True)
+
+                    with g_right:
+                        fig_grip_p = go.Figure()
+                        fig_grip_p.add_trace(go.Scatter(x=p_grip_ready["Date"], y=p_grip_ready[grip_l_col], name="Left Max Force (N)", mode="lines+markers", line=dict(color="#2F80ED", width=3), marker=dict(size=6, color="#2F80ED")))
+                        fig_grip_p.add_trace(go.Scatter(x=p_grip_ready["Date"], y=p_grip_ready[grip_r_col], name="Right Max Force (N)", mode="lines+markers", line=dict(color="#FF8200", width=3, dash="dash"), marker=dict(size=6, color="#FF8200")))
+                        fig_grip_p.update_layout(template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0), xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"), yaxis=dict(showgrid=True, gridcolor="#F0F2F6", title="Force (N)", range=[184 * 0.9, 612 * 1.05]))
+                        st.plotly_chart(fig_grip_p, use_container_width=True, config={"displayModeBar": False})
                 else:
-                  grip_asym_val = (
-                      (
-                          abs(latest_grip_l - latest_grip_r)
-                          / max(latest_grip_l, latest_grip_r)
-                          * 100
-                      )
-                      if max(latest_grip_l, latest_grip_r) > 0
-                      else 0.0
-                  )
-
-                # Normative Cutoffs: Avg ~432.69 | SD ~66.78
-                UPPER_THRESH = 499.47
-                LOWER_THRESH = 365.91
-
-                def get_grip_color(val):
-                  if val >= UPPER_THRESH:
-                    return "tile-green"
-                  elif val >= LOWER_THRESH:
-                    return "tile-orange"
-                  return "tile-red"
-
-                l_grip_cls = get_grip_color(latest_grip_l)
-                r_grip_cls = get_grip_color(latest_grip_r)
-
-                g_left, g_right = st.columns([1.1, 2])
-                with g_left:
-                  gb1, gb2 = st.columns(2)
-                  with gb1:
-                    st.markdown(
-                        f"""
-                                <div class="kpi-tile {l_grip_cls}">
-                                    <h1>{int(latest_grip_l)} N</h1>
-                                    <p>LEFT FORCE</p>
-                                </div>
-                            """,
-                        unsafe_allow_html=True,
-                    )
-                  with gb2:
-                    st.markdown(
-                        f"""
-                                <div class="kpi-tile {r_grip_cls}">
-                                    <h1>{int(latest_grip_r)} N</h1>
-                                    <p>RIGHT FORCE</p>
-                                </div>
-                            """,
-                        unsafe_allow_html=True,
-                    )
-
-                  st.markdown(
-                      f"""
-                            <div class="detail-box">
-                                <div><b>Force Asymmetry:</b> {grip_asym_val:+.1f}%</div>
-                                <div><b>% Change from Base:</b> L: {chg_grip_l:+.1f}% | R: {chg_grip_r:+.1f}%</div>
-                                <div><b>Base Force:</b> L: {int(base_grip_l)} N | R: {int(base_grip_r)} N</div>
-                            </div>
-                        """,
-                      unsafe_allow_html=True,
-                  )
-
-                with g_right:
-                  fig_grip_p = go.Figure()
-                  fig_grip_p.add_trace(
-                      go.Scatter(
-                          x=p_grip_ready["Date"],
-                          y=p_grip_ready[grip_l_col],
-                          name="Left Max Force (N)",
-                          mode="lines+markers",
-                          line=dict(color="#2F80ED", width=3),
-                          marker=dict(size=6, color="#2F80ED"),
-                      )
-                  )
-                  fig_grip_p.add_trace(
-                      go.Scatter(
-                          x=p_grip_ready["Date"],
-                          y=p_grip_ready[grip_r_col],
-                          name="Right Max Force (N)",
-                          mode="lines+markers",
-                          line=dict(color="#FF8200", width=3, dash="dash"),
-                          marker=dict(size=6, color="#FF8200"),
-                      )
-                  )
-                  fig_grip_p.update_layout(
-                      template="plotly_white",
-                      height=230,
-                      margin=dict(l=10, r=10, t=25, b=10),
-                      legend=dict(
-                          orientation="h",
-                          yanchor="bottom",
-                          y=1.02,
-                          xanchor="left",
-                          x=0,
-                      ),
-                      xaxis=dict(
-                          showgrid=True,
-                          gridcolor="#F0F2F6",
-                          tickformat="%b %d<br>%Y",
-                      ),
-                      yaxis=dict(
-                          showgrid=True,
-                          gridcolor="#F0F2F6",
-                          title="Force (N)",
-                          range=[184 * 0.9, 612 * 1.05],
-                      ),
-                  )
-                  st.plotly_chart(
-                      fig_grip_p,
-                      use_container_width=True,
-                      config={"displayModeBar": False},
-                  )
-              else:
-                st.info(
-                    "No Grip Squeeze records available for this selection."
-                )
+                    st.info("No Grip Squeeze records available for this selection.")
             else:
-              st.info("No Grip Squeeze records found.")
+                st.info("No Grip Squeeze records found.")
 
         # =========================================================================
-        # TAB 2: CATAPULT PROFILE (SWING & THROW)
+        # TAB 3: CATAPULT PROFILE (SWING & THROW)
         # =========================================================================
         with tab_catapult:
             sub_swing, sub_throw = st.tabs(["SWING", "THROW"])
