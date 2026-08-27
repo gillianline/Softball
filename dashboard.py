@@ -154,12 +154,13 @@ if check_password():
         cmj_df = safe_read_csv("CMJ_URL")
         er_df = safe_read_csv("ER_URL")
         grip_df = safe_read_csv("GRIP_URL")
+        sprint_df = safe_read_csv("SPRINT_20M_URL")
         roster_df = safe_read_csv("ROSTER_URL")
         swing_df = safe_read_csv("SWING_URL")
         throw_df = safe_read_csv("THROW_URL")
 
         # Standardize athlete name column
-        for df in [ash_df, cmj_df, er_df, grip_df, roster_df, swing_df, throw_df]:
+        for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, roster_df, swing_df, throw_df]:
             if not df.empty:
                 if 'Name' in df.columns and 'Player Name' not in df.columns:
                     df.rename(columns={'Name': 'Player Name'}, inplace=True)
@@ -178,33 +179,35 @@ if check_password():
                     if val and val.lower() != 'nan':
                         photo_dict[str(r[name_col]).strip().lower()] = val
 
-        # Clean ASH numeric columns
+        # Clean numeric columns across datasets
         if not ash_df.empty:
             for col in ash_df.columns:
                 if any(k in col.lower() for k in ['force', 'asym', 'rfd']):
                     ash_df[col] = clean_num_series(ash_df[col])
 
-        # Clean CMJ numeric columns
         if not cmj_df.empty:
             for col in cmj_df.columns:
                 if any(k in col.lower() for k in ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']):
                     cmj_df[col] = clean_num_series(cmj_df[col])
 
-        # Clean ER ROM numeric columns
         if not er_df.empty:
             for col in er_df.columns:
                 if any(k in col.lower() for k in ['rom', 'asymmetry', 'asym']):
                     er_df[col] = clean_num_series(er_df[col])
 
-        # Clean Grip Squeeze Force numeric columns
         if not grip_df.empty:
             for col in grip_df.columns:
                 if any(k in col.lower() for k in ['force', 'asymmetry', 'asym']):
                     grip_df[col] = clean_num_series(grip_df[col])
 
-        return ash_df, cmj_df, er_df, grip_df, swing_df, throw_df, photo_dict
+        if not sprint_df.empty:
+            for col in sprint_df.columns:
+                if any(k in col.lower() for k in ['time', '20m', 'sec', 'speed']):
+                    sprint_df[col] = clean_num_series(sprint_df[col])
 
-    ash_df, cmj_df, er_df, grip_df, swing_df, throw_df, photo_dict = load_all_data()
+        return ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, photo_dict
+
+    ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, photo_dict = load_all_data()
 
     def find_col(df, options):
         if df.empty:
@@ -218,7 +221,7 @@ if check_password():
                 return match_part[0]
         return None
 
-    if not ash_df.empty or not cmj_df.empty or not er_df.empty or not grip_df.empty:
+    if not ash_df.empty or not cmj_df.empty or not er_df.empty or not grip_df.empty or not sprint_df.empty:
         # --- 5. SEASON SETUP ---
         SPRING_START = pd.to_datetime("2026-01-01")
         SPRING_END = pd.to_datetime("2026-05-31 23:59:59")
@@ -228,7 +231,8 @@ if check_password():
             list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
             list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else []) +
             list(er_df['Player Name'].dropna().unique() if 'Player Name' in er_df.columns else []) +
-            list(grip_df['Player Name'].dropna().unique() if 'Player Name' in grip_df.columns else [])
+            list(grip_df['Player Name'].dropna().unique() if 'Player Name' in grip_df.columns else []) +
+            list(sprint_df['Player Name'].dropna().unique() if 'Player Name' in sprint_df.columns else [])
         )))
 
         f_col1, f_col2 = st.columns(2)
@@ -251,6 +255,7 @@ if check_password():
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
         raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
         raw_grip = grip_df[grip_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in grip_df.columns else pd.DataFrame()
+        raw_sprint = sprint_df[sprint_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in sprint_df.columns else pd.DataFrame()
         raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
         raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
 
@@ -258,6 +263,7 @@ if check_password():
         p_cmj = filter_season(raw_cmj).copy()
         p_er = filter_season(raw_er).copy()
         p_grip = filter_season(raw_grip).copy()
+        p_sprint = filter_season(raw_sprint).copy()
         p_swing = filter_season(raw_swing).copy()
         p_throw = filter_season(raw_throw).copy()
 
@@ -276,6 +282,8 @@ if check_password():
         grip_l_col = find_col(grip_df, ['L Max Force (N)', 'L Max Force', 'Left Max Force (N)', 'Force (L)', 'L Grip'])
         grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
         grip_asym_col = find_col(grip_df, ['Force Asymmetry (%)', 'Force Asymmetry', 'Asymmetry (%)', 'Asym (%)'])
+
+        sprint_time_col = find_col(sprint_df, ['Time', '20m Time', '20m Sprint', 'Time (s)', '20m (s)', '20m'])
 
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
@@ -303,13 +311,19 @@ if check_password():
             best_row = temp.loc[idx]
             return best_row[col_name], best_row['Date'].strftime('%m/%d/%Y')
 
-        def fmt_pct(chg):
+        def fmt_pct(chg, lower_is_better=False):
             if np.isnan(chg):
                 return ""
-            if chg > 0:
-                return f'<span class="pct-up">(↑{chg:.1f}%)</span>'
-            elif chg < 0:
-                return f'<span class="pct-down">(↓{abs(chg):.1f}%)</span>'
+            if lower_is_better:
+                if chg < 0:
+                    return f'<span class="pct-up">(↓{abs(chg):.1f}%)</span>'
+                elif chg > 0:
+                    return f'<span class="pct-down">(↑{chg:.1f}%)</span>'
+            else:
+                if chg > 0:
+                    return f'<span class="pct-up">(↑{chg:.1f}%)</span>'
+                elif chg < 0:
+                    return f'<span class="pct-down">(↓{abs(chg):.1f}%)</span>'
             return '<span class="pct-flat">(0.0%)</span>'
 
         def render_table_html(df):
@@ -384,6 +398,12 @@ if check_password():
                             <circle cx="68" cy="162" r="4" fill="#4895DB" stroke="#FFFFFF" stroke-width="1.2" />
                             <rect x="118" y="154" width="16" height="16" rx="4" fill="#4895DB" />
                             <text x="126" y="166" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+
+                            <!-- 5: 20m Sprint (Feet/Sprint Base) -->
+                            <line x1="48" y1="205" x2="18" y2="205" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
+                            <circle cx="48" cy="205" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
+                            <rect x="2" y="197" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="10" y="209" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                         </svg>
                     </div>
                 </div>
@@ -516,9 +536,48 @@ if check_password():
                 else:
                     st.info("No Countermovement Jump data available for this season.")
 
+                # Card 5: 20m Sprint Test
+                if not p_sprint.empty and sprint_time_col and sprint_time_col in p_sprint.columns:
+                    p_sp_val = p_sprint.dropna(subset=[sprint_time_col]).copy()
+                    if not p_sp_val.empty:
+                        sp_best = p_sp_val[sprint_time_col].min()
+                        sp_rec = p_sp_val.iloc[-1]
+                        sp_rec_time = sp_rec[sprint_time_col]
+                        sp_date = sp_rec['Date'].strftime('%Y-%m-%d') if pd.notnull(sp_rec['Date']) else "N/A"
+                        chg_sp = ((sp_rec_time - sp_best) / sp_best * 100) if sp_best > 0 else 0
+
+                        st.markdown(f"""
+                            <div class="assessment-card border-orange">
+                                <div class="card-top">
+                                    <div class="card-title-wrap">
+                                        <div class="badge-num badge-orange">5</div>
+                                        <span class="card-title">20m Sprint Test</span>
+                                    </div>
+                                    <span class="card-date">Latest: {sp_date}</span>
+                                </div>
+                                <div class="card-metrics">
+                                    <b>Best Time:</b> {sp_best:.2f}s &nbsp;→&nbsp; 
+                                    <b>Recent:</b> {sp_rec_time:.2f}s {fmt_pct(chg_sp, lower_is_better=True)}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("No 20m Sprint records available for this season.")
+
             # --- BOTTOM: RAW LOGS IN COLLAPSIBLE DROPDOWNS ---
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f'<h3 style="font-weight:800; font-size:22px; color:#1D1D1F; margin-bottom:14px;">Assessment Raw Logs for {selected} ({season_option})</h3>', unsafe_allow_html=True)
+
+            with st.expander("20m Sprint Test Log", expanded=False):
+                if not raw_sprint.empty and sprint_time_col in raw_sprint.columns:
+                    t_sp = raw_sprint.dropna(subset=['Date', sprint_time_col]).sort_values('Date', ascending=False).copy()
+                    t_sp['DATE'] = t_sp['Date'].dt.strftime('%Y-%m-%d')
+                    t_sp['TEST'] = '20m Sprint'
+                    t_sp['TIME (s)'] = t_sp[sprint_time_col].apply(lambda x: f"{x:.2f}s")
+                    disp_sp = t_sp[['DATE', 'TEST', 'TIME (s)']]
+                    st.markdown(render_table_html(disp_sp), unsafe_allow_html=True)
+                else:
+                    st.info("No 20m Sprint records available.")
 
             with st.expander("ASH Shoulder Test Log", expanded=False):
                 if not raw_ash.empty and ash_l_col in raw_ash.columns and ash_r_col in raw_ash.columns:
@@ -581,10 +640,11 @@ if check_password():
                     st.info("No Countermovement Jump records available.")
 
         # =========================================================================
-        # TAB 2: TESTING PROFILE (INDIVIDUAL TESTS WITH LEFT/RIGHT BOXES & COLOR TILES)
+        # TAB 2: TESTING PROFILE (INDIVIDUAL TESTS WITH PERSONAL BESTS & CHARTS)
         # =========================================================================
         with tab_profile:
             st.subheader("ALL-TIME PERSONAL BESTS")
+            b_sprint, b_sprint_date = get_best_record(raw_sprint, sprint_time_col, is_min=True)
             b_cmj_h, b_cmj_h_date = get_best_record(raw_cmj, cmj_h_col)
             b_rsi, b_rsi_date = get_best_record(raw_cmj, cmj_rsi_col)
             b_ash_l, b_ash_l_date = get_best_record(raw_ash, ash_l_col)
@@ -594,8 +654,12 @@ if check_password():
             b_grip_l, b_grip_l_date = get_best_record(raw_grip, grip_l_col)
             b_grip_r, b_grip_r_date = get_best_record(raw_grip, grip_r_col)
 
-            # Row 1: CMJ & ASH Best Cards
-            b1, b2, b3, b4 = st.columns(4)
+            # Row 1: Sprint, CMJ & RSI Best Cards
+            b0, b1, b2 = st.columns(3)
+            with b0:
+                val = f"{b_sprint:.2f} s" if b_sprint is not None else "N/A"
+                d_str = f"Set on {b_sprint_date}" if b_sprint_date else "No Record"
+                st.markdown(f'<div class="best-card"><h4>Best 20m Sprint</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
             with b1:
                 val = f"{b_cmj_h:.1f} cm" if b_cmj_h is not None else "N/A"
                 d_str = f"Set on {b_cmj_h_date}" if b_cmj_h_date else "No Record"
@@ -604,6 +668,9 @@ if check_password():
                 val = f"{b_rsi:.2f}" if b_rsi is not None else "N/A"
                 d_str = f"Set on {b_rsi_date}" if b_rsi_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best RSI-modified</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+
+            # Row 2: ASH & ER Best Cards
+            b3, b4, b5, b6 = st.columns(4)
             with b3:
                 val = f"{int(b_ash_l)} N" if b_ash_l is not None else "N/A"
                 d_str = f"Set on {b_ash_l_date}" if b_ash_l_date else "No Record"
@@ -612,9 +679,6 @@ if check_password():
                 val = f"{int(b_ash_r)} N" if b_ash_r is not None else "N/A"
                 d_str = f"Set on {b_ash_r_date}" if b_ash_r_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best ASH Force (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
-
-            # Row 2: ER ROM & Grip Squeeze Best Cards
-            b5, b6, b7, b8 = st.columns(4)
             with b5:
                 val = f"{int(b_er_l)}°" if b_er_l is not None else "N/A"
                 d_str = f"Set on {b_er_l_date}" if b_er_l_date else "No Record"
@@ -623,6 +687,9 @@ if check_password():
                 val = f"{int(b_er_r)}°" if b_er_r is not None else "N/A"
                 d_str = f"Set on {b_er_r_date}" if b_er_r_date else "No Record"
                 st.markdown(f'<div class="best-card"><h4>Best ER ROM (Right)</h4><h2>{val}</h2><p>{d_str}</p></div>', unsafe_allow_html=True)
+
+            # Row 3: Grip Squeeze Cards
+            b7, b8, _, _ = st.columns(4)
             with b7:
                 val = f"{int(b_grip_l)} N" if b_grip_l is not None else "N/A"
                 d_str = f"Set on {b_grip_l_date}" if b_grip_l_date else "No Record"
@@ -634,6 +701,45 @@ if check_password():
 
             st.markdown('<div class="section-header">WEEKLY READINESS PROFILE</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # --- SECTION 0: 20M SPRINT SPEED ---
+            st.markdown('<div class="sub-header-title">20M SPRINT SPEED</div>', unsafe_allow_html=True)
+            p_sprint_ready = p_sprint.dropna(subset=['Date']).sort_values('Date').copy() if not p_sprint.empty else pd.DataFrame()
+
+            if not p_sprint_ready.empty and sprint_time_col and sprint_time_col in p_sprint_ready.columns:
+                p_sprint_ready[sprint_time_col] = pd.to_numeric(p_sprint_ready[sprint_time_col], errors='coerce')
+                p_sprint_ready = p_sprint_ready.dropna(subset=[sprint_time_col])
+
+                if not p_sprint_ready.empty:
+                    sp_plot_df = p_sprint_ready.groupby('Date', as_index=False)[sprint_time_col].mean()
+                    latest_sp = sp_plot_df.iloc[-1][sprint_time_col]
+                    base_sp = sp_plot_df[sprint_time_col].mean()
+                    chg_sp = ((latest_sp - base_sp) / base_sp * 100) if base_sp > 0 else 0
+
+                    sp_tile_cls = "tile-green" if chg_sp <= 2.0 else "tile-red"
+
+                    sp_left, sp_right = st.columns([1.1, 2])
+                    with sp_left:
+                        st.markdown(f'<div class="kpi-tile {sp_tile_cls}"><h1>{latest_sp:.2f} s</h1><p>LATEST 20M TIME</p></div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="detail-box"><div><b>% Change from Base:</b> {chg_sp:+.1f}%</div><div><b>Base Value:</b> {base_sp:.2f} s</div></div>', unsafe_allow_html=True)
+
+                    with sp_right:
+                        fig_sp = go.Figure()
+                        fig_sp.add_trace(go.Scatter(x=sp_plot_df['Date'], y=sp_plot_df[sprint_time_col], name="20m Sprint (s)", mode="lines+markers", line=dict(color="#FF8200", width=3.5), marker=dict(size=9, color="#FF8200")))
+                        s_min, s_max = sp_plot_df[sprint_time_col].min(), sp_plot_df[sprint_time_col].max()
+                        fig_sp.update_layout(
+                            template="plotly_white", height=230, margin=dict(l=10, r=10, t=25, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0),
+                            xaxis=dict(showgrid=True, gridcolor="#F0F2F6", tickformat="%b %d<br>%Y"),
+                            yaxis=dict(title="Seconds", showgrid=True, gridcolor="#F0F2F6", range=[s_min * 0.95, s_max * 1.05] if s_min != s_max else [s_min - 0.2, s_max + 0.2])
+                        )
+                        st.plotly_chart(fig_sp, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No 20m Sprint records available for this selection.")
+            else:
+                st.info("No 20m Sprint records available for this season.")
+
+            st.markdown("<br>", unsafe_allow_html=True)
 
             # --- SECTION 1: COUNTERMOVEMENT JUMP ---
             st.markdown('<div class="sub-header-title">COUNTERMOVEMENT JUMP</div>', unsafe_allow_html=True)
