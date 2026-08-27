@@ -132,7 +132,7 @@ if check_password():
         if series is None:
             return pd.Series(dtype=float)
         return series.astype(str).apply(
-            lambda x: re.findall(r"[-+]?\d*\.?\d+", x)[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan
+            lambda x: re.findall(r"[-+]?\d*\.?\d+", str(x))[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan
         ).astype(float)
 
     # --- 4. SAFE DATA LOADING & MERGING ---
@@ -190,9 +190,10 @@ if check_password():
                 if any(k in col.lower() for k in ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']):
                     cmj_df[col] = clean_num_series(cmj_df[col])
 
+        # Clean ER ROM numeric columns
         if not er_df.empty:
             for col in er_df.columns:
-                if any(k in col.lower() for k in ['rom', 'asymmetry', 'asym']):
+                if any(k in col.lower() for k in ['rom', 'asymmetry', 'asym', 'max']):
                     er_df[col] = clean_num_series(er_df[col])
 
         if not grip_df.empty:
