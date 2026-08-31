@@ -226,7 +226,7 @@ if check_password():
         # --- 5. SEASON SETUP ---
         SPRING_START = pd.to_datetime("2026-01-01")
         SPRING_END = pd.to_datetime("2026-05-31 23:59:59")
-        FALL_START = pd.to_datetime("2026-08-24")  
+        FALL_START = pd.to_datetime("2026-08-21")  
 
         all_athletes = sorted(list(set(
             list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
