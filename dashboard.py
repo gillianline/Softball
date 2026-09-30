@@ -4,8 +4,6 @@ import pandas as pd
 import numpy as np
 import re
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly.express as px
 from datetime import datetime, date
 
 # --- 1. PAGE CONFIG ---
@@ -125,23 +123,23 @@ if check_password():
             background: #FFFFFF; 
             border: 1px solid #EAEAEA; 
             border-radius: 8px;
-            padding: 10px 14px; 
-            margin-bottom: 8px; 
+            padding: 12px 16px; 
+            margin-bottom: 12px; 
             position: relative;
             box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
         .border-orange { border-left: 5px solid #FF8200; }
         .border-blue { border-left: 5px solid #4895DB; }
 
-        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .card-title-wrap { display: flex; align-items: center; gap: 8px; }
         .badge-num {
-            width: 20px; 
-            height: 20px; 
+            width: 22px; 
+            height: 22px; 
             border-radius: 5px; 
             color: #FFFFFF;
             font-weight: 800; 
-            font-size: 11px; 
+            font-size: 12px; 
             display: inline-flex;
             align-items: center; 
             justify-content: center;
@@ -149,13 +147,9 @@ if check_password():
         .badge-orange { background-color: #FF8200; }
         .badge-blue { background-color: #4895DB; }
 
-        .card-title { font-weight: 800; font-size: 12.5px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
-        .card-date { font-size: 11px; color: #6C757D; font-weight: 600; }
-        .card-metrics { font-size: 12px; color: #333333; line-height: 1.4; }
-
-        .pct-up { color: #28A745; font-weight: 700; }
-        .pct-down { color: #DC3545; font-weight: 700; }
-        .pct-flat { color: #6C757D; font-weight: 700; }
+        .card-title { font-weight: 800; font-size: 13px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+        .card-date { font-size: 11.5px; color: #6C757D; font-weight: 600; }
+        .card-metrics { font-size: 13px; color: #333333; line-height: 1.4; }
 
         /* Custom Styled Coach Tables */
         .table-container {
@@ -163,7 +157,7 @@ if check_password():
             border-radius: 10px;
             overflow: hidden;
             margin-top: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
         .coach-table { 
@@ -545,72 +539,15 @@ if check_password():
                 """, unsafe_allow_html=True)
 
         # --- 6. NAVIGATION TABS ---
-        tab_intake, tab_profile, tab_catapult = st.tabs(["TESTING", "INDIVIDUAL PROFILE", "CATAPULT PROFILE"])
+        tab_testing, tab_catapult = st.tabs(["TESTING", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: INTAKE ASSESSMENT (BODY HUD + CARDS + SUMMARY TABLES AT BOTTOM)
+        # TAB 1: TESTING (CARDS AT TOP + TABLES DIRECTLY UNDERNEATH)
         # =========================================================================
-        with tab_intake:
-            hud_col1, hud_col2 = st.columns([1.1, 1.9], gap="medium")
-
-            with hud_col1:
-                # Body Map SVG with numbers overlayed on specific body locations
-                hud_svg_html = """
-                <div style="background:#FFFFFF; border-radius:12px; padding:14px; border:1px solid #E5E5E7; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
-                    <div style="color:#1D1D1F; font-weight:800; font-size:12px; letter-spacing:0.8px; text-transform:uppercase; border-bottom:2px solid #FF8200; padding-bottom:4px; margin-bottom:10px;">ANATOMY LOCATION MAP</div>
-                    <div style="position:relative; width:100%; height:440px; background:#FAFDFD; border-radius:10px; border:1px solid #D5E5E8; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                        <svg viewBox="0 0 160 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
-                            <defs>
-                                <linearGradient id="anatomicalBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#C5CACC" />
-                                    <stop offset="25%" stop-color="#E8ECEE" />
-                                    <stop offset="50%" stop-color="#F2F5F7" />
-                                    <stop offset="75%" stop-color="#D0D5D8" />
-                                    <stop offset="100%" stop-color="#9AA0A6" />
-                                </linearGradient>
-                            </defs>
-                            <ellipse cx="68" cy="214" rx="20" ry="3.5" fill="#000000" opacity="0.12" />
-                            <g stroke="#2C3036" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-                                <ellipse cx="68" cy="17" rx="7" ry="9" fill="url(#anatomicalBodyGrad)" />
-                                <path d="M 65 25 L 63 33 M 71 25 L 73 33" stroke-width="1.2" />
-                                <path d="M 63 33 C 58 33, 48 36, 42 40 C 37 43, 36 50, 39 56 L 43 56 C 47 52, 49 46, 52 44 M 73 33 C 78 33, 88 36, 94 40 C 99 43, 100 50, 97 56 L 93 56 C 89 52, 87 46, 84 44" fill="url(#anatomicalBodyGrad)" />
-                                <path d="M 42 40 C 37 43, 35 52, 33 64 C 31 74, 29 82, 27 92 C 25 96, 23 100, 22 104 C 21 106, 23 107, 25 106 C 27 104, 28 98, 30 92 C 33 82, 36 74, 38 64 C 40 54, 42 48, 43 56 Z" fill="url(#anatomicalBodyGrad)" />
-                                <path d="M 94 40 C 99 43, 101 52, 103 64 C 105 74, 107 82, 109 92 C 111 96, 113 100, 114 104 C 115 106, 113 107, 111 106 C 109 104, 108 98, 106 92 C 103 82, 100 74, 98 64 C 96 54, 94 48, 93 56 Z" fill="url(#anatomicalBodyGrad)" />
-                                <path d="M 52 44 L 54 75 L 52 92 L 68 106 L 84 92 L 82 75 L 84 44 Z" fill="url(#anatomicalBodyGrad)" />
-                                <path d="M 52 92 C 50 105, 49 122, 53 138 C 55 144, 55 152, 54 162 C 52 175, 52 192, 54 205 L 48 210 L 58 210 L 59 203 C 60 190, 60 175, 60 162 C 60 152, 60 144, 62 138 C 66 122, 66 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
-                                <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
-                                <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
-                            </g>
-
-                            <!-- BADGE 1: ASH Shoulder (Right Shoulder) -->
-                            <rect x="36" y="36" width="16" height="16" rx="4" fill="#FF8200" />
-                            <text x="44" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
-
-                            <!-- BADGE 2: Countermovement Jump (Hips/Legs) -->
-                            <rect x="60" y="115" width="16" height="16" rx="4" fill="#4895DB" />
-                            <text x="68" y="127" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
-
-                            <!-- BADGE 3: External Rotation ROM (Left Shoulder) -->
-                            <rect x="84" y="36" width="16" height="16" rx="4" fill="#FF8200" />
-                            <text x="92" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
-
-                            <!-- BADGE 4: Grip Strength (Wrist/Hand) -->
-                            <rect x="110" y="88" width="16" height="16" rx="4" fill="#4895DB" />
-                            <text x="118" y="100" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
-
-                            <!-- BADGE 5: 20m Sprint (Lower Legs/Feet) -->
-                            <rect x="60" y="185" width="16" height="16" rx="4" fill="#FF8200" />
-                            <text x="68" y="197" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
-                        </svg>
-                    </div>
-                </div>
-                """
-                components.html(hud_svg_html, height=500)
-
-            with hud_col2:
-                st.markdown('<div class="section-header">Location Assessment Overview</div>', unsafe_allow_html=True)
-                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-                render_assessment_cards()
+        with tab_testing:
+            st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            render_assessment_cards()
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown('<div class="section-header">Testing History Tables</div>', unsafe_allow_html=True)
@@ -662,37 +599,7 @@ if check_password():
                 st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
 
         # =========================================================================
-        # TAB 2: INDIVIDUAL PROFILE (CARDS RESTORED + TABLES)
-        # =========================================================================
-        with tab_profile:
-            st.markdown('<div class="section-header">Athlete Individual Testing Profile</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            # Restored Assessment Cards Section
-            st.markdown('<div class="sub-header-title">Latest Assessment Summary</div>', unsafe_allow_html=True)
-            render_assessment_cards()
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Detailed Testing Logs</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            if not p_cmj.empty:
-                st.markdown('<div class="sub-header-title">CMJ Testing History</div>', unsafe_allow_html=True)
-                disp_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
-                cmj_table_df = p_cmj[disp_cols].copy()
-                if 'Date' in cmj_table_df.columns:
-                    cmj_table_df['Date'] = cmj_table_df['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(cmj_table_df), unsafe_allow_html=True)
-
-            if not p_ash.empty:
-                st.markdown('<div class="sub-header-title">ASH Isometric Shoulder History</div>', unsafe_allow_html=True)
-                ash_table_df = p_ash[[c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]].copy()
-                if 'Date' in ash_table_df.columns:
-                    ash_table_df['Date'] = ash_table_df['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(ash_table_df), unsafe_allow_html=True)
-
-        # =========================================================================
-        # TAB 3: CATAPULT PROFILE (SWING & THROW ANALYTICS)
+        # TAB 2: CATAPULT PROFILE (SWING & THROW ANALYTICS)
         # =========================================================================
         with tab_catapult:
             st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
