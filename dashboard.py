@@ -36,67 +36,161 @@ if check_password():
     # --- 3. CUSTOM CSS THEME ---
     st.markdown("""
         <style>
-        .stApp { background-color: #FFFFFF; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .stApp { 
+            background-color: #FFFFFF; 
+            color: #1D1D1F; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        }
         
         /* Athlete Banner */
         .athlete-banner {
-            background-color: #F8F9FA; padding: 18px 24px; border-radius: 14px;
-            border-left: 8px solid #FF8200; margin-bottom: 20px;
-            display: flex; align-items: center; justify-content: space-between;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            background-color: #F8F9FA; 
+            padding: 16px 20px; 
+            border-radius: 12px;
+            border-left: 6px solid #FF8200; 
+            margin-bottom: 16px;
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .athlete-info { display: flex; align-items: center; }
-        .player-photo { border-radius: 50%; width: 95px; height: 95px; object-fit: cover; border: 3px solid #2F80ED; margin-right: 20px; }
-        .athlete-name { margin: 0; font-size: 26px; font-weight: 800; color: #1D1D1F; }
-        .athlete-sub { margin: 2px 0 0 0; color: #2F80ED; font-weight: 700; font-size: 14px; }
-        
-        /* Section Typography */
-        .section-header {
-            color: #2F80ED; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
-            text-transform: uppercase; margin-top: 10px; margin-bottom: 4px;
+        .player-photo { 
+            border-radius: 50%; 
+            width: 80px; 
+            height: 80px; 
+            object-fit: cover; 
+            border: 2px solid #2F80ED; 
+            margin-right: 18px; 
         }
-        .section-divider { height: 3px; background-color: #FF8200; margin-bottom: 22px; border-radius: 2px; }
+        .athlete-name { margin: 0; font-size: 24px; font-weight: 800; color: #1D1D1F; }
+        .athlete-sub { margin: 2px 0 0 0; color: #2F80ED; font-weight: 700; font-size: 13.5px; }
+        
+        /* Section Typography & Dividers */
+        .section-header {
+            color: #2F80ED; 
+            font-size: 18px; 
+            font-weight: 800; 
+            letter-spacing: 0.5px;
+            text-transform: uppercase; 
+            margin-top: 6px; 
+            margin-bottom: 2px;
+        }
+        .sub-header-title {
+            color: #1D1D1F;
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .section-divider { 
+            height: 3px; 
+            background-color: #FF8200; 
+            margin-top: 4px;
+            margin-bottom: 16px; 
+            border-radius: 2px; 
+        }
         
         /* KPI / Metric Cards */
         .catapult-card {
-            background: #F8F9FA; border: 1px solid #EAEAEA; border-top: 4px solid #FF8200;
-            border-radius: 10px; padding: 12px 14px; text-align: center; margin-bottom: 12px;
+            background: #F8F9FA; 
+            border: 1px solid #EAEAEA; 
+            border-top: 4px solid #FF8200;
+            border-radius: 8px; 
+            padding: 10px 12px; 
+            text-align: center; 
+            margin-bottom: 12px;
         }
-        .catapult-card h5 { margin: 0; color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .catapult-card h3 { margin: 4px 0 2px 0; font-size: 20px; font-weight: 800; color: #1D1D1F; }
-        .catapult-card p { margin: 0; font-size: 11px; color: #2F80ED; font-weight: 700; }
+        .catapult-card h5 { 
+            margin: 0; 
+            color: #6C757D; 
+            font-size: 11px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+        }
+        .catapult-card h3 { 
+            margin: 4px 0 2px 0; 
+            font-size: 22px; 
+            font-weight: 800; 
+            color: #1D1D1F; 
+        }
+        .catapult-card p { 
+            margin: 0; 
+            font-size: 11px; 
+            color: #2F80ED; 
+            font-weight: 700; 
+        }
 
         /* Assessment Cards */
         .assessment-card {
-            background: #FFFFFF; border: 1px solid #EAEAEA; border-radius: 10px;
-            padding: 12px 16px; margin-bottom: 10px; position: relative;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            background: #FFFFFF; 
+            border: 1px solid #EAEAEA; 
+            border-radius: 8px;
+            padding: 10px 14px; 
+            margin-bottom: 8px; 
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
-        .border-orange { border-left: 6px solid #FF8200; }
-        .border-blue { border-left: 6px solid #4895DB; }
+        .border-orange { border-left: 5px solid #FF8200; }
+        .border-blue { border-left: 5px solid #4895DB; }
 
-        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .card-title-wrap { display: flex; align-items: center; gap: 10px; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .card-title-wrap { display: flex; align-items: center; gap: 8px; }
         .badge-num {
-            width: 22px; height: 22px; border-radius: 6px; color: #FFFFFF;
-            font-weight: 800; font-size: 12px; display: inline-flex;
-            align-items: center; justify-content: center;
+            width: 20px; 
+            height: 20px; 
+            border-radius: 5px; 
+            color: #FFFFFF;
+            font-weight: 800; 
+            font-size: 11px; 
+            display: inline-flex;
+            align-items: center; 
+            justify-content: center;
         }
         .badge-orange { background-color: #FF8200; }
         .badge-blue { background-color: #4895DB; }
 
-        .card-title { font-weight: 800; font-size: 13px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+        .card-title { font-weight: 800; font-size: 12.5px; color: #1D1D1F; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
         .card-date { font-size: 11px; color: #6C757D; font-weight: 600; }
-        .card-metrics { font-size: 12.5px; color: #333333; line-height: 1.5; }
+        .card-metrics { font-size: 12px; color: #333333; line-height: 1.4; }
 
-        .pct-up { color: #28a745; font-weight: 700; }
-        .pct-down { color: #dc3545; font-weight: 700; }
-        .pct-flat { color: #6c757d; font-weight: 700; }
+        .pct-up { color: #28A745; font-weight: 700; }
+        .pct-down { color: #DC3545; font-weight: 700; }
+        .pct-flat { color: #6C757D; font-weight: 700; }
 
-        /* Tables */
-        .coach-table { width: 100%; border-collapse: collapse; font-family: sans-serif; text-align: center; margin-top: 8px; margin-bottom: 12px; }
-        .coach-table th { background-color: #F0F4F8; padding: 10px; border-bottom: 2px solid #D0D7DE; color: #334155; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .coach-table td { padding: 9px 10px; border-bottom: 1px solid #EEEEEE; font-size: 12.5px; color: #1D1D1F; }
+        /* Custom Styled Coach Tables */
+        .table-container {
+            border: 1px solid #E5E7EB;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+        .coach-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            text-align: center; 
+        }
+        .coach-table th { 
+            background-color: #F8FAFC; 
+            padding: 10px 12px; 
+            border-bottom: 1px solid #E2E8F0; 
+            color: #475569; 
+            font-weight: 700; 
+            font-size: 11px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+        }
+        .coach-table td { 
+            padding: 8px 12px; 
+            border-bottom: 1px solid #F1F5F9; 
+            font-size: 12.5px; 
+            color: #1E293B; 
+        }
+        .coach-table tr:last-child td { border-bottom: none; }
+        .coach-table tr:nth-child(even) { background-color: #FAFAFA; }
+        .coach-table tr:hover { background-color: #F1F5F9; transition: background-color 0.15s ease-in-out; }
         
         #MainMenu, footer, header { visibility: hidden; }
         </style>
@@ -154,7 +248,6 @@ if check_password():
                 if col in swing_df.columns:
                     swing_df[col] = clean_num_series(swing_df[col])
 
-            # Group multiple drill entries on the same date for an athlete
             agg_dict = {c: 'sum' for c in swing_cols if c in swing_df.columns}
             if 'Session Type' in swing_df.columns:
                 agg_dict['Session Type'] = lambda x: ', '.join(x.dropna().unique())
@@ -174,7 +267,6 @@ if check_password():
                 if col in throw_df.columns:
                     throw_df[col] = clean_num_series(throw_df[col])
 
-            # Group multiple drill entries on the same date for an athlete
             agg_dict_t = {c: 'sum' for c in throw_cols if c in throw_df.columns}
             if 'Session Type' in throw_df.columns:
                 agg_dict_t['Session Type'] = lambda x: ', '.join(x.dropna().unique())
@@ -195,31 +287,18 @@ if check_password():
                     if val and val.lower() != 'nan':
                         photo_dict[str(r[name_col]).strip().lower()] = val
 
-        # Clean numeric columns across testing datasets
-        if not ash_df.empty:
-            for col in ash_df.columns:
-                if any(k in col.lower() for k in ['force', 'asym', 'rfd']):
-                    ash_df[col] = clean_num_series(ash_df[col])
-
-        if not cmj_df.empty:
-            for col in cmj_df.columns:
-                if any(k in col.lower() for k in ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']):
-                    cmj_df[col] = clean_num_series(cmj_df[col])
-
-        if not er_df.empty:
-            for col in er_df.columns:
-                if any(k in col.lower() for k in ['rom', 'asymmetry', 'asym', 'max']):
-                    er_df[col] = clean_num_series(er_df[col])
-
-        if not grip_df.empty:
-            for col in grip_df.columns:
-                if any(k in col.lower() for k in ['force', 'asymmetry', 'asym']):
-                    grip_df[col] = clean_num_series(grip_df[col])
-
-        if not sprint_df.empty:
-            for col in sprint_df.columns:
-                if any(k in col.lower() for k in ['time', '20m', 'sec', 'speed']):
-                    sprint_df[col] = clean_num_series(sprint_df[col])
+        # Clean numeric testing columns
+        for df, col_keywords in [
+            (ash_df, ['force', 'asym', 'rfd']),
+            (cmj_df, ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']),
+            (er_df, ['rom', 'asymmetry', 'asym', 'max']),
+            (grip_df, ['force', 'asymmetry', 'asym']),
+            (sprint_df, ['time', '20m', 'sec', 'speed'])
+        ]:
+            if not df.empty:
+                for col in df.columns:
+                    if any(k in col.lower() for k in col_keywords):
+                        df[col] = clean_num_series(df[col])
 
         return ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, photo_dict
 
@@ -237,7 +316,7 @@ if check_password():
                 return match_part[0]
         return None
 
-    # --- 5. SEASON SETUP & ATHLETE SELECTION ---
+    # --- 5. SEASON & CALENDAR DATE RANGE SETUP ---
     SPRING_START = pd.to_datetime("2026-01-01")
     SPRING_END = pd.to_datetime("2026-05-31 23:59:59")
     FALL_START = pd.to_datetime("2026-08-21")   
@@ -253,20 +332,49 @@ if check_password():
     )))
 
     if all_athletes:
-        f_col1, f_col2 = st.columns(2)
+        f_col1, f_col2, f_col3 = st.columns([1.2, 1, 1.3])
         with f_col1:
             selected = st.selectbox("Select Athlete", all_athletes)
         with f_col2:
-            season_option = st.selectbox("Select Season", ["Fall 2026 (Current)", "Spring 2026", "All Time"], index=0)
+            season_option = st.selectbox("Season Preset", ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"], index=1)
+
+        # Find min/max date across datasets to populate calendar range defaults
+        all_dates = []
+        for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df]:
+            if not df.empty and 'Date' in df.columns:
+                all_dates.extend(df['Date'].dropna().tolist())
+
+        min_date = min(all_dates).date() if all_dates else date(2026, 1, 1)
+        max_date = max(all_dates).date() if all_dates else date(2026, 12, 31)
+
+        # Set preset date defaults
+        if season_option == "Spring 2026":
+            default_start, default_end = date(2026, 1, 1), date(2026, 5, 31)
+        elif season_option == "Fall 2026 (Current)":
+            default_start, default_end = date(2026, 8, 21), max_date
+        elif season_option == "All Time":
+            default_start, default_end = min_date, max_date
+        else:
+            default_start, default_end = min_date, max_date
+
+        with f_col3:
+            date_range = st.date_input(
+                "Select Date Range",
+                value=(default_start, default_end),
+                min_value=min_date,
+                max_value=max_date
+            )
+
+        # Extract start and end from date_input picker safely
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_dt, end_dt = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        else:
+            start_dt, end_dt = pd.to_datetime(default_start), pd.to_datetime(default_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
         def filter_season(df):
             if df.empty or 'Date' not in df.columns:
                 return df
-            if season_option == "Spring 2026":
-                return df[(df['Date'] >= SPRING_START) & (df['Date'] <= SPRING_END)]
-            elif season_option == "Fall 2026 (Current)":
-                return df[df['Date'] >= FALL_START]
-            return df
+            return df[(df['Date'] >= start_dt) & (df['Date'] <= end_dt)]
 
         # Filtered subsets per athlete
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
@@ -298,13 +406,15 @@ if check_password():
 
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
+        # Display Selected Date Subtitle
+        date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
         st.markdown(f"""
             <div class="athlete-banner">
                 <div class="athlete-info">
                     <img src="{img_url}" class="player-photo">
                     <div>
                         <h1 class="athlete-name">{selected}</h1>
-                        <p class="athlete-sub">Softball Performance | {season_option}</p>
+                        <p class="athlete-sub">Softball Performance | {date_str_display}</p>
                     </div>
                 </div>
             </div>
@@ -325,6 +435,22 @@ if check_password():
                     return f'<span class="pct-down">(↓{abs(chg):.1f}%)</span>'
             return '<span class="pct-flat">(0.0%)</span>'
 
+        # Helper to render clean HTML tables
+        def render_custom_table(df):
+            if df.empty:
+                return "<p style='font-size:12px; color:#6C757D; text-align:center;'>No records found.</p>"
+            html = '<div class="table-container"><table class="coach-table"><thead><tr>'
+            for col in df.columns:
+                html += f'<th>{col}</th>'
+            html += '</tr></thead><tbody>'
+            for _, row in df.iterrows():
+                html += '<tr>'
+                for val in row:
+                    html += f'<td>{val}</td>'
+                html += '</tr>'
+            html += 'tbody></table></div>'
+            return html
+
         # --- 6. NAVIGATION TABS ---
         tab_intake, tab_profile, tab_catapult = st.tabs(["TESTING", "INDIVIDUAL PROFILE", "CATAPULT PROFILE"])
 
@@ -332,13 +458,13 @@ if check_password():
         # TAB 1: INTAKE ASSESSMENT (ANATOMY HUD)
         # =========================================================================
         with tab_intake:
-            hud_col1, hud_col2 = st.columns([1.15, 1.85], gap="large")
+            hud_col1, hud_col2 = st.columns([1.1, 1.9], gap="medium")
 
             with hud_col1:
                 hud_svg_html = """
-                <div style="background:#FFFFFF; border-radius:16px; padding:16px; border:1px solid #E5E5E7; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
-                    <div style="color:#1D1D1F; font-weight:800; font-size:13px; letter-spacing:1px; text-transform:uppercase; border-bottom:2px solid #FF8200; padding-bottom:6px; margin-bottom:12px;">ANATOMY LOCATION MAP</div>
-                    <div style="position:relative; width:100%; height:460px; background:#FAFDFD; border-radius:12px; border:1px solid #D5E5E8; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <div style="background:#FFFFFF; border-radius:12px; padding:14px; border:1px solid #E5E5E7; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+                    <div style="color:#1D1D1F; font-weight:800; font-size:12px; letter-spacing:0.8px; text-transform:uppercase; border-bottom:2px solid #FF8200; padding-bottom:4px; margin-bottom:10px;">ANATOMY LOCATION MAP</div>
+                    <div style="position:relative; width:100%; height:440px; background:#FAFDFD; border-radius:10px; border:1px solid #D5E5E8; display:flex; align-items:center; justify-content:center; overflow:hidden;">
                         <svg viewBox="0 0 160 220" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
                             <defs>
                                 <linearGradient id="anatomicalBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -369,23 +495,65 @@ if check_password():
                     </div>
                 </div>
                 """
-                components.html(hud_svg_html, height=530)
+                components.html(hud_svg_html, height=500)
 
             with hud_col2:
-                st.markdown(f'<div class="section-header" style="color:#1D1D1F; font-size:13px; letter-spacing:1px;">LOCATION ASSESSMENT ({season_option.upper()})</div>', unsafe_allow_html=True)
-                
-                # Render Assessment Cards for ASH, ER, Grip, CMJ, Sprint
+                st.markdown(f'<div class="section-header">Location Assessment Overview</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
                 if not p_ash.empty and ash_l_col and ash_r_col:
-                    st.success("ASH Shoulder Assessment available.")
+                    last_ash = p_ash.iloc[-1]
+                    ash_date = pd.to_datetime(last_ash['Date']).strftime('%b %d, %Y')
+                    st.markdown(f"""
+                        <div class="assessment-card border-orange">
+                            <div class="card-top">
+                                <div class="card-title-wrap">
+                                    <span class="badge-num badge-orange">1</span>
+                                    <span class="card-title">ASH Isometric Shoulder Test</span>
+                                </div>
+                                <span class="card-date">{ash_date}</span>
+                            </div>
+                            <div class="card-metrics">
+                                <strong>Left Peak Force:</strong> {last_ash[ash_l_col]:.1f} N &nbsp;|&nbsp; 
+                                <strong>Right Peak Force:</strong> {last_ash[ash_r_col]:.1f} N
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
                 if not p_cmj.empty and cmj_h_col:
-                    st.info("Countermovement Jump Assessment available.")
+                    last_cmj = p_cmj.iloc[-1]
+                    cmj_date = pd.to_datetime(last_cmj['Date']).strftime('%b %d, %Y')
+                    rsi_val = f" | <strong>RSI-m:</strong> {last_cmj[cmj_rsi_col]:.2f}" if cmj_rsi_col and not pd.isna(last_cmj[cmj_rsi_col]) else ""
+                    st.markdown(f"""
+                        <div class="assessment-card border-blue">
+                            <div class="card-top">
+                                <div class="card-title-wrap">
+                                    <span class="badge-num badge-blue">2</span>
+                                    <span class="card-title">Countermovement Jump</span>
+                                </div>
+                                <span class="card-date">{cmj_date}</span>
+                            </div>
+                            <div class="card-metrics">
+                                <strong>Jump Height:</strong> {last_cmj[cmj_h_col]:.1f} cm{rsi_val}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
         # =========================================================================
         # TAB 2: INDIVIDUAL PROFILE
         # =========================================================================
         with tab_profile:
             st.markdown('<div class="section-header">Athlete Individual Testing Profile</div>', unsafe_allow_html=True)
-            st.write("Detailed physical testing trends and force profiles.")
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # Styled Table Summary
+            if not p_cmj.empty:
+                st.markdown('<div class="sub-header-title">CMJ Testing History</div>', unsafe_allow_html=True)
+                disp_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
+                cmj_table_df = p_cmj[disp_cols].copy()
+                if 'Date' in cmj_table_df.columns:
+                    cmj_table_df['Date'] = cmj_table_df['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(cmj_table_df), unsafe_allow_html=True)
 
         # =========================================================================
         # TAB 3: CATAPULT PROFILE (SWING & THROW ANALYTICS)
@@ -394,7 +562,7 @@ if check_password():
             st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            c_col1, c_col2 = st.columns(2)
+            c_col1, c_col2 = st.columns(2, gap="large")
 
             # --- THROW METRICS SUMMARY ---
             with c_col1:
@@ -409,7 +577,7 @@ if check_password():
                             <div class="catapult-card">
                                 <h5>Total Throws</h5>
                                 <h3>{int(tot_throws):,}</h3>
-                                <p>{season_option}</p>
+                                <p>Selected Window</p>
                             </div>
                         """, unsafe_allow_html=True)
                     with kpi2:
@@ -417,32 +585,35 @@ if check_password():
                             <div class="catapult-card">
                                 <h5>Throw Player Load</h5>
                                 <h3>{tot_throw_pl:.1f}</h3>
-                                <p>{season_option}</p>
+                                <p>Selected Window</p>
                             </div>
                         """, unsafe_allow_html=True)
 
                     # Throw Rotation & Intensity Bands Breakdown Chart
                     fig_throw = go.Figure()
                     if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)'))
+                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
+                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
+                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
 
                     fig_throw.update_layout(
                         barmode='stack',
-                        title="Throw Volume by Load Band",
-                        xaxis_title="Date",
+                        title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
+                        xaxis_title="",
                         yaxis_title="Throw Count",
-                        height=320,
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        height=290,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
                     )
                     st.plotly_chart(fig_throw, use_container_width=True)
 
-                    with st.expander("View Raw Throw Log"):
-                        st.dataframe(p_throw, use_container_width=True)
+                    with st.expander("View Formatted Throw Log"):
+                        t_log = p_throw.copy()
+                        if 'Date' in t_log.columns:
+                            t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
+                        st.markdown(render_custom_table(t_log), unsafe_allow_html=True)
                 else:
-                    st.info("No Throw data recorded for this season.")
+                    st.info("No Throw data recorded for this date range.")
 
             # --- SWING METRICS SUMMARY ---
             with c_col2:
@@ -457,7 +628,7 @@ if check_password():
                             <div class="catapult-card">
                                 <h5>Total Swings</h5>
                                 <h3>{int(tot_swings):,}</h3>
-                                <p>{season_option}</p>
+                                <p>Selected Window</p>
                             </div>
                         """, unsafe_allow_html=True)
                     with kpi4:
@@ -465,32 +636,35 @@ if check_password():
                             <div class="catapult-card">
                                 <h5>Swing Max Player Load</h5>
                                 <h3>{tot_swing_pl:.1f}</h3>
-                                <p>{season_option}</p>
+                                <p>Selected Window</p>
                             </div>
                         """, unsafe_allow_html=True)
 
                     # Swing Rotation Bands Chart
                     fig_swing = go.Figure()
                     if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Rotation Band 1'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Rotation Band 2'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Rotation Band 3'))
+                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
+                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
+                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
 
                     fig_swing.update_layout(
                         barmode='stack',
-                        title="Swing Volume by Rotation Velocity Band",
-                        xaxis_title="Date",
+                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=13, color='#1D1D1F')),
+                        xaxis_title="",
                         yaxis_title="Swing Count",
-                        height=320,
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        height=290,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
                     )
                     st.plotly_chart(fig_swing, use_container_width=True)
 
-                    with st.expander("View Raw Swing Log"):
-                        st.dataframe(p_swing, use_container_width=True)
+                    with st.expander("View Formatted Swing Log"):
+                        s_log = p_swing.copy()
+                        if 'Date' in s_log.columns:
+                            s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
+                        st.markdown(render_custom_table(s_log), unsafe_allow_html=True)
                 else:
-                    st.info("No Swing data recorded for this season.")
+                    st.info("No Swing data recorded for this date range.")
 
     else:
         st.warning("No athlete data loaded. Please check your data source URLs in secrets.")
