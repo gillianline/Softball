@@ -476,7 +476,7 @@ if check_password():
         tab_intake, tab_profile, tab_catapult = st.tabs(["TESTING", "INDIVIDUAL PROFILE", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: INTAKE ASSESSMENT (ANATOMY HUD)
+        # TAB 1: INTAKE ASSESSMENT (ANATOMY HUD + ALL TESTING CARDS)
         # =========================================================================
         with tab_intake:
             hud_col1, hud_col2 = st.columns([1.1, 1.9], gap="medium")
@@ -519,9 +519,10 @@ if check_password():
                 components.html(hud_svg_html, height=500)
 
             with hud_col2:
-                st.markdown(f'<div class="section-header">Location Assessment Overview</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Location Assessment Overview</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
+                # 1. ASH Test
                 if not p_ash.empty and ash_l_col and ash_r_col:
                     last_ash = p_ash.iloc[-1]
                     ash_date = pd.to_datetime(last_ash['Date']).strftime('%b %d, %Y')
@@ -541,6 +542,7 @@ if check_password():
                         </div>
                     """, unsafe_allow_html=True)
 
+                # 2. CMJ Test
                 if not p_cmj.empty and cmj_h_col:
                     last_cmj = p_cmj.iloc[-1]
                     cmj_date = pd.to_datetime(last_cmj['Date']).strftime('%b %d, %Y')
@@ -556,6 +558,65 @@ if check_password():
                             </div>
                             <div class="card-metrics">
                                 <strong>Jump Height:</strong> {last_cmj[cmj_h_col]:.1f} cm{rsi_val}
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                # 3. Shoulder ER ROM
+                if not p_er.empty and er_l_col and er_r_col:
+                    last_er = p_er.iloc[-1]
+                    er_date = pd.to_datetime(last_er['Date']).strftime('%b %d, %Y')
+                    st.markdown(f"""
+                        <div class="assessment-card border-orange">
+                            <div class="card-top">
+                                <div class="card-title-wrap">
+                                    <span class="badge-num badge-orange">3</span>
+                                    <span class="card-title">External Rotation (ER) ROM</span>
+                                </div>
+                                <span class="card-date">{er_date}</span>
+                            </div>
+                            <div class="card-metrics">
+                                <strong>Left Max ROM:</strong> {last_er[er_l_col]:.1f}° &nbsp;|&nbsp; 
+                                <strong>Right Max ROM:</strong> {last_er[er_r_col]:.1f}°
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                # 4. Grip Strength
+                if not p_grip.empty and grip_l_col and grip_r_col:
+                    last_grip = p_grip.iloc[-1]
+                    grip_date = pd.to_datetime(last_grip['Date']).strftime('%b %d, %Y')
+                    st.markdown(f"""
+                        <div class="assessment-card border-blue">
+                            <div class="card-top">
+                                <div class="card-title-wrap">
+                                    <span class="badge-num badge-blue">4</span>
+                                    <span class="card-title">Grip Strength Test</span>
+                                </div>
+                                <span class="card-date">{grip_date}</span>
+                            </div>
+                            <div class="card-metrics">
+                                <strong>Left Max Force:</strong> {last_grip[grip_l_col]:.1f} N &nbsp;|&nbsp; 
+                                <strong>Right Max Force:</strong> {last_grip[grip_r_col]:.1f} N
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                # 5. 20m Sprint
+                if not p_sprint.empty and sprint_time_col:
+                    last_sprint = p_sprint.iloc[-1]
+                    sprint_date = pd.to_datetime(last_sprint['Date']).strftime('%b %d, %Y')
+                    st.markdown(f"""
+                        <div class="assessment-card border-orange">
+                            <div class="card-top">
+                                <div class="card-title-wrap">
+                                    <span class="badge-num badge-orange">5</span>
+                                    <span class="card-title">20m Sprint Performance</span>
+                                </div>
+                                <span class="card-date">{sprint_date}</span>
+                            </div>
+                            <div class="card-metrics">
+                                <strong>Time:</strong> {last_sprint[sprint_time_col]:.2f} s
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
@@ -583,7 +644,7 @@ if check_password():
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             # METRIC GLOSSARY & LEGEND EXPANDER
-            with st.expander("Metric Descriptions", expanded=False):
+            with st.expander("📖 Metric Descriptions & Classification Legend", expanded=False):
                 st.markdown("#### **Throwing Metrics Legend**")
                 t_l1, t_l2, t_l3 = st.columns(3)
                 with t_l1:
@@ -734,7 +795,7 @@ if check_password():
                     )
                     st.plotly_chart(fig_throw, use_container_width=True)
 
-                    with st.expander("Throw Log"):
+                    with st.expander("View Formatted Throw Log"):
                         t_log = p_throw.copy()
                         if 'Date' in t_log.columns:
                             t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
@@ -785,7 +846,7 @@ if check_password():
                     )
                     st.plotly_chart(fig_swing, use_container_width=True)
 
-                    with st.expander("Swing Log"):
+                    with st.expander("View Formatted Swing Log"):
                         s_log = p_swing.copy()
                         if 'Date' in s_log.columns:
                             s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
