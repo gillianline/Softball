@@ -191,6 +191,29 @@ if check_password():
         .coach-table tr:last-child td { border-bottom: none; }
         .coach-table tr:nth-child(even) { background-color: #FAFAFA; }
         .coach-table tr:hover { background-color: #F1F5F9; transition: background-color 0.15s ease-in-out; }
+
+        /* Metric Legend / Description Cards */
+        .legend-card {
+            background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+            height: 100%;
+        }
+        .legend-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #0F172A;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .legend-desc {
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.45;
+        }
         
         #MainMenu, footer, header { visibility: hidden; }
         </style>
@@ -338,7 +361,7 @@ if check_password():
         with f_col2:
             season_option = st.selectbox("Season Preset", ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"], index=1)
 
-        # Find min/max date across datasets to populate calendar range defaults
+        # Find min/max date across datasets
         all_dates = []
         for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df]:
             if not df.empty and 'Date' in df.columns:
@@ -347,7 +370,6 @@ if check_password():
         min_date = min(all_dates).date() if all_dates else date(2026, 1, 1)
         max_date = max(all_dates).date() if all_dates else date(2026, 12, 31)
 
-        # Set preset date defaults
         if season_option == "Spring 2026":
             default_start, default_end = date(2026, 1, 1), date(2026, 5, 31)
         elif season_option == "Fall 2026 (Current)":
@@ -365,7 +387,6 @@ if check_password():
                 max_value=max_date
             )
 
-        # Extract start and end from date_input picker safely
         if isinstance(date_range, tuple) and len(date_range) == 2:
             start_dt, end_dt = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         else:
@@ -448,7 +469,7 @@ if check_password():
                 for val in row:
                     html += f'<td>{val}</td>'
                 html += '</tr>'
-            html += 'tbody></table></div>'
+            html += '</tbody></table></div>'
             return html
 
         # --- 6. NAVIGATION TABS ---
@@ -546,7 +567,6 @@ if check_password():
             st.markdown('<div class="section-header">Athlete Individual Testing Profile</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            # Styled Table Summary
             if not p_cmj.empty:
                 st.markdown('<div class="sub-header-title">CMJ Testing History</div>', unsafe_allow_html=True)
                 disp_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
@@ -561,6 +581,113 @@ if check_password():
         with tab_catapult:
             st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # METRIC GLOSSARY & LEGEND EXPANDER
+            with st.expander("📖 Metric Descriptions & Classification Legend", expanded=False):
+                st.markdown("#### **Throwing Metrics Legend**")
+                t_l1, t_l2, t_l3 = st.columns(3)
+                with t_l1:
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Player Load 1</div>
+                            <div class="legend-desc">Light, low-effort throws. Examples include short-distance warming up, playing light catch, or casual sub-maximal returns.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Rotation Band 1</div>
+                            <div class="legend-desc">Throws made with minimal hip/torso separation or torso whip. These are typically flick throws, touch passes, or flat-footed tossing.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with t_l2:
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Player Load 2</div>
+                            <div class="legend-desc">Moderate-effort throws. Examples include standard situational plays, standard infield/outfield drill throws, or medium-distance tracking.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Rotation Band 2</div>
+                            <div class="legend-desc">Standard mechanical throws where the body goes through a normal, controlled rotational sequence.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with t_l3:
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Player Load 3</div>
+                            <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield quarterback passes.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Rotation Band 3</div>
+                            <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. This tracks when an athlete is really letting the ball fly and using full rotational power.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("#### **Batting Swing Metrics Legend**")
+                s_l1, s_l2, s_l3 = st.columns(3)
+                with s_l1:
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Rotation Band 1</div>
+                            <div class="legend-desc">The total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">PL Band 1</div>
+                            <div class="legend-desc">Swings with a low peak physical load/impact.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Forward % (Median)</div>
+                            <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with s_l2:
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Rotation Band 2</div>
+                            <div class="legend-desc">The total number of medium-intensity/moderate speed swings.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">PL Band 2</div>
+                            <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Lateral % (Median)</div>
+                            <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with s_l3:
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Rotation Band 3</div>
+                            <div class="legend-desc">The total number of high-intensity/maximum speed swings.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">PL Band 3</div>
+                            <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown("""
+                        <div class="legend-card">
+                            <div class="legend-title">Vertical % (Median)</div>
+                            <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
 
             c_col1, c_col2 = st.columns(2, gap="large")
 
