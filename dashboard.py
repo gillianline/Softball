@@ -583,7 +583,7 @@ if check_password():
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             # METRIC GLOSSARY & LEGEND EXPANDER
-            with st.expander("📖 Metric Descriptions & Classification Legend", expanded=False):
+            with st.expander("Metric Descriptions", expanded=False):
                 st.markdown("#### **Throwing Metrics Legend**")
                 t_l1, t_l2, t_l3 = st.columns(3)
                 with t_l1:
@@ -734,7 +734,7 @@ if check_password():
                     )
                     st.plotly_chart(fig_throw, use_container_width=True)
 
-                    with st.expander("View Formatted Throw Log"):
+                    with st.expander("Throw Log"):
                         t_log = p_throw.copy()
                         if 'Date' in t_log.columns:
                             t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
@@ -785,7 +785,7 @@ if check_password():
                     )
                     st.plotly_chart(fig_swing, use_container_width=True)
 
-                    with st.expander("View Formatted Swing Log"):
+                    with st.expander("Swing Log"):
                         s_log = p_swing.copy()
                         if 'Date' in s_log.columns:
                             s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
