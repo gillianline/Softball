@@ -251,7 +251,6 @@ if check_password():
         swing_df = safe_read_csv("SWING_URL")
         throw_df = safe_read_csv("THROW_URL")
 
-        # Standardize athlete name column across all datasets
         for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, roster_df, swing_df, throw_df]:
             if not df.empty:
                 if 'Name' in df.columns and 'Player Name' not in df.columns:
@@ -259,7 +258,6 @@ if check_password():
                 if 'Player Name' in df.columns:
                     df['Player Name'] = df['Player Name'].astype(str).str.strip()
 
-        # Process Swing Data Columns
         if not swing_df.empty:
             swing_cols = [
                 'Sum Swing Max Player Load', 'Swing Count',
@@ -279,7 +277,6 @@ if check_password():
             
             swing_df = swing_df.groupby(['Player Name', 'Date'], as_index=False).agg(agg_dict)
 
-        # Process Throw Data Columns
         if not throw_df.empty:
             throw_cols = [
                 'Total Throw Count', 'Total Throw Player Load',
@@ -298,7 +295,6 @@ if check_password():
 
             throw_df = throw_df.groupby(['Player Name', 'Date'], as_index=False).agg(agg_dict_t)
 
-        # Roster Photos
         photo_dict = {}
         if not roster_df.empty:
             photo_col_candidates = [c for c in roster_df.columns if any(k in c.lower() for k in ['photo', 'picture', 'headshot', 'image', 'url'])]
@@ -310,7 +306,6 @@ if check_password():
                     if val and val.lower() != 'nan':
                         photo_dict[str(r[name_col]).strip().lower()] = val
 
-        # Clean numeric testing columns
         for df, col_keywords in [
             (ash_df, ['force', 'asym', 'rfd']),
             (cmj_df, ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']),
@@ -340,10 +335,6 @@ if check_password():
         return None
 
     # --- 5. SEASON & CALENDAR DATE RANGE SETUP ---
-    SPRING_START = pd.to_datetime("2026-01-01")
-    SPRING_END = pd.to_datetime("2026-05-31 23:59:59")
-    FALL_START = pd.to_datetime("2026-08-21")   
-
     all_athletes = sorted(list(set(
         list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
         list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else []) +
@@ -361,7 +352,6 @@ if check_password():
         with f_col2:
             season_option = st.selectbox("Season Preset", ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"], index=1)
 
-        # Find min/max date across datasets
         all_dates = []
         for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df]:
             if not df.empty and 'Date' in df.columns:
@@ -397,7 +387,6 @@ if check_password():
                 return df
             return df[(df['Date'] >= start_dt) & (df['Date'] <= end_dt)]
 
-        # Filtered subsets per athlete
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
         raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
@@ -414,7 +403,6 @@ if check_password():
         p_swing = filter_season(raw_swing).copy()
         p_throw = filter_season(raw_throw).copy()
 
-        # Dynamic Columns
         ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Force (L)', 'Peak Force (L)'])
         ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Force (R)', 'Peak Force (R)'])
         cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]', 'Jump Height (cm)'])
@@ -427,7 +415,6 @@ if check_password():
 
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
-        # Display Selected Date Subtitle
         date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
         st.markdown(f"""
             <div class="athlete-banner">
@@ -441,22 +428,6 @@ if check_password():
             </div>
         """, unsafe_allow_html=True)
 
-        def fmt_pct(chg, lower_is_better=False):
-            if np.isnan(chg):
-                return ""
-            if lower_is_better:
-                if chg < 0:
-                    return f'<span class="pct-up">(↓{abs(chg):.1f}%)</span>'
-                elif chg > 0:
-                    return f'<span class="pct-down">(↑{chg:.1f}%)</span>'
-            else:
-                if chg > 0:
-                    return f'<span class="pct-up">(↑{chg:.1f}%)</span>'
-                elif chg < 0:
-                    return f'<span class="pct-down">(↓{abs(chg):.1f}%)</span>'
-            return '<span class="pct-flat">(0.0%)</span>'
-
-        # Helper to render clean HTML tables
         def render_custom_table(df):
             if df.empty:
                 return "<p style='font-size:12px; color:#6C757D; text-align:center;'>No records found.</p>"
@@ -472,16 +443,118 @@ if check_password():
             html += '</tbody></table></div>'
             return html
 
+        # --- Helper for Assessment Cards Rendering ---
+        def render_assessment_cards():
+            # 1. ASH
+            if not p_ash.empty and ash_l_col and ash_r_col:
+                last_ash = p_ash.iloc[-1]
+                ash_date = pd.to_datetime(last_ash['Date']).strftime('%b %d, %Y')
+                st.markdown(f"""
+                    <div class="assessment-card border-orange">
+                        <div class="card-top">
+                            <div class="card-title-wrap">
+                                <span class="badge-num badge-orange">1</span>
+                                <span class="card-title">ASH Isometric Shoulder Test</span>
+                            </div>
+                            <span class="card-date">{ash_date}</span>
+                        </div>
+                        <div class="card-metrics">
+                            <strong>Left Peak Force:</strong> {last_ash[ash_l_col]:.1f} N &nbsp;|&nbsp; 
+                            <strong>Right Peak Force:</strong> {last_ash[ash_r_col]:.1f} N
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # 2. CMJ
+            if not p_cmj.empty and cmj_h_col:
+                last_cmj = p_cmj.iloc[-1]
+                cmj_date = pd.to_datetime(last_cmj['Date']).strftime('%b %d, %Y')
+                rsi_val = f" | <strong>RSI-m:</strong> {last_cmj[cmj_rsi_col]:.2f}" if cmj_rsi_col and not pd.isna(last_cmj[cmj_rsi_col]) else ""
+                st.markdown(f"""
+                    <div class="assessment-card border-blue">
+                        <div class="card-top">
+                            <div class="card-title-wrap">
+                                <span class="badge-num badge-blue">2</span>
+                                <span class="card-title">Countermovement Jump</span>
+                            </div>
+                            <span class="card-date">{cmj_date}</span>
+                        </div>
+                        <div class="card-metrics">
+                            <strong>Jump Height:</strong> {last_cmj[cmj_h_col]:.1f} cm{rsi_val}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # 3. Shoulder ER ROM
+            if not p_er.empty and er_l_col and er_r_col:
+                last_er = p_er.iloc[-1]
+                er_date = pd.to_datetime(last_er['Date']).strftime('%b %d, %Y')
+                st.markdown(f"""
+                    <div class="assessment-card border-orange">
+                        <div class="card-top">
+                            <div class="card-title-wrap">
+                                <span class="badge-num badge-orange">3</span>
+                                <span class="card-title">External Rotation (ER) ROM</span>
+                            </div>
+                            <span class="card-date">{er_date}</span>
+                        </div>
+                        <div class="card-metrics">
+                            <strong>Left Max ROM:</strong> {last_er[er_l_col]:.1f}° &nbsp;|&nbsp; 
+                            <strong>Right Max ROM:</strong> {last_er[er_r_col]:.1f}°
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # 4. Grip Strength
+            if not p_grip.empty and grip_l_col and grip_r_col:
+                last_grip = p_grip.iloc[-1]
+                grip_date = pd.to_datetime(last_grip['Date']).strftime('%b %d, %Y')
+                st.markdown(f"""
+                    <div class="assessment-card border-blue">
+                        <div class="card-top">
+                            <div class="card-title-wrap">
+                                <span class="badge-num badge-blue">4</span>
+                                <span class="card-title">Grip Strength Test</span>
+                            </div>
+                            <span class="card-date">{grip_date}</span>
+                        </div>
+                        <div class="card-metrics">
+                            <strong>Left Max Force:</strong> {last_grip[grip_l_col]:.1f} N &nbsp;|&nbsp; 
+                            <strong>Right Max Force:</strong> {last_grip[grip_r_col]:.1f} N
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # 5. 20m Sprint
+            if not p_sprint.empty and sprint_time_col:
+                last_sprint = p_sprint.iloc[-1]
+                sprint_date = pd.to_datetime(last_sprint['Date']).strftime('%b %d, %Y')
+                st.markdown(f"""
+                    <div class="assessment-card border-orange">
+                        <div class="card-top">
+                            <div class="card-title-wrap">
+                                <span class="badge-num badge-orange">5</span>
+                                <span class="card-title">20m Sprint Performance</span>
+                            </div>
+                            <span class="card-date">{sprint_date}</span>
+                        </div>
+                        <div class="card-metrics">
+                            <strong>Time:</strong> {last_sprint[sprint_time_col]:.2f} s
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
         # --- 6. NAVIGATION TABS ---
         tab_intake, tab_profile, tab_catapult = st.tabs(["TESTING", "INDIVIDUAL PROFILE", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: INTAKE ASSESSMENT (ANATOMY HUD + ALL TESTING CARDS)
+        # TAB 1: INTAKE ASSESSMENT (BODY HUD + CARDS + SUMMARY TABLES AT BOTTOM)
         # =========================================================================
         with tab_intake:
             hud_col1, hud_col2 = st.columns([1.1, 1.9], gap="medium")
 
             with hud_col1:
+                # Body Map SVG with numbers overlayed on specific body locations
                 hud_svg_html = """
                 <div style="background:#FFFFFF; border-radius:12px; padding:14px; border:1px solid #E5E5E7; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
                     <div style="color:#1D1D1F; font-weight:800; font-size:12px; letter-spacing:0.8px; text-transform:uppercase; border-bottom:2px solid #FF8200; padding-bottom:4px; margin-bottom:10px;">ANATOMY LOCATION MAP</div>
@@ -508,10 +581,26 @@ if check_password():
                                 <path d="M 84 92 C 86 105, 87 122, 83 138 C 81 144, 81 152, 82 162 C 84 175, 84 192, 82 205 L 88 210 L 78 210 L 77 203 C 76 190, 76 175, 76 162 C 76 152, 76 144, 74 138 C 70 122, 70 105, 68 106 Z" fill="url(#anatomicalBodyGrad)" />
                                 <line x1="68" y1="8" x2="68" y2="211" stroke="#FF8200" stroke-width="1.3" />
                             </g>
-                            <line x1="88" y1="44" x2="118" y2="44" stroke="#FF8200" stroke-width="2" stroke-dasharray="2 2" />
-                            <circle cx="88" cy="44" r="4" fill="#FF8200" stroke="#FFFFFF" stroke-width="1.2" />
-                            <rect x="118" y="36" width="16" height="16" rx="4" fill="#FF8200" />
-                            <text x="126" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+
+                            <!-- BADGE 1: ASH Shoulder (Right Shoulder) -->
+                            <rect x="36" y="36" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="44" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">1</text>
+
+                            <!-- BADGE 2: Countermovement Jump (Hips/Legs) -->
+                            <rect x="60" y="115" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="68" y="127" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">2</text>
+
+                            <!-- BADGE 3: External Rotation ROM (Left Shoulder) -->
+                            <rect x="84" y="36" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="92" y="48" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">3</text>
+
+                            <!-- BADGE 4: Grip Strength (Wrist/Hand) -->
+                            <rect x="110" y="88" width="16" height="16" rx="4" fill="#4895DB" />
+                            <text x="118" y="100" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">4</text>
+
+                            <!-- BADGE 5: 20m Sprint (Lower Legs/Feet) -->
+                            <rect x="60" y="185" width="16" height="16" rx="4" fill="#FF8200" />
+                            <text x="68" y="197" font-size="10" font-weight="900" fill="#FFFFFF" text-anchor="middle">5</text>
                         </svg>
                     </div>
                 </div>
@@ -521,111 +610,70 @@ if check_password():
             with hud_col2:
                 st.markdown('<div class="section-header">Location Assessment Overview</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                render_assessment_cards()
 
-                # 1. ASH Test
-                if not p_ash.empty and ash_l_col and ash_r_col:
-                    last_ash = p_ash.iloc[-1]
-                    ash_date = pd.to_datetime(last_ash['Date']).strftime('%b %d, %Y')
-                    st.markdown(f"""
-                        <div class="assessment-card border-orange">
-                            <div class="card-top">
-                                <div class="card-title-wrap">
-                                    <span class="badge-num badge-orange">1</span>
-                                    <span class="card-title">ASH Isometric Shoulder Test</span>
-                                </div>
-                                <span class="card-date">{ash_date}</span>
-                            </div>
-                            <div class="card-metrics">
-                                <strong>Left Peak Force:</strong> {last_ash[ash_l_col]:.1f} N &nbsp;|&nbsp; 
-                                <strong>Right Peak Force:</strong> {last_ash[ash_r_col]:.1f} N
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Testing History Tables</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-                # 2. CMJ Test
-                if not p_cmj.empty and cmj_h_col:
-                    last_cmj = p_cmj.iloc[-1]
-                    cmj_date = pd.to_datetime(last_cmj['Date']).strftime('%b %d, %Y')
-                    rsi_val = f" | <strong>RSI-m:</strong> {last_cmj[cmj_rsi_col]:.2f}" if cmj_rsi_col and not pd.isna(last_cmj[cmj_rsi_col]) else ""
-                    st.markdown(f"""
-                        <div class="assessment-card border-blue">
-                            <div class="card-top">
-                                <div class="card-title-wrap">
-                                    <span class="badge-num badge-blue">2</span>
-                                    <span class="card-title">Countermovement Jump</span>
-                                </div>
-                                <span class="card-date">{cmj_date}</span>
-                            </div>
-                            <div class="card-metrics">
-                                <strong>Jump Height:</strong> {last_cmj[cmj_h_col]:.1f} cm{rsi_val}
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            # 1. ASH History Table
+            if not p_ash.empty:
+                st.markdown('<div class="sub-header-title">ASH Isometric Shoulder Test History</div>', unsafe_allow_html=True)
+                ash_cols = [c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]
+                ash_tbl = p_ash[ash_cols].copy()
+                if 'Date' in ash_tbl.columns:
+                    ash_tbl['Date'] = ash_tbl['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(ash_tbl), unsafe_allow_html=True)
 
-                # 3. Shoulder ER ROM
-                if not p_er.empty and er_l_col and er_r_col:
-                    last_er = p_er.iloc[-1]
-                    er_date = pd.to_datetime(last_er['Date']).strftime('%b %d, %Y')
-                    st.markdown(f"""
-                        <div class="assessment-card border-orange">
-                            <div class="card-top">
-                                <div class="card-title-wrap">
-                                    <span class="badge-num badge-orange">3</span>
-                                    <span class="card-title">External Rotation (ER) ROM</span>
-                                </div>
-                                <span class="card-date">{er_date}</span>
-                            </div>
-                            <div class="card-metrics">
-                                <strong>Left Max ROM:</strong> {last_er[er_l_col]:.1f}° &nbsp;|&nbsp; 
-                                <strong>Right Max ROM:</strong> {last_er[er_r_col]:.1f}°
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            # 2. CMJ History Table
+            if not p_cmj.empty:
+                st.markdown('<div class="sub-header-title">Countermovement Jump History</div>', unsafe_allow_html=True)
+                cmj_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
+                cmj_tbl = p_cmj[cmj_cols].copy()
+                if 'Date' in cmj_tbl.columns:
+                    cmj_tbl['Date'] = cmj_tbl['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(cmj_tbl), unsafe_allow_html=True)
 
-                # 4. Grip Strength
-                if not p_grip.empty and grip_l_col and grip_r_col:
-                    last_grip = p_grip.iloc[-1]
-                    grip_date = pd.to_datetime(last_grip['Date']).strftime('%b %d, %Y')
-                    st.markdown(f"""
-                        <div class="assessment-card border-blue">
-                            <div class="card-top">
-                                <div class="card-title-wrap">
-                                    <span class="badge-num badge-blue">4</span>
-                                    <span class="card-title">Grip Strength Test</span>
-                                </div>
-                                <span class="card-date">{grip_date}</span>
-                            </div>
-                            <div class="card-metrics">
-                                <strong>Left Max Force:</strong> {last_grip[grip_l_col]:.1f} N &nbsp;|&nbsp; 
-                                <strong>Right Max Force:</strong> {last_grip[grip_r_col]:.1f} N
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            # 3. ER ROM History Table
+            if not p_er.empty:
+                st.markdown('<div class="sub-header-title">External Rotation (ER) ROM History</div>', unsafe_allow_html=True)
+                er_cols = [c for c in ['Date', er_l_col, er_r_col] if c and c in p_er.columns]
+                er_tbl = p_er[er_cols].copy()
+                if 'Date' in er_tbl.columns:
+                    er_tbl['Date'] = er_tbl['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(er_tbl), unsafe_allow_html=True)
 
-                # 5. 20m Sprint
-                if not p_sprint.empty and sprint_time_col:
-                    last_sprint = p_sprint.iloc[-1]
-                    sprint_date = pd.to_datetime(last_sprint['Date']).strftime('%b %d, %Y')
-                    st.markdown(f"""
-                        <div class="assessment-card border-orange">
-                            <div class="card-top">
-                                <div class="card-title-wrap">
-                                    <span class="badge-num badge-orange">5</span>
-                                    <span class="card-title">20m Sprint Performance</span>
-                                </div>
-                                <span class="card-date">{sprint_date}</span>
-                            </div>
-                            <div class="card-metrics">
-                                <strong>Time:</strong> {last_sprint[sprint_time_col]:.2f} s
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
+            # 4. Grip Strength History Table
+            if not p_grip.empty:
+                st.markdown('<div class="sub-header-title">Grip Strength History</div>', unsafe_allow_html=True)
+                grip_cols = [c for c in ['Date', grip_l_col, grip_r_col] if c and c in p_grip.columns]
+                grip_tbl = p_grip[grip_cols].copy()
+                if 'Date' in grip_tbl.columns:
+                    grip_tbl['Date'] = grip_tbl['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(grip_tbl), unsafe_allow_html=True)
+
+            # 5. 20m Sprint History Table
+            if not p_sprint.empty:
+                st.markdown('<div class="sub-header-title">20m Sprint Performance History</div>', unsafe_allow_html=True)
+                sprint_cols = [c for c in ['Date', sprint_time_col] if c and c in p_sprint.columns]
+                sprint_tbl = p_sprint[sprint_cols].copy()
+                if 'Date' in sprint_tbl.columns:
+                    sprint_tbl['Date'] = sprint_tbl['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
 
         # =========================================================================
-        # TAB 2: INDIVIDUAL PROFILE
+        # TAB 2: INDIVIDUAL PROFILE (CARDS RESTORED + TABLES)
         # =========================================================================
         with tab_profile:
             st.markdown('<div class="section-header">Athlete Individual Testing Profile</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # Restored Assessment Cards Section
+            st.markdown('<div class="sub-header-title">Latest Assessment Summary</div>', unsafe_allow_html=True)
+            render_assessment_cards()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Detailed Testing Logs</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
             if not p_cmj.empty:
@@ -636,6 +684,13 @@ if check_password():
                     cmj_table_df['Date'] = cmj_table_df['Date'].dt.strftime('%b %d, %Y')
                 st.markdown(render_custom_table(cmj_table_df), unsafe_allow_html=True)
 
+            if not p_ash.empty:
+                st.markdown('<div class="sub-header-title">ASH Isometric Shoulder History</div>', unsafe_allow_html=True)
+                ash_table_df = p_ash[[c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]].copy()
+                if 'Date' in ash_table_df.columns:
+                    ash_table_df['Date'] = ash_table_df['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(ash_table_df), unsafe_allow_html=True)
+
         # =========================================================================
         # TAB 3: CATAPULT PROFILE (SWING & THROW ANALYTICS)
         # =========================================================================
@@ -643,7 +698,6 @@ if check_password():
             st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            # METRIC GLOSSARY & LEGEND EXPANDER
             with st.expander("📖 Metric Descriptions & Classification Legend", expanded=False):
                 st.markdown("#### **Throwing Metrics Legend**")
                 t_l1, t_l2, t_l3 = st.columns(3)
@@ -752,7 +806,6 @@ if check_password():
 
             c_col1, c_col2 = st.columns(2, gap="large")
 
-            # --- THROW METRICS SUMMARY ---
             with c_col1:
                 st.markdown('<div class="sub-header-title">Throwing Load Summary</div>', unsafe_allow_html=True)
                 if not p_throw.empty:
@@ -777,7 +830,6 @@ if check_password():
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # Throw Rotation & Intensity Bands Breakdown Chart
                     fig_throw = go.Figure()
                     if 'Total Throw Count - Player Load 1' in p_throw.columns:
                         fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
@@ -803,7 +855,6 @@ if check_password():
                 else:
                     st.info("No Throw data recorded for this date range.")
 
-            # --- SWING METRICS SUMMARY ---
             with c_col2:
                 st.markdown('<div class="sub-header-title">Batting Swing Summary</div>', unsafe_allow_html=True)
                 if not p_swing.empty:
@@ -828,7 +879,6 @@ if check_password():
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # Swing Rotation Bands Chart
                     fig_swing = go.Figure()
                     if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
                         fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
