@@ -151,11 +151,13 @@ if check_password():
         .card-date { font-size: 11.5px; color: #6C757D; font-weight: 600; }
         .card-metrics { font-size: 13px; color: #333333; line-height: 1.4; }
 
-        /* Custom Styled Coach Tables */
+        /* Custom Styled Coach Tables with Scroll Fix */
         .table-container {
             border: 1px solid #E5E7EB;
             border-radius: 10px;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 450px;
             margin-top: 8px;
             margin-bottom: 20px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
@@ -167,6 +169,8 @@ if check_password():
             text-align: center; 
         }
         .coach-table th { 
+            position: sticky;
+            top: 0;
             background-color: #F8FAFC; 
             padding: 10px 12px; 
             border-bottom: 1px solid #E2E8F0; 
@@ -175,12 +179,14 @@ if check_password():
             font-size: 11px; 
             text-transform: uppercase; 
             letter-spacing: 0.5px; 
+            z-index: 10;
         }
         .coach-table td { 
             padding: 8px 12px; 
             border-bottom: 1px solid #F1F5F9; 
             font-size: 12.5px; 
             color: #1E293B; 
+            white-space: nowrap;
         }
         .coach-table tr:last-child td { border-bottom: none; }
         .coach-table tr:nth-child(even) { background-color: #FAFAFA; }
@@ -542,7 +548,7 @@ if check_password():
         tab_testing, tab_catapult = st.tabs(["TESTING", "CATAPULT PROFILE"])
 
         # =========================================================================
-        # TAB 1: TESTING (CARDS AT TOP + TABLES DIRECTLY UNDERNEATH)
+        # TAB 1: TESTING
         # =========================================================================
         with tab_testing:
             st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
@@ -599,7 +605,7 @@ if check_password():
                 st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
 
         # =========================================================================
-        # TAB 2: CATAPULT PROFILE (SWING & THROW ANALYTICS)
+        # TAB 2: CATAPULT PROFILE
         # =========================================================================
         with tab_catapult:
             st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
@@ -638,13 +644,13 @@ if check_password():
                     st.markdown("""
                         <div class="legend-card">
                             <div class="legend-title">Player Load 3</div>
-                            <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield quarterback passes.</div>
+                            <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield passes.</div>
                         </div>
                     """, unsafe_allow_html=True)
                     st.markdown("""
                         <div class="legend-card">
                             <div class="legend-title">Rotation Band 3</div>
-                            <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. This tracks when an athlete is really letting the ball fly and using full rotational power.</div>
+                            <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. Tracks when an athlete is using full rotational power.</div>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -655,161 +661,40 @@ if check_password():
                     st.markdown("""
                         <div class="legend-card">
                             <div class="legend-title">Rotation Band 1</div>
-                            <div class="legend-desc">The total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 1</div>
-                            <div class="legend-desc">Swings with a low peak physical load/impact.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Forward % (Median)</div>
-                            <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
+                            <div class="legend-desc">Total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
                         </div>
                     """, unsafe_allow_html=True)
                 with s_l2:
                     st.markdown("""
                         <div class="legend-card">
                             <div class="legend-title">Rotation Band 2</div>
-                            <div class="legend-desc">The total number of medium-intensity/moderate speed swings.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 2</div>
-                            <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Lateral % (Median)</div>
-                            <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
+                            <div class="legend-desc">Moderate-speed swings from standard practice reps and controlled contact drills.</div>
                         </div>
                     """, unsafe_allow_html=True)
                 with s_l3:
                     st.markdown("""
                         <div class="legend-card">
                             <div class="legend-title">Rotation Band 3</div>
-                            <div class="legend-desc">The total number of high-intensity/maximum speed swings.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 3</div>
-                            <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Vertical % (Median)</div>
-                            <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
+                            <div class="legend-desc">Game-speed, max-effort rotational swings tracking high bat-speed efforts.</div>
                         </div>
                     """, unsafe_allow_html=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
+            # --- THROW LOGS ---
+            st.markdown('<div class="sub-header-title">Throw Data Log</div>', unsafe_allow_html=True)
+            if not p_throw.empty:
+                disp_throw = p_throw.copy()
+                if 'Date' in disp_throw.columns:
+                    disp_throw['Date'] = disp_throw['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(disp_throw), unsafe_allow_html=True)
+            else:
+                st.info("No throw data available for selected date range.")
 
-            c_col1, c_col2 = st.columns(2, gap="large")
-
-            with c_col1:
-                st.markdown('<div class="sub-header-title">Throwing Load Summary</div>', unsafe_allow_html=True)
-                if not p_throw.empty:
-                    tot_throws = p_throw['Total Throw Count'].sum() if 'Total Throw Count' in p_throw.columns else 0
-                    tot_throw_pl = p_throw['Total Throw Player Load'].sum() if 'Total Throw Player Load' in p_throw.columns else 0
-
-                    kpi1, kpi2 = st.columns(2)
-                    with kpi1:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Total Throws</h5>
-                                <h3>{int(tot_throws):,}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with kpi2:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Throw Player Load</h5>
-                                <h3>{tot_throw_pl:.1f}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                    fig_throw = go.Figure()
-                    if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
-
-                    fig_throw.update_layout(
-                        barmode='stack',
-                        title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Throw Count",
-                        height=290,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-                    )
-                    st.plotly_chart(fig_throw, use_container_width=True)
-
-                    with st.expander("View Throw Log"):
-                        t_log = p_throw.copy()
-                        if 'Date' in t_log.columns:
-                            t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
-                        st.markdown(render_custom_table(t_log), unsafe_allow_html=True)
-                else:
-                    st.info("No Throw data recorded for this date range.")
-
-            with c_col2:
-                st.markdown('<div class="sub-header-title">Batting Swing Summary</div>', unsafe_allow_html=True)
-                if not p_swing.empty:
-                    tot_swings = p_swing['Swing Count'].sum() if 'Swing Count' in p_swing.columns else 0
-                    tot_swing_pl = p_swing['Sum Swing Max Player Load'].sum() if 'Sum Swing Max Player Load' in p_swing.columns else 0
-
-                    kpi3, kpi4 = st.columns(2)
-                    with kpi3:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Total Swings</h5>
-                                <h3>{int(tot_swings):,}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with kpi4:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Swing Max Player Load</h5>
-                                <h3>{tot_swing_pl:.1f}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                    fig_swing = go.Figure()
-                    if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
-
-                    fig_swing.update_layout(
-                        barmode='stack',
-                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=13, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Swing Count",
-                        height=290,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-                    )
-                    st.plotly_chart(fig_swing, use_container_width=True)
-
-                    with st.expander("View Swing Log"):
-                        s_log = p_swing.copy()
-                        if 'Date' in s_log.columns:
-                            s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
-                        st.markdown(render_custom_table(s_log), unsafe_allow_html=True)
-                else:
-                    st.info("No Swing data recorded for this date range.")
-
-    else:
-        st.warning("No athlete data loaded. Please check your data source URLs in secrets.")
+            # --- SWING LOGS ---
+            st.markdown('<div class="sub-header-title">Batting Swing Data Log</div>', unsafe_allow_html=True)
+            if not p_swing.empty:
+                disp_swing = p_swing.copy()
+                if 'Date' in disp_swing.columns:
+                    disp_swing['Date'] = disp_swing['Date'].dt.strftime('%b %d, %Y')
+                st.markdown(render_custom_table(disp_swing), unsafe_allow_html=True)
+            else:
+                st.info("No swing data available for selected date range.")
