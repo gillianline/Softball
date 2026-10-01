@@ -410,17 +410,17 @@ if check_password():
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
         date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
-        st.markdown(f"""
-            <div class="athlete-banner">
-                <div class="athlete-info">
-                    <img src="{img_url}" class="player-photo">
-                    <div>
-                        <h1 class="athlete-name">{selected}</h1>
-                        <p class="athlete-sub">Softball Performance | {date_str_display}</p>
-                    </div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        #st.markdown(f"""
+            #<div class="athlete-banner">
+               # <div class="athlete-info">
+                    #<img src="{img_url}" class="player-photo">
+                   # <div>
+                        #<h1 class="athlete-name">{selected}</h1>
+                        #<p class="athlete-sub">Softball Performance | {date_str_display}</p>
+                    #</div>
+                #</div>
+            #</div>
+        #""", unsafe_allow_html=True)
 
         def render_custom_table(df):
             if df.empty:
@@ -543,7 +543,34 @@ if check_password():
                 st.warning("No athlete data available.")
                 return None, None
     
-            selected = st.selectbox("Select Athlete", all_athletes, key=f"{key_prefix}_athlete")
+            # --- 5. GLOBAL SEASON & CALENDAR DATE RANGE SETUP ---
+            f_col1, f_col2 = st.columns([1, 1.3])
+
+            with f_col1:
+                season_option = st.selectbox("Season Preset", ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"], index=1)
+
+            # Date Range Calculation
+            if season_option == "Spring 2026":
+                default_start, default_end = date(2026, 1, 1), date(2026, 5, 31)
+            elif season_option == "Fall 2026 (Current)":
+                default_start, default_end = date(2026, 8, 21), max_date
+            elif season_option == "All Time":
+                default_start, default_end = min_date, max_date
+            else:
+                default_start, default_end = min_date, max_date
+
+            with f_col2:
+                date_range = st.date_input(
+                    "Select Date Range",
+                    value=(default_start, default_end),
+                    min_value=min_date,
+                    max_value=max_date
+                )
+
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_dt, end_dt = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            else:
+                start_dt, end_dt = pd.to_datetime(default_start), pd.to_datetime(default_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
     
             raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
             raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
@@ -564,17 +591,17 @@ if check_password():
             img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
             date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
 
-            st.markdown(f"""
-                <div class="athlete-banner">
-                    <div class="athlete-info">
-                        <img src="{img_url}" class="player-photo">
-                        <div>
-                            <h1 class="athlete-name">{selected}</h1>
-                            <p class="athlete-sub">Softball Performance | {date_str_display}</p>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            #st.markdown(f"""
+                #<div class="athlete-banner">
+                    #<div class="athlete-info">
+                        #<img src="{img_url}" class="player-photo">
+                        #<div>
+                            #<h1 class="athlete-name">{selected}</h1>
+                            #<p class="athlete-sub">Softball Performance | {date_str_display}</p>
+                        #</div>
+                    #</div>
+                #</div>
+            #""", unsafe_allow_html=True)
 
             return selected, (p_ash, p_cmj, p_er, p_grip, p_sprint, p_swing, p_throw)
 
