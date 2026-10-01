@@ -589,58 +589,58 @@ if check_password():
             selected, player_data = setup_player_view("testing")
             if player_data:
                 p_ash, p_cmj, p_er, p_grip, p_sprint, p_swing, p_throw = player_data
-            st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            render_assessment_cards()
+                st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                render_assessment_cards()
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Testing History Tables</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Testing History Tables</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            # 1. ASH History Table
-            if not p_ash.empty:
-                st.markdown('<div class="sub-header-title">ASH Isometric Shoulder Test History</div>', unsafe_allow_html=True)
-                ash_cols = [c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]
-                ash_tbl = p_ash[ash_cols].copy()
-                if 'Date' in ash_tbl.columns:
-                    ash_tbl['Date'] = ash_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(ash_tbl), unsafe_allow_html=True)
+                # 1. ASH History Table
+                if not p_ash.empty:
+                    st.markdown('<div class="sub-header-title">ASH Isometric Shoulder Test History</div>', unsafe_allow_html=True)
+                    ash_cols = [c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]
+                    ash_tbl = p_ash[ash_cols].copy()
+                    if 'Date' in ash_tbl.columns:
+                        ash_tbl['Date'] = ash_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(ash_tbl), unsafe_allow_html=True)
 
-            # 2. CMJ History Table
-            if not p_cmj.empty:
-                st.markdown('<div class="sub-header-title">Countermovement Jump History</div>', unsafe_allow_html=True)
-                cmj_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
-                cmj_tbl = p_cmj[cmj_cols].copy()
-                if 'Date' in cmj_tbl.columns:
-                    cmj_tbl['Date'] = cmj_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(cmj_tbl), unsafe_allow_html=True)
+                # 2. CMJ History Table
+                if not p_cmj.empty:
+                    st.markdown('<div class="sub-header-title">Countermovement Jump History</div>', unsafe_allow_html=True)
+                    cmj_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
+                    cmj_tbl = p_cmj[cmj_cols].copy()
+                    if 'Date' in cmj_tbl.columns:
+                        cmj_tbl['Date'] = cmj_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(cmj_tbl), unsafe_allow_html=True)
 
-            # 3. ER ROM History Table
-            if not p_er.empty:
-                st.markdown('<div class="sub-header-title">External Rotation (ER) ROM History</div>', unsafe_allow_html=True)
-                er_cols = [c for c in ['Date', er_l_col, er_r_col] if c and c in p_er.columns]
-                er_tbl = p_er[er_cols].copy()
-                if 'Date' in er_tbl.columns:
-                    er_tbl['Date'] = er_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(er_tbl), unsafe_allow_html=True)
+                # 3. ER ROM History Table
+                if not p_er.empty:
+                    st.markdown('<div class="sub-header-title">External Rotation (ER) ROM History</div>', unsafe_allow_html=True)
+                    er_cols = [c for c in ['Date', er_l_col, er_r_col] if c and c in p_er.columns]
+                    er_tbl = p_er[er_cols].copy()
+                    if 'Date' in er_tbl.columns:
+                        er_tbl['Date'] = er_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(er_tbl), unsafe_allow_html=True)
 
-            # 4. Grip Strength History Table
-            if not p_grip.empty:
-                st.markdown('<div class="sub-header-title">Grip Strength History</div>', unsafe_allow_html=True)
-                grip_cols = [c for c in ['Date', grip_l_col, grip_r_col] if c and c in p_grip.columns]
-                grip_tbl = p_grip[grip_cols].copy()
-                if 'Date' in grip_tbl.columns:
-                    grip_tbl['Date'] = grip_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(grip_tbl), unsafe_allow_html=True)
+                # 4. Grip Strength History Table
+                if not p_grip.empty:
+                    st.markdown('<div class="sub-header-title">Grip Strength History</div>', unsafe_allow_html=True)
+                    grip_cols = [c for c in ['Date', grip_l_col, grip_r_col] if c and c in p_grip.columns]
+                    grip_tbl = p_grip[grip_cols].copy()
+                    if 'Date' in grip_tbl.columns:
+                        grip_tbl['Date'] = grip_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(grip_tbl), unsafe_allow_html=True)
 
-            # 5. 20m Sprint History Table
-            if not p_sprint.empty:
-                st.markdown('<div class="sub-header-title">20m Sprint Performance History</div>', unsafe_allow_html=True)
-                sprint_cols = [c for c in ['Date', sprint_time_col] if c and c in p_sprint.columns]
-                sprint_tbl = p_sprint[sprint_cols].copy()
-                if 'Date' in sprint_tbl.columns:
-                    sprint_tbl['Date'] = sprint_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
+                # 5. 20m Sprint History Table
+                if not p_sprint.empty:
+                    st.markdown('<div class="sub-header-title">20m Sprint Performance History</div>', unsafe_allow_html=True)
+                    sprint_cols = [c for c in ['Date', sprint_time_col] if c and c in p_sprint.columns]
+                    sprint_tbl = p_sprint[sprint_cols].copy()
+                    if 'Date' in sprint_tbl.columns:
+                        sprint_tbl['Date'] = sprint_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
 
         # =========================================================================
         # TAB 2: CATAPULT PROFILE (SWING & THROW ANALYTICS)
@@ -648,238 +648,238 @@ if check_password():
         with tab_catapult:
             selected, player_data = setup_player_view("catapult")
             if player_data:
-            st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            with st.expander("Metric Descriptions", expanded=False):
-                st.markdown("#### **Throwing Metrics Legend**")
-                t_l1, t_l2, t_l3 = st.columns(3)
-                with t_l1:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Player Load 1</div>
-                            <div class="legend-desc">Light, low-effort throws. Examples include short-distance warming up, playing light catch, or casual sub-maximal returns.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 1</div>
-                            <div class="legend-desc">Throws made with minimal hip/torso separation or torso whip. These are typically flick throws, touch passes, or flat-footed tossing.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with t_l2:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Player Load 2</div>
-                            <div class="legend-desc">Moderate-effort throws. Examples include standard situational plays, standard infield/outfield drill throws, or medium-distance tracking.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 2</div>
-                            <div class="legend-desc">Standard mechanical throws where the body goes through a normal, controlled rotational sequence.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with t_l3:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Player Load 3</div>
-                            <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield quarterback passes.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 3</div>
-                            <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. This tracks when an athlete is really letting the ball fly and using full rotational power.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                with st.expander("Metric Descriptions", expanded=False):
+                    st.markdown("#### **Throwing Metrics Legend**")
+                    t_l1, t_l2, t_l3 = st.columns(3)
+                    with t_l1:
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Player Load 1</div>
+                                <div class="legend-desc">Light, low-effort throws. Examples include short-distance warming up, playing light catch, or casual sub-maximal returns.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Rotation Band 1</div>
+                                <div class="legend-desc">Throws made with minimal hip/torso separation or torso whip. These are typically flick throws, touch passes, or flat-footed tossing.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with t_l2:
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Player Load 2</div>
+                                <div class="legend-desc">Moderate-effort throws. Examples include standard situational plays, standard infield/outfield drill throws, or medium-distance tracking.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Rotation Band 2</div>
+                                <div class="legend-desc">Standard mechanical throws where the body goes through a normal, controlled rotational sequence.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with t_l3:
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Player Load 3</div>
+                                <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield quarterback passes.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Rotation Band 3</div>
+                                <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. This tracks when an athlete is really letting the ball fly and using full rotational power.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown("#### **Batting Swing Metrics Legend**")
+                    s_l1, s_l2, s_l3 = st.columns(3)
+                    with s_l1:
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Rotation Band 1</div>
+                                <div class="legend-desc">The total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">PL Band 1</div>
+                                <div class="legend-desc">Swings with a low peak physical load/impact.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Forward % (Median)</div>
+                                <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with s_l2:
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Rotation Band 2</div>
+                                <div class="legend-desc">The total number of medium-intensity/moderate speed swings.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">PL Band 2</div>
+                                <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Lateral % (Median)</div>
+                                <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with s_l3:
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Rotation Band 3</div>
+                                <div class="legend-desc">The total number of high-intensity/maximum speed swings.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">PL Band 3</div>
+                                <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown("""
+                            <div class="legend-card">
+                                <div class="legend-title">Vertical % (Median)</div>
+                                <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("#### **Batting Swing Metrics Legend**")
-                s_l1, s_l2, s_l3 = st.columns(3)
-                with s_l1:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 1</div>
-                            <div class="legend-desc">The total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 1</div>
-                            <div class="legend-desc">Swings with a low peak physical load/impact.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Forward % (Median)</div>
-                            <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with s_l2:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 2</div>
-                            <div class="legend-desc">The total number of medium-intensity/moderate speed swings.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 2</div>
-                            <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Lateral % (Median)</div>
-                            <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with s_l3:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 3</div>
-                            <div class="legend-desc">The total number of high-intensity/maximum speed swings.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 3</div>
-                            <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Vertical % (Median)</div>
-                            <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
+                c_col1, c_col2 = st.columns(2, gap="large")
 
-            c_col1, c_col2 = st.columns(2, gap="large")
+                with c_col1:
+                    st.markdown('<div class="sub-header-title">Throwing Load Summary</div>', unsafe_allow_html=True)
+                    if not p_throw.empty:
+                        tot_throws = p_throw['Total Throw Count'].sum() if 'Total Throw Count' in p_throw.columns else 0
+                        tot_throw_pl = p_throw['Total Throw Player Load'].sum() if 'Total Throw Player Load' in p_throw.columns else 0
 
-            with c_col1:
-                st.markdown('<div class="sub-header-title">Throwing Load Summary</div>', unsafe_allow_html=True)
-                if not p_throw.empty:
-                    tot_throws = p_throw['Total Throw Count'].sum() if 'Total Throw Count' in p_throw.columns else 0
-                    tot_throw_pl = p_throw['Total Throw Player Load'].sum() if 'Total Throw Player Load' in p_throw.columns else 0
+                        kpi1, kpi2 = st.columns(2)
+                        with kpi1:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Total Throws</h5>
+                                    <h3>{int(tot_throws):,}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with kpi2:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Throw Player Load</h5>
+                                    <h3>{tot_throw_pl:.1f}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
 
-                    kpi1, kpi2 = st.columns(2)
-                    with kpi1:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Total Throws</h5>
-                                <h3>{int(tot_throws):,}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with kpi2:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Throw Player Load</h5>
-                                <h3>{tot_throw_pl:.1f}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        fig_throw = go.Figure()
+                        if 'Total Throw Count - Player Load 1' in p_throw.columns:
+                            fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
+                            fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
+                            fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
 
-                    fig_throw = go.Figure()
-                    if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
+                        fig_throw.update_layout(
+                            barmode='stack',
+                            title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
+                            xaxis_title="",
+                            yaxis_title="Throw Count",
+                            height=290,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
+                        )
+                        st.plotly_chart(fig_throw, use_container_width=True)
 
-                    fig_throw.update_layout(
-                        barmode='stack',
-                        title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Throw Count",
-                        height=290,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-                    )
-                    st.plotly_chart(fig_throw, use_container_width=True)
-
-                    with st.expander("View Throw Log"):
-                        t_log = p_throw.copy()
-                        if 'Date' in t_log.columns:
-                            t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
+                        with st.expander("View Throw Log"):
+                            t_log = p_throw.copy()
+                            if 'Date' in t_log.columns:
+                                t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
                 
-                        # Identify key identifier columns dynamic match
-                        name_col = next((c for c in t_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
-                        activity_col = next((c for c in t_log.columns if 'activity' in c.lower()), None)
+                            # Identify key identifier columns dynamic match
+                            name_col = next((c for c in t_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
+                            activity_col = next((c for c in t_log.columns if 'activity' in c.lower()), None)
                 
-                        # Reorder columns: Name, Activity, Date, then remaining metrics
-                        front_cols = [c for c in [name_col, activity_col, 'Date'] if c in t_log.columns]
-                        remaining_cols = [c for c in t_log.columns if c not in front_cols]
-                        t_log = t_log[front_cols + remaining_cols]
+                            # Reorder columns: Name, Activity, Date, then remaining metrics
+                            front_cols = [c for c in [name_col, activity_col, 'Date'] if c in t_log.columns]
+                            remaining_cols = [c for c in t_log.columns if c not in front_cols]
+                            t_log = t_log[front_cols + remaining_cols]
                 
-                        # Render using st.dataframe to enable horizontal & vertical scrolling
-                        st.dataframe(t_log, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No Throw data recorded for this date range.")
+                            # Render using st.dataframe to enable horizontal & vertical scrolling
+                            st.dataframe(t_log, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No Throw data recorded for this date range.")
 
-            with c_col2:
-                st.markdown('<div class="sub-header-title">Batting Swing Summary</div>', unsafe_allow_html=True)
-                if not p_swing.empty:
-                    tot_swings = p_swing['Swing Count'].sum() if 'Swing Count' in p_swing.columns else 0
-                    tot_swing_pl = p_swing['Sum Swing Max Player Load'].sum() if 'Sum Swing Max Player Load' in p_swing.columns else 0
+                with c_col2:
+                    st.markdown('<div class="sub-header-title">Batting Swing Summary</div>', unsafe_allow_html=True)
+                    if not p_swing.empty:
+                        tot_swings = p_swing['Swing Count'].sum() if 'Swing Count' in p_swing.columns else 0
+                        tot_swing_pl = p_swing['Sum Swing Max Player Load'].sum() if 'Sum Swing Max Player Load' in p_swing.columns else 0
 
-                    kpi3, kpi4 = st.columns(2)
-                    with kpi3:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Total Swings</h5>
-                                <h3>{int(tot_swings):,}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with kpi4:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Swing Max Player Load</h5>
-                                <h3>{tot_swing_pl:.1f}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        kpi3, kpi4 = st.columns(2)
+                        with kpi3:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Total Swings</h5>
+                                    <h3>{int(tot_swings):,}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with kpi4:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Swing Max Player Load</h5>
+                                    <h3>{tot_swing_pl:.1f}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
 
-                    fig_swing = go.Figure()
-                    if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
+                        fig_swing = go.Figure()
+                        if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
+                            fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
+                            fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
+                            fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
 
-                    fig_swing.update_layout(
-                        barmode='stack',
-                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=13, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Swing Count",
-                        height=290,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-                    )
-                    st.plotly_chart(fig_swing, use_container_width=True)
+                        fig_swing.update_layout(
+                            barmode='stack',
+                            title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=13, color='#1D1D1F')),
+                            xaxis_title="",
+                            yaxis_title="Swing Count",
+                            height=290,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
+                        )
+                        st.plotly_chart(fig_swing, use_container_width=True)
 
-                    with st.expander("View Swing Log"):
-                        s_log = p_swing.copy()
-                        if 'Date' in s_log.columns:
-                            s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
+                        with st.expander("View Swing Log"):
+                            s_log = p_swing.copy()
+                            if 'Date' in s_log.columns:
+                                s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
                 
-                        # Identify key identifier columns dynamic match
-                        name_col = next((c for c in s_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
-                        activity_col = next((c for c in s_log.columns if 'activity' in c.lower()), None)
+                            # Identify key identifier columns dynamic match
+                            name_col = next((c for c in s_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
+                            activity_col = next((c for c in s_log.columns if 'activity' in c.lower()), None)
                 
-                        # Reorder columns: Name, Activity, Date, then remaining metrics
-                        front_cols = [c for c in [name_col, activity_col, 'Date'] if c in s_log.columns]
-                        remaining_cols = [c for c in s_log.columns if c not in front_cols]
-                        s_log = s_log[front_cols + remaining_cols]
+                            # Reorder columns: Name, Activity, Date, then remaining metrics
+                            front_cols = [c for c in [name_col, activity_col, 'Date'] if c in s_log.columns]
+                            remaining_cols = [c for c in s_log.columns if c not in front_cols]
+                            s_log = s_log[front_cols + remaining_cols]
                 
-                        # Render using st.dataframe to enable horizontal & vertical scrolling
-                        st.dataframe(s_log, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No Swing data recorded for this date range.")
+                            # Render using st.dataframe to enable horizontal & vertical scrolling
+                            st.dataframe(s_log, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No Swing data recorded for this date range.")
 
-# =========================================================================
+        # =========================================================================
         # TAB 3: TEAM SUMMARY (CATAPULT AGGREGATED ROSTER VIEW)
         # =========================================================================
         with tab_team_summary:
