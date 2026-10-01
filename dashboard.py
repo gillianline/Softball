@@ -764,7 +764,7 @@ if check_password():
                         activity_col = next((c for c in t_log.columns if 'activity' in c.lower()), None)
                 
                         # Reorder columns: Name, Activity, Date, then remaining metrics
-                        front_cols = [c for c in [name_col, activity_col, 'Date'] if c in t_log.columns]
+                        front_cols = [c for c in [name_col, activity_col] if c in t_log.columns]
                         remaining_cols = [c for c in t_log.columns if c not in front_cols]
                         t_log = t_log[front_cols + remaining_cols]
                 
