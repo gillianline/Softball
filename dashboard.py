@@ -539,7 +539,7 @@ if check_password():
                 """, unsafe_allow_html=True)
 
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult = st.tabs(["TESTING", "CATAPULT PROFILE"])
+        tab_testing, tab_catapult, tab_team_summary = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY"])
 
         # =========================================================================
         # TAB 1: TESTING (CARDS AT TOP + TABLES DIRECTLY UNDERNEATH)
@@ -832,3 +832,137 @@ if check_password():
                         st.dataframe(s_log, use_container_width=True, hide_index=True)
                 else:
                     st.info("No Swing data recorded for this date range.")
+
+# =========================================================================
+        # TAB 3: TEAM SUMMARY (CATAPULT AGGREGATED ROSTER VIEW)
+        # =========================================================================
+        with tab_team_summary:
+            st.markdown('<div class="section-header">Catapult Team Summary Overview</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # Filter swing and throw datasets by the chosen date range for all players
+            team_swing = filter_season(swing_df).copy() if not swing_df.empty else pd.DataFrame()
+            team_throw = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
+
+            if team_swing.empty and team_throw.empty:
+                st.warning("No Catapult swing or throw data found for any athlete within the selected date range.")
+            else:
+                # 1. Prepare Aggregations per Athlete
+                swing_summary = pd.DataFrame()
+                if not team_swing.empty:
+                    s_count_col = find_col(team_swing, ['Swing Count'])
+                    s_load_col = find_col(team_swing, ['Sum Swing Max Player Load'])
+                    s_b3_col = find_col(team_swing, ['Swing Max Rotation Band 3 Count'])
+
+                    s_agg = {}
+                    if s_count_col: s_agg[s_count_col] = 'sum'
+                    if s_load_col: s_agg[s_load_col] = 'sum'
+                    if s_b3_col: s_agg[s_b3_col] = 'sum'
+
+                    if s_agg:
+                        swing_summary = team_swing.groupby('Player Name', as_index=False).agg(s_agg)
+
+                throw_summary = pd.DataFrame()
+                if not team_throw.empty:
+                    t_count_col = find_col(team_throw, ['Total Throw Count'])
+                    t_load_col = find_col(team_throw, ['Total Throw Player Load'])
+                    t_l3_col = find_col(team_throw, ['Total Throw Count - Player Load 3'])
+                    t_b3_col = find_col(team_throw, ['Total Throw Count - Rotation Band 3'])
+
+                    t_agg = {}
+                    if t_count_col: t_agg[t_count_col] = 'sum'
+                    if t_load_col: t_agg[t_load_col] = 'sum'
+                    if t_l3_col: t_agg[t_l3_col] = 'sum'
+                    if t_b3_col: t_agg[t_b3_col] = 'sum'
+
+                    if t_agg:
+                        throw_summary = team_throw.groupby('Player Name', as_index=False).agg(t_agg)
+
+                # Merge swing and throw team summaries
+                if not swing_summary.empty and not throw_summary.empty:
+                    team_df = pd.merge(swing_summary, throw_summary, on='Player Name', how='outer')
+                elif not swing_summary.empty:
+                    team_df = swing_summary
+                else:
+                    team_df = throw_summary
+
+                team_df.fillna(0, inplace=True)
+
+                # Standardize Column Names for Display
+                rename_dict = {}
+                if 'Swing Count' in team_df.columns: rename_dict['Swing Count'] = 'Total Swings'
+                if 'Sum Swing Max Player Load' in team_df.columns: rename_dict['Sum Swing Max Player Load'] = 'Swing Player Load'
+                if 'Swing Max Rotation Band 3 Count' in team_df.columns: rename_dict['Swing Max Rotation Band 3 Count'] = 'Band 3 Swings'
+                if 'Total Throw Count' in team_df.columns: rename_dict['Total Throw Count'] = 'Total Throws'
+                if 'Total Throw Player Load' in team_df.columns: rename_dict['Total Throw Player Load'] = 'Throw Player Load'
+                if 'Total Throw Count - Player Load 3' in team_df.columns: rename_dict['Total Throw Count - Player Load 3'] = 'Load 3 Throws'
+                if 'Total Throw Count - Rotation Band 3' in team_df.columns: rename_dict['Total Throw Count - Rotation Band 3'] = 'Band 3 Throws'
+
+                team_df.rename(columns=rename_dict, inplace=True)
+
+                # 2. Key Performance KPI Cards
+                col1, col2, col3, col4 = st.columns(4)
+                
+                tot_swings = int(team_df['Total Swings'].sum()) if 'Total Swings' in team_df.columns else 0
+                tot_throws = int(team_df['Total Throws'].sum()) if 'Total Throws' in team_df.columns else 0
+                active_players = len(team_df)
+                avg_swings = round(tot_swings / active_players, 1) if active_players > 0 else 0
+
+                with col1:
+                    st.markdown(f"""
+                        <div class="catapult-card">
+                            <h5>Active Athletes</h5>
+                            <h3>{active_players}</h3>
+                            <p>Logged Data</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"""
+                        <div class="catapult-card">
+                            <h5>Team Total Swings</h5>
+                            <h3>{tot_swings:,}</h3>
+                            <p>Accumulated Volume</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col3:
+                    st.markdown(f"""
+                        <div class="catapult-card">
+                            <h5>Team Total Throws</h5>
+                            <h3>{tot_throws:,}</h3>
+                            <p>Accumulated Volume</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with col4:
+                    st.markdown(f"""
+                        <div class="catapult-card">
+                            <h5>Avg Swings / Player</h5>
+                            <h3>{avg_swings}</h3>
+                            <p>Team Mean</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="sub-header-title">Athlete Workload Summary Table</div>', unsafe_allow_html=True)
+
+                # Round numbers for clean display
+                numeric_cols = team_df.select_dtypes(include=[np.number]).columns
+                team_df[numeric_cols] = team_df[numeric_cols].round(1)
+
+                # Sort by highest swing volume by default
+                sort_col = 'Total Swings' if 'Total Swings' in team_df.columns else team_df.columns[1]
+                team_df.sort_values(by=sort_col, ascending=False, inplace=True)
+
+                st.dataframe(
+                    team_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # CSV Download Button
+                csv = team_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download Team Summary CSV",
+                    data=csv,
+                    file_name=f"catapult_team_summary_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
+                    mime='text/csv'
+                )
