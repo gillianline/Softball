@@ -542,12 +542,17 @@ if check_password():
             if not all_athletes:
                 st.warning("No athlete data available.")
                 return None, None
-    
-            # --- 5. GLOBAL SEASON & CALENDAR DATE RANGE SETUP ---
+
+            # --- SEASON & DATE FILTERS ---
             f_col1, f_col2 = st.columns([1, 1.3])
 
             with f_col1:
-                season_option = st.selectbox("Season Preset", ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"], index=1)
+                season_option = st.selectbox(
+                    "Season Preset",
+                    ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"],
+                    index=1,
+                    key=f"{key_prefix}_season"
+                )
 
             # Date Range Calculation
             if season_option == "Spring 2026":
@@ -564,46 +569,100 @@ if check_password():
                     "Select Date Range",
                     value=(default_start, default_end),
                     min_value=min_date,
-                    max_value=max_date
+                    max_value=max_date,
+                    key=f"{key_prefix}_date_range"
                 )
 
             if isinstance(date_range, tuple) and len(date_range) == 2:
-                start_dt, end_dt = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                start_dt = pd.to_datetime(date_range[0])
+                end_dt = (
+                    pd.to_datetime(date_range[1])
+                    + pd.Timedelta(days=1)
+                    - pd.Timedelta(seconds=1)
+                )
             else:
-                start_dt, end_dt = pd.to_datetime(default_start), pd.to_datetime(default_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                start_dt = pd.to_datetime(default_start)
+                end_dt = (
+                    pd.to_datetime(default_end)
+                    + pd.Timedelta(days=1)
+                    - pd.Timedelta(seconds=1)
+                )
+
+            def local_filter(df):
+                if df.empty or "Date" not in df.columns:
+                    return df
+                return df[(df["Date"] >= start_dt) & (df["Date"] <= end_dt)]
+
+            raw_ash = (
+                ash_df[ash_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in ash_df.columns
+                else pd.DataFrame()
+            )
+
+            raw_cmj = (
+                cmj_df[cmj_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in cmj_df.columns
+                else pd.DataFrame()
+            )
+
+            raw_er = (
+                er_df[er_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in er_df.columns
+                    else pd.DataFrame()
+            )
+
+            raw_grip = (
+                grip_df[grip_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in grip_df.columns
+                else pd.DataFrame()
+            )
+
+            raw_sprint = (
+                sprint_df[sprint_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in sprint_df.columns
+                else pd.DataFrame()
+            )
+
+            raw_swing = (
+                swing_df[swing_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in swing_df.columns
+                else pd.DataFrame()
+            )
+
+            raw_throw = (
+                throw_df[throw_df["Player Name"] == selected].sort_values("Date")
+                if "Player Name" in throw_df.columns
+                else pd.DataFrame()
+            )
+
+            p_ash = local_filter(raw_ash).copy()
+            p_cmj = local_filter(raw_cmj).copy()
+            p_er = local_filter(raw_er).copy()
+            p_grip = local_filter(raw_grip).copy()
+            p_sprint = local_filter(raw_sprint).copy()
+            p_swing = local_filter(raw_swing).copy()
+            p_throw = local_filter(raw_throw).copy()
+
+            img_url = photo_dict.get(
+                selected.strip().lower(),
+                "https://www.w3schools.com/howto/img_avatar.png"
+            )
+
+            date_str_display = (
+                f"{start_dt.strftime('%b %d, %Y')} – "
+                f"{end_dt.strftime('%b %d, %Y')}"
+            )
+
+            return selected, (
+                p_ash,
+                p_cmj,
+                p_er,
+                p_grip,
+                p_sprint,
+                p_swing,
+                p_throw
+            )
     
-            raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
-            raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
-            raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
-            raw_grip = grip_df[grip_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in grip_df.columns else pd.DataFrame()
-            raw_sprint = sprint_df[sprint_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in sprint_df.columns else pd.DataFrame()
-            raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
-            raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
-
-            p_ash = filter_season(raw_ash).copy()
-            p_cmj = filter_season(raw_cmj).copy()
-            p_er = filter_season(raw_er).copy()
-            p_grip = filter_season(raw_grip).copy()
-            p_sprint = filter_season(raw_sprint).copy()
-            p_swing = filter_season(raw_swing).copy()
-            p_throw = filter_season(raw_throw).copy()
-
-            img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
-            date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
-
-            #st.markdown(f"""
-                #<div class="athlete-banner">
-                    #<div class="athlete-info">
-                        #<img src="{img_url}" class="player-photo">
-                        #<div>
-                            #<h1 class="athlete-name">{selected}</h1>
-                            #<p class="athlete-sub">Softball Performance | {date_str_display}</p>
-                        #</div>
-                    #</div>
-                #</div>
-            #""", unsafe_allow_html=True)
-
-            return selected, (p_ash, p_cmj, p_er, p_grip, p_sprint, p_swing, p_throw)
 
 
         # --- 6. NAVIGATION TABS ---
