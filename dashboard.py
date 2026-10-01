@@ -952,11 +952,91 @@ if check_password():
                 sort_col = 'Total Swings' if 'Total Swings' in team_df.columns else team_df.columns[1]
                 team_df.sort_values(by=sort_col, ascending=False, inplace=True)
 
-                st.dataframe(
-                    team_df,
-                    use_container_width=True,
-                    hide_index=True
-                )
+
+                def render_styled_team_table(df):
+                    if df.empty:
+                        return "<p style='text-align:center; color:#6C757D;'>No data available.</p>"
+    
+                    # CSS styling for centered text, alternating row colors, and visual section separation
+                    html = """
+                    <style>
+                        .styled-team-container {
+                            border: 1px solid #E2E8F0;
+                            border-radius: 10px;
+                            overflow-x: auto;
+                            margin-top: 10px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                        }
+                        .styled-team-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            text-align: center;
+                        }
+                        .styled-team-table th {
+                            background-color: #F1F5F9;
+                            color: #1E293B;
+                            font-weight: 700;
+                            font-size: 12px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                            padding: 12px 10px;
+                            border-bottom: 2px solid #CBD5E1;
+                            text-align: center !important;
+                        }
+                        .styled-team-table td {
+                            padding: 10px 12px;
+                            border-bottom: 1px solid #E2E8F0;
+                            font-size: 13px;
+                            color: #334155;
+                            text-align: center !important;
+                        }
+                        /* Alternating row colors */
+                        .styled-team-table tbody tr:nth-child(even) {
+                            background-color: #F8FAFC;
+                        }
+                        .styled-team-table tbody tr:hover {
+                            background-color: #EDF2F7;
+                        }
+                        /* Soft subtle tint for Swings vs Throws columns */
+                        .col-swing {
+                            background-color: rgba(255, 130, 0, 0.03);
+                        }
+                        .col-throw {
+                            background-color: rgba(47, 128, 237, 0.03);
+                        }
+                    </style>
+                    <div class="styled-team-container">
+                        <table class="styled-team-table">
+                            <thead>
+                                <tr>
+                    """
+    
+                    # Header row
+                    for col in df.columns:
+                        html += f'<th>{col}</th>'
+                    html += '</tr></thead><tbody>'
+    
+                    # Data rows
+                    for _, row in df.iterrows():
+                        html += '<tr>'
+                        for col_name, val in row.items():
+                            # Apply slight background tint based on metric group
+                            cell_class = ""
+                            if "Swing" in col_name:
+                                cell_class = 'class="col-swing"'
+                            elif "Throw" in col_name:
+                                cell_class = 'class="col-throw"'
+                
+                            formatted_val = f"{val:,}" if isinstance(val, (int, np.integer)) else f"{val}"
+                            html += f'<td {cell_class}>{formatted_val}</td>'
+                        html += '</tr>'
+        
+                    html += '</tbody></table></div>'
+                    return html
+
+                # Render in Streamlit
+                st.markdown(render_styled_team_table(team_df), unsafe_allow_html=True)
 
                 # CSV Download Button
                 csv = team_df.to_csv(index=False).encode('utf-8')
