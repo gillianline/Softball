@@ -537,6 +537,47 @@ if check_password():
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+                
+        def setup_player_view(key_prefix):
+            if not all_athletes:
+                st.warning("No athlete data available.")
+                return None, None
+    
+            selected = st.selectbox("Select Athlete", all_athletes, key=f"{key_prefix}_athlete")
+    
+            raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
+            raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
+            raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
+            raw_grip = grip_df[grip_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in grip_df.columns else pd.DataFrame()
+            raw_sprint = sprint_df[sprint_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in sprint_df.columns else pd.DataFrame()
+            raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
+            raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
+
+            p_ash = filter_season(raw_ash).copy()
+            p_cmj = filter_season(raw_cmj).copy()
+            p_er = filter_season(raw_er).copy()
+            p_grip = filter_season(raw_grip).copy()
+            p_sprint = filter_season(raw_sprint).copy()
+            p_swing = filter_season(raw_swing).copy()
+            p_throw = filter_season(raw_throw).copy()
+
+            img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
+            date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
+
+            st.markdown(f"""
+                <div class="athlete-banner">
+                    <div class="athlete-info">
+                        <img src="{img_url}" class="player-photo">
+                        <div>
+                            <h1 class="athlete-name">{selected}</h1>
+                            <p class="athlete-sub">Softball Performance | {date_str_display}</p>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            return selected, (p_ash, p_cmj, p_er, p_grip, p_sprint, p_swing, p_throw)
+
 
         # --- 6. NAVIGATION TABS ---
         tab_testing, tab_catapult, tab_team_summary = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY"])
@@ -545,6 +586,9 @@ if check_password():
         # TAB 1: TESTING (CARDS AT TOP + TABLES DIRECTLY UNDERNEATH)
         # =========================================================================
         with tab_testing:
+            selected, player_data = setup_player_view("testing")
+            if player_data:
+                p_ash, p_cmj, p_er, p_grip, p_sprint, p_swing, p_throw = player_data
             st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             render_assessment_cards()
@@ -602,6 +646,8 @@ if check_password():
         # TAB 2: CATAPULT PROFILE (SWING & THROW ANALYTICS)
         # =========================================================================
         with tab_catapult:
+            selected, player_data = setup_player_view("catapult")
+            if player_data:
             st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
