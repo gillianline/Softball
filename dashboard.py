@@ -282,7 +282,7 @@ if check_password():
                     throw_df[col] = clean_num_series(throw_df[col])
 
             agg_dict_t = {c: 'sum' for c in throw_cols if c in throw_df.columns}
-            if 'Session Type' in throw_df.columns:
+            if 'Session Type' in throw_dict_t if 'Session Type' in throw_df.columns else {}:
                 agg_dict_t['Session Type'] = lambda x: ', '.join(x.dropna().unique())
             if 'Activity' in throw_df.columns:
                 agg_dict_t['Activity'] = lambda x: ', '.join(x.dropna().unique())
@@ -365,16 +365,18 @@ if check_password():
             default_start, default_end = date(2026, 8, 1), today
 
         with f_col3:
-            # Unrestricted Calendar Picker (No min_value/max_value lockouts)
+            # Unrestricted Calendar Picker with min_value/max_value allowed up to today
             date_range = st.date_input(
                 "Select Date Range",
                 value=(default_start, default_end),
+                min_value=date(2020, 1, 1),
+                max_value=today,
                 key="global_date_picker"
             )
 
         with f_col4:
             st.write(" ") # Layout alignment offset
-            if st.button("Refresh"):
+            if st.button("🔄 Refresh"):
                 st.cache_data.clear()
                 st.rerun()
 
@@ -423,7 +425,7 @@ if check_password():
 
         def render_custom_table(df):
             if df.empty:
-                return "<p style='font-size:12px; color:#6C757D; text-align:center;'>No records found.</p>"
+                return "<p style='font-size:12px; color:#6C757D; text-align:center;'>No records found for selected date range.</p>"
             html = '<div class="table-container"><table class="coach-table"><thead><tr>'
             for col in df.columns:
                 html += f'<th>{col}</th>'
@@ -438,8 +440,11 @@ if check_password():
 
         # --- Helper for Assessment Cards Rendering ---
         def render_assessment_cards():
+            has_any_data = False
+
             # 1. ASH
             if not p_ash.empty and ash_l_col and ash_r_col:
+                has_any_data = True
                 last_ash = p_ash.iloc[-1]
                 ash_date = pd.to_datetime(last_ash['Date']).strftime('%b %d, %Y')
                 st.markdown(f"""
@@ -460,6 +465,7 @@ if check_password():
 
             # 2. CMJ
             if not p_cmj.empty and cmj_h_col:
+                has_any_data = True
                 last_cmj = p_cmj.iloc[-1]
                 cmj_date = pd.to_datetime(last_cmj['Date']).strftime('%b %d, %Y')
                 rsi_val = f" | <strong>RSI-m:</strong> {last_cmj[cmj_rsi_col]:.2f}" if cmj_rsi_col and not pd.isna(last_cmj[cmj_rsi_col]) else ""
@@ -480,6 +486,7 @@ if check_password():
 
             # 3. Shoulder ER ROM
             if not p_er.empty and er_l_col and er_r_col:
+                has_any_data = True
                 last_er = p_er.iloc[-1]
                 er_date = pd.to_datetime(last_er['Date']).strftime('%b %d, %Y')
                 st.markdown(f"""
@@ -500,6 +507,7 @@ if check_password():
 
             # 4. Grip Strength
             if not p_grip.empty and grip_l_col and grip_r_col:
+                has_any_data = True
                 last_grip = p_grip.iloc[-1]
                 grip_date = pd.to_datetime(last_grip['Date']).strftime('%b %d, %Y')
                 st.markdown(f"""
@@ -520,6 +528,7 @@ if check_password():
 
             # 5. 20m Sprint
             if not p_sprint.empty and sprint_time_col:
+                has_any_data = True
                 last_sprint = p_sprint.iloc[-1]
                 sprint_date = pd.to_datetime(last_sprint['Date']).strftime('%b %d, %Y')
                 st.markdown(f"""
@@ -536,6 +545,9 @@ if check_password():
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+            if not has_any_data:
+                st.info(f"No testing assessment entries found for {selected} within the selected date window ({start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}).")
 
         # --- 6. NAVIGATION TABS ---
         tab_testing, tab_catapult, tab_team_summary = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY"])
