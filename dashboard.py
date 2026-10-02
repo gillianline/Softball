@@ -689,7 +689,7 @@ if check_password():
         # TAB 1: TESTING (CARDS AT TOP + TABLES DIRECTLY UNDERNEATH)
         # =========================================================================
         with tab_testing:
-            selected, player_data = setup_player_view("testing")
+            #selected, player_data = setup_player_view("testing")
             if player_data:
                 p_ash, p_cmj, p_er, p_grip, p_sprint, p_swing, p_throw = player_data
                 st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
@@ -749,7 +749,7 @@ if check_password():
         # TAB 2: CATAPULT PROFILE (SWING & THROW ANALYTICS)
         # =========================================================================
         with tab_catapult:
-            selected, player_data = setup_player_view("catapult")
+            #selected, player_data = setup_player_view("catapult")
             if player_data:
                 st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
