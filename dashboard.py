@@ -366,15 +366,15 @@ if check_password():
             default_start, default_end = date(2026, 8, 1), today
 
         with f_col3:
-            # Unrestricted Calendar Picker with min_value/max_value allowed up to today
+            # Completely unrestricted calendar picker (max_value=None allows selecting any future date)
             date_range = st.date_input(
                 "Select Date Range",
                 value=(default_start, default_end),
                 min_value=date(2020, 1, 1),
-                max_value=today,
+                max_value=None,
                 key="global_date_picker"
             )
-
+            
         with f_col4:
             st.write(" ") # Layout alignment offset
             if st.button("Refresh"):
