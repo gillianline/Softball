@@ -329,7 +329,7 @@ if check_password():
                 return match_part[0]
         return None
 
-    # --- 5. SEASON & CALENDAR DATE RANGE SETUP ---
+   # --- 5. SEASON & CALENDAR DATE RANGE SETUP ---
     all_athletes = sorted(list(set(
         list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
         list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else []) +
@@ -342,11 +342,12 @@ if check_password():
 
     if all_athletes:
         today = date.today()
+
+        f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1, 1, 1, 0.5])
         
-        # Single Unified Control Bar
-        f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1, 1.3, 0.5])
         with f_col1:
             selected = st.selectbox("Select Athlete", all_athletes, key="global_athlete_select")
+            
         with f_col2:
             season_option = st.selectbox(
                 "Season Preset", 
@@ -355,42 +356,50 @@ if check_password():
                 key="global_season_select"
             )
 
-        # Dynamic Preset Bounds
-        if season_option == "Spring 2026":
-            default_start, default_end = date(2026, 1, 1), date(2026, 5, 31)
-        elif season_option == "Fall 2026 (Current)":
-            default_start, default_end = date(2026, 8, 21), today
-        elif season_option == "All Time":
-            default_start, default_end = date(2020, 1, 1), today
-        else:
-            default_start, default_end = date(2026, 8, 1), today
+        # Handle Presets by explicitly forcing session_state updates
+        if "last_season_option" not in st.session_state:
+            st.session_state["last_season_option"] = season_option
 
+        if season_option != st.session_state["last_season_option"]:
+            st.session_state["last_season_option"] = season_option
+            if season_option == "Spring 2026":
+                st.session_state["global_start_date"] = date(2026, 1, 1)
+                st.session_state["global_end_date"] = date(2026, 5, 31)
+            elif season_option == "Fall 2026 (Current)":
+                st.session_state["global_start_date"] = date(2026, 8, 21)
+                st.session_state["global_end_date"] = today
+            elif season_option == "All Time":
+                st.session_state["global_start_date"] = date(2020, 1, 1)
+                st.session_state["global_end_date"] = today
+
+        # Set fallback initial state if not present
+        if "global_start_date" not in st.session_state:
+            st.session_state["global_start_date"] = date(2026, 8, 21)
+        if "global_end_date" not in st.session_state:
+            st.session_state["global_end_date"] = today
+
+        # Single-date pickers with NO max_value limit
         with f_col3:
-            # Completely unrestricted calendar picker (max_value=None allows selecting any future date)
-            date_range = st.date_input(
-                "Select Date Range",
-                value=(default_start, default_end),
-                min_value=date(2020, 1, 1),
-                max_value=None,
-                key="global_date_picker"
+            start_date_val = st.date_input(
+                "Start Date",
+                key="global_start_date"
             )
-            
+
         with f_col4:
-            st.write(" ") # Layout alignment offset
+            end_date_val = st.date_input(
+                "End Date",
+                key="global_end_date"
+            )
+
+        with f_col5:
+            st.write(" ") # Layout offset
             if st.button("Refresh"):
                 st.cache_data.clear()
                 st.rerun()
 
-        # Date Parsing Logic (Full day coverage)
-        if isinstance(date_range, tuple) and len(date_range) == 2:
-            start_dt = pd.to_datetime(date_range[0])
-            end_dt = pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        elif isinstance(date_range, tuple) and len(date_range) == 1:
-            start_dt = pd.to_datetime(date_range[0])
-            end_dt = pd.to_datetime(date_range[0]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        else:
-            start_dt = pd.to_datetime(default_start)
-            end_dt = pd.to_datetime(default_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        # Datetime conversions for DataFrame filtering
+        start_dt = pd.to_datetime(start_date_val)
+        end_dt = pd.to_datetime(end_date_val) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
         def filter_season(df):
             if df.empty or 'Date' not in df.columns:
