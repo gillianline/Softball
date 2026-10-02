@@ -340,47 +340,64 @@ if check_password():
     )))
 
     if all_athletes:
-        f_col1, f_col2, f_col3 = st.columns([1.2, 1, 1.3])
+        # Top-level Global Filter Bar
+        f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1, 1.3, 0.5])
+        
         with f_col1:
-            selected = st.selectbox("Select Athlete", all_athletes)
+            selected = st.selectbox("Select Athlete", all_athletes, key="global_athlete")
+            
         with f_col2:
-            season_option = st.selectbox("Season Preset", ["Custom Range", "Fall 2026 (Current)", "Spring 2026", "All Time"], index=1)
+            season_option = st.selectbox(
+                "Season Preset", 
+                ["Fall 2026 (Current)", "Spring 2026", "All Time", "Custom Range"], 
+                index=0,
+                key="global_season"
+            )
 
-        all_dates = []
-        for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df]:
-            if not df.empty and 'Date' in df.columns:
-                all_dates.extend(df['Date'].dropna().tolist())
-
-        min_date = min(all_dates).date() if all_dates else date(2026, 1, 1)
-        max_date = max(all_dates).date() if all_dates else date(2026, 12, 31)
-
+        # Allow flexible calendar navigation up to today's date
+        today = date.today()
+        
         if season_option == "Spring 2026":
             default_start, default_end = date(2026, 1, 1), date(2026, 5, 31)
         elif season_option == "Fall 2026 (Current)":
-            default_start, default_end = date(2026, 8, 21), max_date
+            default_start, default_end = date(2026, 8, 21), today
         elif season_option == "All Time":
-            default_start, default_end = min_date, max_date
+            default_start, default_end = date(2020, 1, 1), today
         else:
-            default_start, default_end = min_date, max_date
+            default_start, default_end = date(2026, 8, 1), today
 
         with f_col3:
+            # Removed min_value and max_value constraints to allow full calendar navigation across months
             date_range = st.date_input(
                 "Select Date Range",
                 value=(default_start, default_end),
-                min_value=min_date,
-                max_value=max_date
+                key="global_date_picker"
             )
 
-        if isinstance(date_range, tuple) and len(date_range) == 2:
-            start_dt, end_dt = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        else:
-            start_dt, end_dt = pd.to_datetime(default_start), pd.to_datetime(default_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        with f_col4:
+            st.write(" ") # Spacing offset
+            if st.button("🔄 Refresh Data"):
+                st.cache_data.clear()
+                st.rerun()
 
+        # Parse Date Range safely up through the end of the selected day
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_dt = pd.to_datetime(date_range[0])
+            end_dt = pd.to_datetime(date_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        elif isinstance(date_range, tuple) and len(date_range) == 1:
+            start_dt = pd.to_datetime(date_range[0])
+            end_dt = pd.to_datetime(date_range[0]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        else:
+            start_dt = pd.to_datetime(default_start)
+            end_dt = pd.to_datetime(default_end) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+        # Filter Function
         def filter_season(df):
             if df.empty or 'Date' not in df.columns:
                 return df
             return df[(df['Date'] >= start_dt) & (df['Date'] <= end_dt)]
 
+        # Filter Athlete & Date Range Data
         raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
         raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
         raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
@@ -406,7 +423,7 @@ if check_password():
         grip_l_col = find_col(grip_df, ['L Max Force (N)', 'L Max Force', 'Left Max Force (N)', 'Force (L)', 'L Grip'])
         grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
         sprint_time_col = find_col(sprint_df, ['Time', '20m Time', '20m Sprint', 'Time (s)', '20m (s)', '20m'])
-
+        
         img_url = photo_dict.get(selected.strip().lower(), 'https://www.w3schools.com/howto/img_avatar.png')
 
         date_str_display = f"{start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}"
