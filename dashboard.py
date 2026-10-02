@@ -222,7 +222,8 @@ if check_password():
         ).astype(float)
 
     # --- 4. SAFE DATA LOADING & MERGING ---
-    @st.cache_data(ttl=300)
+    # --- 4. SAFE DATA LOADING & MERGING ---
+    @st.cache_data(ttl=0)
     def load_all_data():
         def safe_read_csv(secret_key):
             if secret_key in st.secrets and str(st.secrets[secret_key]).strip():
@@ -282,7 +283,7 @@ if check_password():
                     throw_df[col] = clean_num_series(throw_df[col])
 
             agg_dict_t = {c: 'sum' for c in throw_cols if c in throw_df.columns}
-            if 'Session Type' in throw_dict_t if 'Session Type' in throw_df.columns else {}:
+            if 'Session Type' in throw_df.columns:
                 agg_dict_t['Session Type'] = lambda x: ', '.join(x.dropna().unique())
             if 'Activity' in throw_df.columns:
                 agg_dict_t['Activity'] = lambda x: ', '.join(x.dropna().unique())
