@@ -377,7 +377,7 @@ if check_password():
 
         with f_col4:
             st.write(" ") # Layout alignment offset
-            if st.button("🔄 Refresh"):
+            if st.button("Refresh"):
                 st.cache_data.clear()
                 st.rerun()
 
