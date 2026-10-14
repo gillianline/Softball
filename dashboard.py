@@ -1059,7 +1059,7 @@ if check_password():
 
             if report_type == "Throws":
                 if not p_throw.empty:
-                    # 1. Band Graph for Throws
+                    # 1. Band Graph for Throws (Player Load)
                     fig_rep_throw_band = go.Figure()
                     if 'Total Throw Count - Player Load 1' in p_throw.columns:
                         fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
@@ -1079,7 +1079,27 @@ if check_password():
 
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                    # 2. Line Graph for Total Throws Over Time
+                    # 2. Band Graph for Throws (Rotation)
+                    fig_rep_throw_rot = go.Figure()
+                    if 'Total Throw Count - Rotation Band 1' in p_throw.columns:
+                        fig_rep_throw_rot.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Rotation Band 1'], name='Rot Band 1', marker_color='#F59E0B'))
+                        fig_rep_throw_rot.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Rotation Band 2'], name='Rot Band 2', marker_color='#EF4444'))
+                        fig_rep_throw_rot.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Rotation Band 3'], name='Rot Band 3', marker_color='#8B5CF6'))
+
+                    fig_rep_throw_rot.update_layout(
+                        barmode='stack',
+                        title=dict(text="Throw Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
+                        xaxis_title="",
+                        yaxis_title="Throw Count",
+                        height=350,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
+                    )
+                    st.plotly_chart(fig_rep_throw_rot, use_container_width=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # 3. Line Graph for Total Throws Over Time
                     fig_rep_throw_line = go.Figure()
                     if 'Total Throw Count' in p_throw.columns:
                         hover_template = '<b>Date:</b> %{x|%b %d, %Y}<br><b>Total Throws:</b> %{y}'
