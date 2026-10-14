@@ -252,8 +252,6 @@ if check_password():
         </style>
     """, unsafe_allow_html=True)
     
-        </style>
-    """, unsafe_allow_html=True)
 
     # Clean numeric helper
     def clean_num_series(series):
@@ -263,7 +261,6 @@ if check_password():
             lambda x: re.findall(r"[-+]?\d*\.?\d+", str(x))[0] if re.findall(r"[-+]?\d*\.?\d+", str(x)) else np.nan
         ).astype(float)
 
-    # --- 4. SAFE DATA LOADING & MERGING ---
     # --- 4. SAFE DATA LOADING & MERGING ---
     @st.cache_data(ttl=0)
     def load_all_data():
