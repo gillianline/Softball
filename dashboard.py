@@ -560,7 +560,7 @@ if check_password():
                 st.info(f"No testing assessment entries found for {selected} within the selected date window ({start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}).")
 
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult, tab_team_summary = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY"])
+        tab_testing, tab_catapult, tab_team_summary = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT"])
 
         # =========================================================================
         # TAB 1: TESTING
@@ -1045,3 +1045,133 @@ if check_password():
                     file_name=f"catapult_team_summary_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
                     mime='text/csv'
                 )
+        # =========================================================================
+        # TAB 4: REPORT PAGE (SWINGS VS THROWS)
+        # =========================================================================
+        with tab_report:
+            st.markdown('<div class="section-header">Activity Volume Report</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # Selector for Swings or Throws
+            report_type = st.radio("Select Metric to View:", ["Swings", "Throws"], horizontal=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            if report_type == "Throws":
+                if not p_throw.empty:
+                    # 1. Band Graph for Throws
+                    fig_rep_throw_band = go.Figure()
+                    if 'Total Throw Count - Player Load 1' in p_throw.columns:
+                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
+                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
+                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
+
+                    fig_rep_throw_band.update_layout(
+                        barmode='stack',
+                        title=dict(text="Throw Volume by Load Band", font=dict(size=14, color='#1D1D1F')),
+                        xaxis_title="",
+                        yaxis_title="Throw Count",
+                        height=350,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
+                    )
+                    st.plotly_chart(fig_rep_throw_band, use_container_width=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # 2. Line Graph for Total Throws by Activity
+                    fig_rep_throw_line = go.Figure()
+                    if 'Total Throw Count' in p_throw.columns:
+                        if 'Activity' in p_throw.columns:
+                            for act in p_throw['Activity'].dropna().unique():
+                                df_act = p_throw[p_throw['Activity'] == act]
+                                fig_rep_throw_line.add_trace(go.Scatter(
+                                    x=df_act['Date'], 
+                                    y=df_act['Total Throw Count'], 
+                                    mode='lines+markers', 
+                                    name=str(act),
+                                    line=dict(width=3),
+                                    marker=dict(size=8)
+                                ))
+                        else:
+                            fig_rep_throw_line.add_trace(go.Scatter(
+                                x=p_throw['Date'], 
+                                y=p_throw['Total Throw Count'], 
+                                mode='lines+markers', 
+                                name='Total Throws',
+                                line=dict(width=3, color='#FF8200'),
+                                marker=dict(size=8)
+                            ))
+
+                    fig_rep_throw_line.update_layout(
+                        title=dict(text="Total Throws Over Time (By Activity)", font=dict(size=14, color='#1D1D1F')),
+                        xaxis_title="",
+                        yaxis_title="Total Throws",
+                        height=350,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+                        hovermode="x unified"
+                    )
+                    st.plotly_chart(fig_rep_throw_line, use_container_width=True)
+
+                else:
+                    st.info("No Throw data available for the selected athlete in this date range.")
+
+            else:  # If Swings selected
+                if not p_swing.empty:
+                    # 1. Band Graph for Swings
+                    fig_rep_swing_band = go.Figure()
+                    if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
+                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
+                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
+                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
+
+                    fig_rep_swing_band.update_layout(
+                        barmode='stack',
+                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
+                        xaxis_title="",
+                        yaxis_title="Swing Count",
+                        height=350,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
+                    )
+                    st.plotly_chart(fig_rep_swing_band, use_container_width=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # 2. Line Graph for Total Swings by Activity
+                    fig_rep_swing_line = go.Figure()
+                    if 'Swing Count' in p_swing.columns:
+                        if 'Activity' in p_swing.columns:
+                            for act in p_swing['Activity'].dropna().unique():
+                                df_act = p_swing[p_swing['Activity'] == act]
+                                fig_rep_swing_line.add_trace(go.Scatter(
+                                    x=df_act['Date'], 
+                                    y=df_act['Swing Count'], 
+                                    mode='lines+markers', 
+                                    name=str(act),
+                                    line=dict(width=3),
+                                    marker=dict(size=8)
+                                ))
+                        else:
+                            fig_rep_swing_line.add_trace(go.Scatter(
+                                x=p_swing['Date'], 
+                                y=p_swing['Swing Count'], 
+                                mode='lines+markers', 
+                                name='Total Swings',
+                                line=dict(width=3, color='#4895DB'),
+                                marker=dict(size=8)
+                            ))
+
+                    fig_rep_swing_line.update_layout(
+                        title=dict(text="Total Swings Over Time (By Activity)", font=dict(size=14, color='#1D1D1F')),
+                        xaxis_title="",
+                        yaxis_title="Total Swings",
+                        height=350,
+                        margin=dict(l=10, r=10, t=35, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+                        hovermode="x unified"
+                    )
+                    st.plotly_chart(fig_rep_swing_line, use_container_width=True)
+
+                else:
+                    st.info("No Swing data available for the selected athlete in this date range.")
