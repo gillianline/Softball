@@ -210,6 +210,48 @@ if check_password():
         }
         
         #MainMenu, footer, header { visibility: hidden; }
+
+        /* --- PRINT OPTIMIZATION --- */
+        @media print {
+            /* 1. Hide Streamlit Chrome & Navigation */
+            [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], 
+            .stApp > header, footer, #MainMenu {
+                display: none !important;
+            }
+            
+            /* 2. Hide Interactive Widgets (Dropdowns, Buttons, Date Pickers, Radio Buttons) */
+            button, [data-testid="stSelectbox"], [data-testid="stDateInput"], .stRadio {
+                display: none !important;
+            }
+
+            /* 3. Hide the Tab Selector Row */
+            [data-testid="stTabs"] [data-baseweb="tab-list"] {
+                display: none !important;
+            }
+
+            /* 4. Force browsers to print your background colors (badges, colored borders) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* 5. Prevent elements from breaking cleanly across page breaks */
+            .catapult-card, .assessment-card, .legend-card, .js-plotly-plot, .styled-team-container {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 20px !important;
+            }
+
+            /* 6. Remove app padding to maximize paper space */
+            .main .block-container {
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
         </style>
     """, unsafe_allow_html=True)
 
