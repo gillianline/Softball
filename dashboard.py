@@ -1105,7 +1105,7 @@ if check_password():
                         yaxis_title="Total Throws",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
-                        showlegend=False,  # Hidden because it is just one continuous line now
+                        showlegend=False,
                         hovermode="x unified"
                     )
                     st.plotly_chart(fig_rep_throw_line, use_container_width=True)
@@ -1161,65 +1161,7 @@ if check_password():
                         yaxis_title="Total Swings",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
-                        showlegend=False, # Hidden because it is just one continuous line now
-                        hovermode="x unified"
-                    )
-                    st.plotly_chart(fig_rep_swing_line, use_container_width=True)
-
-                else:
-                    st.info("No Swing data available for the selected athlete in this date range.")
-
-            else:  # If Swings selected
-                if not p_swing.empty:
-                    # 1. Band Graph for Swings
-                    fig_rep_swing_band = go.Figure()
-                    if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
-                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
-                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
-                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
-
-                    fig_rep_swing_band.update_layout(
-                        barmode='stack',
-                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Swing Count",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
-                    )
-                    st.plotly_chart(fig_rep_swing_band, use_container_width=True)
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    # 2. Line Graph for Total Swings by Activity
-                    fig_rep_swing_line = go.Figure()
-                    if 'Swing Count' in p_swing.columns:
-                        if 'Activity' in p_swing.columns:
-                            for act in p_swing['Activity'].dropna().unique():
-                                df_act = p_swing[p_swing['Activity'] == act]
-                                fig_rep_swing_line.add_trace(go.Scatter(
-                                    x=df_act['Date'], 
-                                    y=df_act['Swing Count'], 
-                                    mode='lines', 
-                                    name=str(act),
-                                    line=dict(width=4)
-                                ))
-                        else:
-                            fig_rep_swing_line.add_trace(go.Scatter(
-                                x=p_swing['Date'], 
-                                y=p_swing['Swing Count'], 
-                                mode='lines', 
-                                name='Total Swings',
-                                line=dict(width=4, color='#4895DB')
-                            ))
-
-                    fig_rep_swing_line.update_layout(
-                        title=dict(text="Total Swings Over Time (By Activity)", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Total Swings",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+                        showlegend=False,
                         hovermode="x unified"
                     )
                     st.plotly_chart(fig_rep_swing_line, use_container_width=True)
