@@ -1144,7 +1144,13 @@ if check_password():
                     fig_rep_throw_band.update_layout(
                         barmode='stack',
                         title=dict(text="Throw Volume by Load Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
+                        xaxis=dict(
+                            title="",
+                            tickmode='array',
+                            tickvals=p_throw['Date'],
+                            tickformat='%b %d, %Y',
+                            tickangle=-45
+                        ),
                         yaxis_title="Throw Count",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
@@ -1164,7 +1170,13 @@ if check_password():
                     fig_rep_throw_rot.update_layout(
                         barmode='stack',
                         title=dict(text="Throw Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
+                        xaxis=dict(
+                            title="",
+                            tickmode='array',
+                            tickvals=p_throw['Date'],
+                            tickformat='%b %d, %Y',
+                            tickangle=-45
+                        ),
                         yaxis_title="Throw Count",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
@@ -1187,16 +1199,23 @@ if check_password():
                         fig_rep_throw_line.add_trace(go.Scatter(
                             x=p_throw['Date'], 
                             y=p_throw['Total Throw Count'], 
-                            mode='lines', 
+                            mode='lines+markers',  # Added markers to explicitly show the points
                             name='Total Throws',
                             line=dict(width=4, color='#FF8200'),
+                            marker=dict(size=8),
                             customdata=custom_data,
                             hovertemplate=hover_template + '<extra></extra>'
                         ))
 
                     fig_rep_throw_line.update_layout(
                         title=dict(text="Total Throws Over Time", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
+                        xaxis=dict(
+                            title="",
+                            tickmode='array',
+                            tickvals=p_throw['Date'],
+                            tickformat='%b %d, %Y',
+                            tickangle=-45
+                        ),
                         yaxis_title="Total Throws",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
@@ -1268,7 +1287,13 @@ if check_password():
                     fig_rep_swing_band.update_layout(
                         barmode='stack',
                         title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
+                        xaxis=dict(
+                            title="",
+                            tickmode='array',
+                            tickvals=p_swing['Date'],
+                            tickformat='%b %d, %Y',
+                            tickangle=-45
+                        ),
                         yaxis_title="Swing Count",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
@@ -1291,16 +1316,23 @@ if check_password():
                         fig_rep_swing_line.add_trace(go.Scatter(
                             x=p_swing['Date'], 
                             y=p_swing['Swing Count'], 
-                            mode='lines', 
+                            mode='lines+markers',  # Added markers to explicitly show the points
                             name='Total Swings',
                             line=dict(width=4, color='#4895DB'),
+                            marker=dict(size=8),
                             customdata=custom_data,
                             hovertemplate=hover_template + '<extra></extra>'
                         ))
 
                     fig_rep_swing_line.update_layout(
                         title=dict(text="Total Swings Over Time", font=dict(size=14, color='#1D1D1F')),
-                        xaxis_title="",
+                        xaxis=dict(
+                            title="",
+                            tickmode='array',
+                            tickvals=p_swing['Date'],
+                            tickformat='%b %d, %Y',
+                            tickangle=-45
+                        ),
                         yaxis_title="Total Swings",
                         height=350,
                         margin=dict(l=10, r=10, t=35, b=10),
