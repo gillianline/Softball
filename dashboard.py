@@ -760,10 +760,11 @@ if check_password():
 
                     fig_throw = go.Figure()
                     if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
+                        # Changed marker_color to #EC4899 (Pink)
+                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
                         fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
                         fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
-
+                        
                     fig_throw.update_layout(
                         barmode='stack',
                         title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
@@ -1059,12 +1060,14 @@ if check_password():
             if report_type == "Throws":
                 if not p_throw.empty:
                     # 1. Band Graph for Throws
+                    # 1. Band Graph for Throws
                     fig_rep_throw_band = go.Figure()
                     if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#6366F1'))
+                        # Changed marker_color to #EC4899 (Pink)
+                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
                         fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
                         fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
-
+                        
                     fig_rep_throw_band.update_layout(
                         barmode='stack',
                         title=dict(text="Throw Volume by Load Band", font=dict(size=14, color='#1D1D1F')),
