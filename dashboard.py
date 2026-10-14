@@ -560,7 +560,7 @@ if check_password():
                 st.info(f"No testing assessment entries found for {selected} within the selected date window ({start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}).")
 
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult, tab_team_summary = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT"])
+        tab_testing, tab_catapult, tab_team_summary, tab_report = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT"])
 
         # =========================================================================
         # TAB 1: TESTING
