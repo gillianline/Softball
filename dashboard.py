@@ -1449,17 +1449,17 @@ if check_password():
                     p_ash_r = f"{row['Prev ASH (R)']:.1f}" if pd.notna(row.get('Prev ASH (R)')) else "-"
                     c_ash_r = format_trend(row.get('Prev ASH (R)'), row.get('Curr ASH (R)'))
 
-                    html_table += f"""
-                        <tr>
-                            <td style="font-weight:600; text-align:left !important; color:#1D1D1F;">{p_name}</td>
-                            <td class="col-cmj">{p_cmj}</td>
-                            <td class="col-cmj">{c_cmj}</td>
-                            <td class="col-ash">{p_ash_l}</td>
-                            <td class="col-ash">{c_ash_l}</td>
-                            <td class="col-ash">{p_ash_r}</td>
-                            <td class="col-ash">{c_ash_r}</td>
-                        </tr>
-                    """
+                    # Removing indentation from the generated HTML string to prevent Markdown codeblocks
+                    html_table += "<tr>"
+                    html_table += f"<td style='font-weight:600; text-align:left !important; color:#1D1D1F;'>{p_name}</td>"
+                    html_table += f"<td class='col-cmj'>{p_cmj}</td>"
+                    html_table += f"<td class='col-cmj'>{c_cmj}</td>"
+                    html_table += f"<td class='col-ash'>{p_ash_l}</td>"
+                    html_table += f"<td class='col-ash'>{c_ash_l}</td>"
+                    html_table += f"<td class='col-ash'>{p_ash_r}</td>"
+                    html_table += f"<td class='col-ash'>{c_ash_r}</td>"
+                    html_table += "</tr>"
+
                 html_table += "</tbody></table></div>"
                 
                 st.markdown(html_table, unsafe_allow_html=True)
