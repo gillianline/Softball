@@ -599,7 +599,8 @@ if check_password():
                 st.info(f"No testing assessment entries found for {selected} within the selected date window ({start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}).")
 
         # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult, tab_team_summary, tab_report = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT"])
+        # ADDED "TEAM TESTS" TAB HERE
+        tab_testing, tab_catapult, tab_team_summary, tab_report, tab_team_tests = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT", "TEAM TESTS"])
 
         # =========================================================================
         # TAB 1: TESTING
@@ -1011,6 +1012,7 @@ if check_password():
                             border-radius: 10px;
                             overflow-x: auto;
                             margin-top: 10px;
+                            margin-bottom: 20px;
                             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
                         }
                         .styled-team-table {
@@ -1343,3 +1345,121 @@ if check_password():
 
                 else:
                     st.info("No Swing data available for the selected athlete in this date range.")
+
+        # =========================================================================
+        # TAB 5: TEAM TESTS (CMJ & ASH TRENDS)
+        # =========================================================================
+        with tab_team_tests:
+            st.markdown('<div class="section-header">Team Assessment Trends</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # Helper function to find the absolute "Latest" and "Previous" test for every athlete
+            def get_test_trends(df, val_col, player_col='Player Name', date_col='Date'):
+                if df.empty or not val_col:
+                    return pd.DataFrame()
+                
+                # Use the full unfiltered dataframe to ensure we capture all historical tests 
+                temp = df.dropna(subset=[val_col]).sort_values(date_col)
+                trends = []
+                
+                for player, grp in temp.groupby(player_col):
+                    if len(grp) >= 2:
+                        prev_v = grp.iloc[-2][val_col]
+                        curr_v = grp.iloc[-1][val_col]
+                    elif len(grp) == 1:
+                        prev_v = np.nan
+                        curr_v = grp.iloc[-1][val_col]
+                    else:
+                        continue
+                    trends.append({player_col: player, 'Prev': prev_v, 'Curr': curr_v})
+                    
+                return pd.DataFrame(trends).set_index(player_col)
+
+            # Calculate trends
+            cmj_trends = get_test_trends(cmj_df, cmj_h_col)
+            ash_l_trends = get_test_trends(ash_df, ash_l_col)
+            ash_r_trends = get_test_trends(ash_df, ash_r_col)
+
+            # Merge trends into a single summary dataframe
+            team_test_df = pd.DataFrame(index=all_athletes)
+            team_test_df.index.name = 'Player Name'
+
+            if not cmj_trends.empty:
+                team_test_df = team_test_df.join(cmj_trends.rename(columns={'Prev': 'Prev CMJ', 'Curr': 'Curr CMJ'}))
+            if not ash_l_trends.empty:
+                team_test_df = team_test_df.join(ash_l_trends.rename(columns={'Prev': 'Prev ASH (L)', 'Curr': 'Curr ASH (L)'}))
+            if not ash_r_trends.empty:
+                team_test_df = team_test_df.join(ash_r_trends.rename(columns={'Prev': 'Prev ASH (R)', 'Curr': 'Curr ASH (R)'}))
+
+            team_test_df = team_test_df.dropna(how='all').reset_index()
+
+            # Helper to generate the directional HTML arrow based on test diffs
+            def format_trend(prev_val, curr_val):
+                if pd.isna(curr_val):
+                    return "-"
+                if pd.isna(prev_val):
+                    return f"{curr_val:.1f}"
+                diff = curr_val - prev_val
+                
+                if diff > 0:
+                    return f"{curr_val:.1f} <span style='color:#10B981; font-weight:bold;'>&uarr;</span>"
+                elif diff < 0:
+                    return f"{curr_val:.1f} <span style='color:#EF4444; font-weight:bold;'>&darr;</span>"
+                else:
+                    return f"{curr_val:.1f} <span style='color:#6C757D; font-weight:bold;'>-</span>"
+
+            if team_test_df.empty:
+                st.info("No CMJ or ASH testing data available to display trends.")
+            else:
+                # Custom HTML table rendering mimicking the existing CSS theme
+                html_table = """
+                <style>
+                    .trend-table { width: 100%; border-collapse: collapse; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+                    .trend-table th { background-color: #F8FAFC; color: #475569; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #CBD5E1; text-align: center !important;}
+                    .trend-table td { padding: 10px 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #E2E8F0; text-align: center !important;}
+                    .trend-table tbody tr:nth-child(even) { background-color: #F8FAFC; }
+                    .trend-table tbody tr:hover { background-color: #EDF2F7; }
+                    .col-cmj { background-color: rgba(47, 128, 237, 0.04); }
+                    .col-ash { background-color: rgba(255, 130, 0, 0.04); }
+                </style>
+                <div class="styled-team-container">
+                <table class="trend-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left !important;">Player Name</th>
+                            <th class="col-cmj">Prev CMJ (cm)</th>
+                            <th class="col-cmj">Current CMJ (cm)</th>
+                            <th class="col-ash">Prev ASH L (N)</th>
+                            <th class="col-ash">Current ASH L (N)</th>
+                            <th class="col-ash">Prev ASH R (N)</th>
+                            <th class="col-ash">Current ASH R (N)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                """
+                for _, row in team_test_df.iterrows():
+                    p_name = row['Player Name']
+                    
+                    p_cmj = f"{row['Prev CMJ']:.1f}" if pd.notna(row.get('Prev CMJ')) else "-"
+                    c_cmj = format_trend(row.get('Prev CMJ'), row.get('Curr CMJ'))
+
+                    p_ash_l = f"{row['Prev ASH (L)']:.1f}" if pd.notna(row.get('Prev ASH (L)')) else "-"
+                    c_ash_l = format_trend(row.get('Prev ASH (L)'), row.get('Curr ASH (L)'))
+
+                    p_ash_r = f"{row['Prev ASH (R)']:.1f}" if pd.notna(row.get('Prev ASH (R)')) else "-"
+                    c_ash_r = format_trend(row.get('Prev ASH (R)'), row.get('Curr ASH (R)'))
+
+                    html_table += f"""
+                        <tr>
+                            <td style="font-weight:600; text-align:left !important; color:#1D1D1F;">{p_name}</td>
+                            <td class="col-cmj">{p_cmj}</td>
+                            <td class="col-cmj">{c_cmj}</td>
+                            <td class="col-ash">{p_ash_l}</td>
+                            <td class="col-ash">{c_ash_l}</td>
+                            <td class="col-ash">{p_ash_r}</td>
+                            <td class="col-ash">{c_ash_r}</td>
+                        </tr>
+                    """
+                html_table += "</tbody></table></div>"
+                
+                st.markdown(html_table, unsafe_allow_html=True)
