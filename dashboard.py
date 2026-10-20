@@ -404,10 +404,10 @@ if check_password():
         st.markdown("<br>", unsafe_allow_html=True)
 
         # --- GLOBAL FILTERS ---
-        f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1, 1, 1, 0.5])
+        f_col1, f_col2, f_col3, f_col4, f_col5, f_col6 = st.columns([1.2, 1, 1, 1, 0.5, 0.6])
         
         with f_col1:
-            if view_mode == "👤 Individual Athlete":
+            if view_mode == "Individual Athlete":
                 selected = st.selectbox("Select Athlete", all_athletes, key="global_athlete_select")
             else:
                 selected = None
@@ -452,11 +452,33 @@ if check_password():
             end_date_val = st.date_input("End Date", key="global_end_date")
 
         with f_col5:
-            st.write(" ")
+            st.write(" ") # Layout offset
             if st.button("Refresh"):
                 st.cache_data.clear()
                 st.rerun()
 
+        with f_col6:
+            st.write(" ") # Layout offset
+            components.html(
+                """
+                <button onclick="window.parent.print()" style="
+                    background-color: #FFFFFF; 
+                    border: 1px solid #E2E8F0; 
+                    border-radius: 8px; 
+                    color: #1D1D1F; 
+                    cursor: pointer; 
+                    font-size: 14px; 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    padding: 0; 
+                    width: 100%; 
+                    height: 38px;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+                    font-weight: 600;">
+                    Print View
+                </button>
+                """,
+                height=45
+            )
         start_dt = pd.to_datetime(start_date_val)
         end_dt = pd.to_datetime(end_date_val) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
