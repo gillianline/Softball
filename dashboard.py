@@ -816,7 +816,7 @@ if check_password():
                     )
 
             # =========================================================================
-            # PLAYER CARDS (DAILY THROW BREAKDOWN)
+            # TAB 6: PLAYER CARDS (DAILY THROW BREAKDOWN)
             # =========================================================================
             with tab_player_cards:
                 st.markdown('<div class="section-header">Player Throwing Cards</div>', unsafe_allow_html=True)
@@ -852,10 +852,7 @@ if check_password():
                         sum_pl3 = player_data[t_pl3_col].sum() if t_pl3_col else 0
                         sum_rb3 = player_data[t_rb3_col].sum() if t_rb3_col else 0
                         
-                        # Identify the maximum single-day throw count for this player
                         max_day_throws = player_data[t_count_col].max() if t_count_col else 0
-                        
-                        # Determine if player has a significant total relative to the team
                         is_high_volume = (sum_tot >= significant_threshold) and (sum_tot > 0)
                         vol_badge = "<span style='background:#EF4444; color:white; font-size:9px; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight:800; letter-spacing:0.5px;'>HIGH VOLUME</span>" if is_high_volume else ""
                         
@@ -866,19 +863,16 @@ if check_password():
 
                         rows_html = ""
                         for _, row in player_data.iterrows():
-                            # Activity formatting
                             if act_col and pd.notna(row[act_col]) and str(row[act_col]).strip() and str(row[act_col]).strip().lower() != 'nan':
                                 activity_str = str(row[act_col]).strip()
                             else:
                                 activity_str = row['Date'].strftime('%b %d') if pd.notna(row['Date']) else "N/A"
                                 
-                            # Data Extraction
                             raw_tot = row[t_count_col] if t_count_col and pd.notna(row[t_count_col]) else 0
                             tot = f"{raw_tot:.0f}"
                             pl3 = f"{row[t_pl3_col]:.0f}" if t_pl3_col and pd.notna(row[t_pl3_col]) else "0"
                             rb3 = f"{row[t_rb3_col]:.0f}" if t_rb3_col and pd.notna(row[t_rb3_col]) else "0"
                             
-                            # Highlight the row if it's the highest day (and greater than 0)
                             if raw_tot == max_day_throws and max_day_throws > 0:
                                 bg_color = "rgba(255, 130, 0, 0.08)"
                                 icon = " <span style='font-size: 9px; color: #FF8200; font-weight: 800; letter-spacing: 0.5px;'>MAX</span>"
@@ -890,14 +884,34 @@ if check_password():
 
                         footer_html = f"<tfoot style='position: sticky; bottom: 0; background: #F8FAFC; border-top: 2px solid #E2E8F0; z-index: 1;'><tr><td style='padding: 12px 4px; text-align: left; font-weight: 800; color: #1D1D1F; font-size: 11px; text-transform: uppercase;'>Total</td><td style='padding: 12px 4px; color: #4895DB; font-weight: 800;'>{sum_tot:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_pl3:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_rb3:,.0f}</td></tr></tfoot>"
                         
-                        # Change top border color if high volume
                         card_border = "#EF4444" if is_high_volume else "#FF8200"
                         
-                        card_html = f"<div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid {card_border}; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 70px; height: 70px; box-sizing: border-box; padding: 6px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Throwing Profile{vol_badge}</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Activity</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html}</tbody>{footer_html}</table></div></div>"
+                        card_html = f"<div style='page-break-inside: avoid; break-inside: avoid; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid {card_border}; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 70px; height: 70px; box-sizing: border-box; padding: 6px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Throwing Profile{vol_badge}</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Activity</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html}</tbody>{footer_html}</table></div></div>"
                         
                         with cols[idx % 3]:
                             st.markdown(card_html, unsafe_allow_html=True)
 
+                # --- TEAM THROWING SUMMARY TABLE AT THE BOTTOM ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Team Throwing Summary Roster</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                summary_rows = []
+                for player in players_with_throws:
+                    p_data = team_throw_cards[team_throw_cards['Player Name'] == player]
+                    t_cnt = p_data[t_count_col_global].sum() if t_count_col_global else 0
+                    t_pl3 = p_data['Total Throw Count - Player Load 3'].sum() if 'Total Throw Count - Player Load 3' in p_data.columns else 0
+                    t_rb3 = p_data['Total Throw Count - Rotation Band 3'].sum() if 'Total Throw Count - Rotation Band 3' in p_data.columns else 0
+                    
+                    summary_rows.append({
+                        'Player Name': player,
+                        'Total Throws': int(t_cnt),
+                        'Band 3 Player Load': int(t_pl3),
+                        'Band 3 Rotation': int(t_rb3)
+                    })
+
+                summary_df = pd.DataFrame(summary_rows).sort_values(by='Total Throws', ascending=False)
+                st.markdown(render_styled_team_table(summary_df), unsafe_allow_html=True)
 
             # =========================================================================
             # REPORT PAGE (SWINGS VS THROWS)
