@@ -1494,7 +1494,9 @@ if check_password():
                     html_table += "</tbody></table></div>"
                     
                     st.markdown(html_table, unsafe_allow_html=True)
-            # =========================================================================
+
+        
+        # =========================================================================
         # TAB 6: PLAYER CARDS (DAILY THROW BREAKDOWN)
         # =========================================================================
         with tab_player_cards:
@@ -1509,69 +1511,73 @@ if check_password():
             else:
                 # Get a unique list of all players who have throw data in this range
                 players_with_throws = sorted(team_throw_cards['Player Name'].dropna().unique())
+                
+                # Create a 3-column grid layout for the cards
+                cols = st.columns(3, gap="medium")
 
-                for player in players_with_throws:
-                    # Filter data down to just this player, sorted chronologically
+                for idx, player in enumerate(players_with_throws):
                     player_data = team_throw_cards[team_throw_cards['Player Name'] == player].sort_values('Date')
-                    
                     if player_data.empty:
                         continue
-
-                    # Safely locate the specific metrics you requested
+                        
+                    # Safely locate the specific metrics
                     t_count_col = find_col(player_data, ['Total Throw Count'])
                     t_pl3_col = find_col(player_data, ['Total Throw Count - Player Load 3'])
                     t_rb3_col = find_col(player_data, ['Total Throw Count - Rotation Band 3'])
+                    
+                    # Fetch photo URL from the photo_dict you built during data loading
+                    p_key = str(player).strip().lower()
+                    photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
 
-                    # Generate an orange-accented header for the player
-                    st.markdown(f"""
-                        <div style="background-color: #F8F9FA; padding: 10px 15px; border-left: 5px solid #FF8200; border-radius: 5px; margin-top: 20px; margin-bottom: 5px;">
-                            <h3 style="margin:0; color:#1D1D1F; font-size:16px; text-transform: uppercase;">{player}</h3>
+                    # Build the HTML for the table rows dynamically
+                    rows_html = ""
+                    for _, row in player_data.iterrows():
+                        date_str = row['Date'].strftime('%b %d') if pd.notna(row['Date']) else "N/A"
+                        tot = f"{row[t_count_col]:.0f}" if t_count_col and pd.notna(row[t_count_col]) else "0"
+                        pl3 = f"{row[t_pl3_col]:.0f}" if t_pl3_col and pd.notna(row[t_pl3_col]) else "0"
+                        rb3 = f"{row[t_rb3_col]:.0f}" if t_rb3_col and pd.notna(row[t_rb3_col]) else "0"
+                        
+                        rows_html += f"""
+                            <tr style="border-bottom: 1px solid #F1F5F9; transition: background-color 0.15s ease;">
+                                <td style="padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;">{date_str}</td>
+                                <td style="padding: 10px 4px; color: #4895DB; font-weight: 800;">{tot}</td>
+                                <td style="padding: 10px 4px; color: #FF8200; font-weight: 600;">{pl3}</td>
+                                <td style="padding: 10px 4px; color: #FF8200; font-weight: 600;">{rb3}</td>
+                            </tr>
+                        """
+
+                    # Build the full card HTML wrapper
+                    card_html = f"""
+                        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #FF8200; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;">
+                            
+                            <!-- Card Header: Photo and Name -->
+                            <div style="background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;">
+                                <img src="{photo_url}" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div>
+                                    <h3 style="margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;">{player}</h3>
+                                    <p style="margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Throwing Profile</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Card Body: Scrollable Data Table -->
+                            <div style="padding: 0px 15px 15px 15px; flex-grow: 1; overflow-y: auto;">
+                                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                                    <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                                        <tr style="color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            <th style="padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;">Date</th>
+                                            <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Total</th>
+                                            <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Band 3 PL</th>
+                                            <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Band 3 Rot</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rows_html}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    """, unsafe_allow_html=True)
-
-                    # Build the display columns map
-                    display_cols = ['Date']
-                    rename_map = {'Date': 'Date'}
+                    """
                     
-                    if t_count_col:
-                        display_cols.append(t_count_col)
-                        rename_map[t_count_col] = 'Total Throws'
-                    if t_pl3_col:
-                        display_cols.append(t_pl3_col)
-                        rename_map[t_pl3_col] = 'Band 3 PL Throws'
-                    if t_rb3_col:
-                        display_cols.append(t_rb3_col)
-                        rename_map[t_rb3_col] = 'Rotation Band 3'
-
-                    # Prep the DataFrame for the HTML table
-                    p_disp = player_data[display_cols].copy()
-                    p_disp['Date'] = p_disp['Date'].dt.strftime('%b %d, %Y')
-                    p_disp = p_disp.rename(columns=rename_map)
-
-                    # Reusing the existing styled-team-table CSS for a unified look
-                    html_table = f'''
-                    <div class="styled-team-container" style="margin-bottom: 30px; box-shadow: none;">
-                        <table class="styled-team-table">
-                            <thead>
-                                <tr>
-                    '''
-                    
-                    for col in p_disp.columns:
-                        html_table += f'<th>{col}</th>'
-                    html_table += '</tr></thead><tbody>'
-
-                    for _, row in p_disp.iterrows():
-                        html_table += '<tr>'
-                        for i, val in enumerate(row):
-                            if i == 0: 
-                                # Bold the date column
-                                html_table += f'<td style="font-weight: 600; color: #1D1D1F;">{val}</td>'
-                            else:
-                                # Apply the light blue "col-throw" background to the metrics
-                                formatted_val = f"{val:,.0f}" if isinstance(val, (int, float)) and not pd.isna(val) else "0"
-                                html_table += f'<td class="col-throw">{formatted_val}</td>'
-                        html_table += '</tr>'
-
-                    html_table += '</tbody></table></div>'
-                    
-                    st.markdown(html_table, unsafe_allow_html=True)
+                    # Render the built card into the correct grid column
+                    with cols[idx % 3]:
+                        st.markdown(card_html, unsafe_allow_html=True)
