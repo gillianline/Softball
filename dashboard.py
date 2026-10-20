@@ -397,7 +397,7 @@ if check_password():
         
         view_mode = st.radio(
             "Select Dashboard View:", 
-            ["🛡️ Team Overview", "👤 Individual Athlete"], 
+            ["Team Overview", "Individual Athlete"], 
             horizontal=True,
             label_visibility="collapsed"
         )
