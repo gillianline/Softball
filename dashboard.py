@@ -1537,46 +1537,51 @@ if check_password():
                         pl3 = f"{row[t_pl3_col]:.0f}" if t_pl3_col and pd.notna(row[t_pl3_col]) else "0"
                         rb3 = f"{row[t_rb3_col]:.0f}" if t_rb3_col and pd.notna(row[t_rb3_col]) else "0"
                         
+                        # NO INDENTATION HERE
                         rows_html += f"""
-                            <tr style="border-bottom: 1px solid #F1F5F9; transition: background-color 0.15s ease;">
-                                <td style="padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;">{date_str}</td>
-                                <td style="padding: 10px 4px; color: #4895DB; font-weight: 800;">{tot}</td>
-                                <td style="padding: 10px 4px; color: #FF8200; font-weight: 600;">{pl3}</td>
-                                <td style="padding: 10px 4px; color: #FF8200; font-weight: 600;">{rb3}</td>
-                            </tr>
-                        """
+<tr style="border-bottom: 1px solid #F1F5F9; transition: background-color 0.15s ease;">
+    <td style="padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;">{date_str}</td>
+    <td style="padding: 10px 4px; color: #4895DB; font-weight: 800;">{tot}</td>
+    <td style="padding: 10px 4px; color: #FF8200; font-weight: 600;">{pl3}</td>
+    <td style="padding: 10px 4px; color: #FF8200; font-weight: 600;">{rb3}</td>
+</tr>
+"""
 
-                    # Build the full card HTML wrapper
+                    # NO INDENTATION HERE
                     card_html = f"""
-                        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #FF8200; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;">
-                            
-                            <!-- Card Header: Photo and Name -->
-                            <div style="background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;">
-                                <img src="{photo_url}" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                <div>
-                                    <h3 style="margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;">{player}</h3>
-                                    <p style="margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Throwing Profile</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Card Body: Scrollable Data Table -->
-                            <div style="padding: 0px 15px 15px 15px; flex-grow: 1; overflow-y: auto;">
-                                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-                                    <thead style="position: sticky; top: 0; background: white; z-index: 1;">
-                                        <tr style="color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">
-                                            <th style="padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;">Date</th>
-                                            <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Total</th>
-                                            <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Band 3 PL</th>
-                                            <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Band 3 Rot</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {rows_html}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    """
+<div style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #FF8200; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;">
+    
+    <!-- Card Header: Photo and Name -->
+    <div style="background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;">
+        <img src="{photo_url}" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div>
+            <h3 style="margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;">{player}</h3>
+            <p style="margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Throwing Profile</p>
+        </div>
+    </div>
+    
+    <!-- Card Body: Scrollable Data Table -->
+    <div style="padding: 0px 15px 15px 15px; flex-grow: 1; overflow-y: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+            <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                <tr style="color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <th style="padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;">Date</th>
+                    <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Total</th>
+                    <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Band 3 PL</th>
+                    <th style="padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;">Band 3 Rot</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+</div>
+"""
+                    
+                    # Render the built card into the correct grid column
+                    with cols[idx % 3]:
+                        st.markdown(card_html, unsafe_allow_html=True)
                     
                     # Render the built card into the correct grid column
                     with cols[idx % 3]:
