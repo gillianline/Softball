@@ -382,10 +382,40 @@ if check_password():
     if all_athletes:
         today = date.today()
 
+        # --- MASTER VIEW TOGGLE ---
+        st.markdown("""
+            <style>
+            div[data-testid="stRadio"] > div {
+                background-color: #F8F9FA;
+                padding: 10px 15px;
+                border-radius: 8px;
+                border: 1px solid #EAEAEA;
+                display: inline-flex;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        view_mode = st.radio(
+            "Select Dashboard View:", 
+            ["🛡️ Team Overview", "👤 Individual Athlete"], 
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # --- GLOBAL FILTERS ---
         f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1, 1, 1, 0.5])
         
         with f_col1:
-            selected = st.selectbox("Select Athlete", all_athletes, key="global_athlete_select")
+            if view_mode == "👤 Individual Athlete":
+                selected = st.selectbox("Select Athlete", all_athletes, key="global_athlete_select")
+            else:
+                selected = None
+                st.markdown("""
+                    <div style='padding: 8px 12px; background-color: rgba(255, 130, 0, 0.1); border-left: 4px solid #FF8200; border-radius: 4px; color: #1D1D1F; font-weight: 700; font-size: 14px;'>
+                        Viewing Full Team Roster
+                    </div>
+                """, unsafe_allow_html=True)
             
         with f_col2:
             season_option = st.selectbox(
@@ -395,7 +425,6 @@ if check_password():
                 key="global_season_select"
             )
 
-        # Handle Presets by explicitly forcing session_state updates
         if "last_season_option" not in st.session_state:
             st.session_state["last_season_option"] = season_option
 
@@ -411,32 +440,23 @@ if check_password():
                 st.session_state["global_start_date"] = date(2020, 1, 1)
                 st.session_state["global_end_date"] = today
 
-        # Set fallback initial state if not present
         if "global_start_date" not in st.session_state:
             st.session_state["global_start_date"] = date(2026, 8, 21)
         if "global_end_date" not in st.session_state:
             st.session_state["global_end_date"] = today
 
-        # Single-date pickers with NO max_value limit
         with f_col3:
-            start_date_val = st.date_input(
-                "Start Date",
-                key="global_start_date"
-            )
+            start_date_val = st.date_input("Start Date", key="global_start_date")
 
         with f_col4:
-            end_date_val = st.date_input(
-                "End Date",
-                key="global_end_date"
-            )
+            end_date_val = st.date_input("End Date", key="global_end_date")
 
         with f_col5:
-            st.write(" ") # Layout offset
+            st.write(" ")
             if st.button("Refresh"):
                 st.cache_data.clear()
                 st.rerun()
 
-        # Datetime conversions for DataFrame filtering
         start_dt = pd.to_datetime(start_date_val)
         end_dt = pd.to_datetime(end_date_val) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
@@ -445,32 +465,33 @@ if check_password():
                 return df
             return df[(df['Date'] >= start_dt) & (df['Date'] <= end_dt)]
 
-        # Global Filtered DataFrames per Selected Athlete
-        raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
-        raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
-        raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
-        raw_grip = grip_df[grip_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in grip_df.columns else pd.DataFrame()
-        raw_sprint = sprint_df[sprint_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in sprint_df.columns else pd.DataFrame()
-        raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
-        raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
+        # Global Filtered DataFrames per Selected Athlete (Only process if in Individual Mode)
+        if selected:
+            raw_ash = ash_df[ash_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in ash_df.columns else pd.DataFrame()
+            raw_cmj = cmj_df[cmj_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in cmj_df.columns else pd.DataFrame()
+            raw_er = er_df[er_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in er_df.columns else pd.DataFrame()
+            raw_grip = grip_df[grip_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in grip_df.columns else pd.DataFrame()
+            raw_sprint = sprint_df[sprint_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in sprint_df.columns else pd.DataFrame()
+            raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
+            raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
 
-        p_ash = filter_season(raw_ash).copy()
-        p_cmj = filter_season(raw_cmj).copy()
-        p_er = filter_season(raw_er).copy()
-        p_grip = filter_season(raw_grip).copy()
-        p_sprint = filter_season(raw_sprint).copy()
-        p_swing = filter_season(raw_swing).copy()
-        p_throw = filter_season(raw_throw).copy()
-
-        ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Force (L)', 'Peak Force (L)'])
-        ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Force (R)', 'Peak Force (R)'])
-        cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]', 'Jump Height (cm)'])
-        cmj_rsi_col = find_col(cmj_df, ['RSI-modified (Imp-Mom) [m/s]', 'RSI-modified', 'RSI-m'])
-        er_l_col = find_col(er_df, ['L Max ROM (°)', 'L Max ROM', 'Left Max ROM', 'L ROM'])
-        er_r_col = find_col(er_df, ['R Max ROM (°)', 'R Max ROM', 'Right Max ROM', 'R ROM'])
-        grip_l_col = find_col(grip_df, ['L Max Force (N)', 'L Max Force', 'Left Max Force (N)', 'Force (L)', 'L Grip'])
-        grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
-        sprint_time_col = find_col(sprint_df, ['Time', '20m Time', '20m Sprint', 'Time (s)', '20m (s)', '20m'])
+            p_ash = filter_season(raw_ash).copy()
+            p_cmj = filter_season(raw_cmj).copy()
+            p_er = filter_season(raw_er).copy()
+            p_grip = filter_season(raw_grip).copy()
+            p_sprint = filter_season(raw_sprint).copy()
+            p_swing = filter_season(raw_swing).copy()
+            p_throw = filter_season(raw_throw).copy()
+            
+            ash_l_col = find_col(ash_df, ['Peak Vertical Force [N] (L)', 'Force (L)', 'Peak Force (L)'])
+            ash_r_col = find_col(ash_df, ['Peak Vertical Force [N] (R)', 'Force (R)', 'Peak Force (R)'])
+            cmj_h_col = find_col(cmj_df, ['Jump Height (Imp-Mom) [cm]', 'Jump Height [cm]', 'Jump Height (cm)'])
+            cmj_rsi_col = find_col(cmj_df, ['RSI-modified (Imp-Mom) [m/s]', 'RSI-modified', 'RSI-m'])
+            er_l_col = find_col(er_df, ['L Max ROM (°)', 'L Max ROM', 'Left Max ROM', 'L ROM'])
+            er_r_col = find_col(er_df, ['R Max ROM (°)', 'R Max ROM', 'Right Max ROM', 'R ROM'])
+            grip_l_col = find_col(grip_df, ['L Max Force (N)', 'L Max Force', 'Left Max Force (N)', 'Force (L)', 'L Grip'])
+            grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
+            sprint_time_col = find_col(sprint_df, ['Time', '20m Time', '20m Sprint', 'Time (s)', '20m (s)', '20m'])
 
         def render_custom_table(df):
             if df.empty:
@@ -487,7 +508,7 @@ if check_password():
             html += '</tbody></table></div>'
             return html
 
-        # --- Helper for Assessment Cards Rendering ---
+        # --- Assessment Cards Helper ---
         def render_assessment_cards():
             has_any_data = False
 
@@ -598,507 +619,518 @@ if check_password():
             if not has_any_data:
                 st.info(f"No testing assessment entries found for {selected} within the selected date window ({start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}).")
 
-        # --- 6. NAVIGATION TABS ---
-        tab_testing, tab_catapult, tab_team_summary, tab_report, tab_team_tests, tab_player_cards = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT", "TEAM TESTS", "PLAYER CARDS"])
 
-        # =========================================================================
-        # TAB 1: TESTING
-        # =========================================================================
-        with tab_testing:
-            st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            render_assessment_cards()
+        # --- 6. CONDITIONAL NAVIGATION TAB RENDERING ---
+        
+        if view_mode == "🛡️ Team Overview":
+            tab_team_summary, tab_player_cards, tab_report, tab_team_tests = st.tabs(["TEAM SUMMARY", "PLAYER THROW CARDS", "VOLUME REPORT", "TEAM TESTS"])
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Testing History Tables</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            # =========================================================================
+            # TEAM SUMMARY (CATAPULT AGGREGATED ROSTER VIEW)
+            # =========================================================================
+            with tab_team_summary:
+                st.markdown('<div class="section-header">Catapult Team Summary Overview</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-            # 1. ASH History Table
-            if not p_ash.empty:
-                st.markdown('<div class="sub-header-title">ASH Isometric Shoulder Test History</div>', unsafe_allow_html=True)
-                ash_cols = [c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]
-                ash_tbl = p_ash[ash_cols].copy()
-                if 'Date' in ash_tbl.columns:
-                    ash_tbl['Date'] = ash_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(ash_tbl), unsafe_allow_html=True)
+                team_swing = filter_season(swing_df).copy() if not swing_df.empty else pd.DataFrame()
+                team_throw = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
 
-            # 2. CMJ History Table
-            if not p_cmj.empty:
-                st.markdown('<div class="sub-header-title">Countermovement Jump History</div>', unsafe_allow_html=True)
-                cmj_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
-                cmj_tbl = p_cmj[cmj_cols].copy()
-                if 'Date' in cmj_tbl.columns:
-                    cmj_tbl['Date'] = cmj_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(cmj_tbl), unsafe_allow_html=True)
+                if team_swing.empty and team_throw.empty:
+                    st.warning("No Catapult swing or throw data found for any athlete within the selected date range.")
+                else:
+                    swing_summary = pd.DataFrame()
+                    if not team_swing.empty:
+                        s_count_col = find_col(team_swing, ['Swing Count'])
+                        s_load_col = find_col(team_swing, ['Sum Swing Max Player Load'])
+                        s_b3_col = find_col(team_swing, ['Swing Max Rotation Band 3 Count'])
 
-            # 3. ER ROM History Table
-            if not p_er.empty:
-                st.markdown('<div class="sub-header-title">External Rotation (ER) ROM History</div>', unsafe_allow_html=True)
-                er_cols = [c for c in ['Date', er_l_col, er_r_col] if c and c in p_er.columns]
-                er_tbl = p_er[er_cols].copy()
-                if 'Date' in er_tbl.columns:
-                    er_tbl['Date'] = er_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(er_tbl), unsafe_allow_html=True)
+                        s_agg = {}
+                        if s_count_col: s_agg[s_count_col] = 'sum'
+                        if s_load_col: s_agg[s_load_col] = 'sum'
+                        if s_b3_col: s_agg[s_b3_col] = 'sum'
 
-            # 4. Grip Strength History Table
-            if not p_grip.empty:
-                st.markdown('<div class="sub-header-title">Grip Strength History</div>', unsafe_allow_html=True)
-                grip_cols = [c for c in ['Date', grip_l_col, grip_r_col] if c and c in p_grip.columns]
-                grip_tbl = p_grip[grip_cols].copy()
-                if 'Date' in grip_tbl.columns:
-                    grip_tbl['Date'] = grip_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(grip_tbl), unsafe_allow_html=True)
+                        if s_agg:
+                            swing_summary = team_swing.groupby('Player Name', as_index=False).agg(s_agg)
 
-            # 5. 20m Sprint History Table
-            if not p_sprint.empty:
-                st.markdown('<div class="sub-header-title">20m Sprint Performance History</div>', unsafe_allow_html=True)
-                sprint_cols = [c for c in ['Date', sprint_time_col] if c and c in p_sprint.columns]
-                sprint_tbl = p_sprint[sprint_cols].copy()
-                if 'Date' in sprint_tbl.columns:
-                    sprint_tbl['Date'] = sprint_tbl['Date'].dt.strftime('%b %d, %Y')
-                st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
+                    throw_summary = pd.DataFrame()
+                    if not team_throw.empty:
+                        t_count_col = find_col(team_throw, ['Total Throw Count'])
+                        t_load_col = find_col(team_throw, ['Total Throw Player Load'])
+                        t_l3_col = find_col(team_throw, ['Total Throw Count - Player Load 3'])
+                        t_b3_col = find_col(team_throw, ['Total Throw Count - Rotation Band 3'])
 
-        # =========================================================================
-        # TAB 2: CATAPULT PROFILE (SWING & THROW ANALYTICS)
-        # =========================================================================
-        with tab_catapult:
-            st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                        t_agg = {}
+                        if t_count_col: t_agg[t_count_col] = 'sum'
+                        if t_load_col: t_agg[t_load_col] = 'sum'
+                        if t_l3_col: t_agg[t_l3_col] = 'sum'
+                        if t_b3_col: t_agg[t_b3_col] = 'sum'
 
-            with st.expander("Metric Descriptions", expanded=False):
-                st.markdown("#### **Throwing Metrics Legend**")
-                t_l1, t_l2, t_l3 = st.columns(3)
-                with t_l1:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Player Load 1</div>
-                            <div class="legend-desc">Light, low-effort throws. Examples include short-distance warming up, playing light catch, or casual sub-maximal returns.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 1</div>
-                            <div class="legend-desc">Throws made with minimal hip/torso separation or torso whip. These are typically flick throws, touch passes, or flat-footed tossing.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with t_l2:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Player Load 2</div>
-                            <div class="legend-desc">Moderate-effort throws. Examples include standard situational plays, standard infield/outfield drill throws, or medium-distance tracking.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 2</div>
-                            <div class="legend-desc">Standard mechanical throws where the body goes through a normal, controlled rotational sequence.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with t_l3:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Player Load 3</div>
-                            <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield quarterback passes.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 3</div>
-                            <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. This tracks when an athlete is really letting the ball fly and using full rotational power.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                        if t_agg:
+                            throw_summary = team_throw.groupby('Player Name', as_index=False).agg(t_agg)
 
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("#### **Batting Swing Metrics Legend**")
-                s_l1, s_l2, s_l3 = st.columns(3)
-                with s_l1:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 1</div>
-                            <div class="legend-desc">The total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 1</div>
-                            <div class="legend-desc">Swings with a low peak physical load/impact.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Forward % (Median)</div>
-                            <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with s_l2:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 2</div>
-                            <div class="legend-desc">The total number of medium-intensity/moderate speed swings.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 2</div>
-                            <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Lateral % (Median)</div>
-                            <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with s_l3:
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Rotation Band 3</div>
-                            <div class="legend-desc">The total number of high-intensity/maximum speed swings.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">PL Band 3</div>
-                            <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.markdown("""
-                        <div class="legend-card">
-                            <div class="legend-title">Vertical % (Median)</div>
-                            <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    if not swing_summary.empty and not throw_summary.empty:
+                        team_df = pd.merge(swing_summary, throw_summary, on='Player Name', how='outer')
+                    elif not swing_summary.empty:
+                        team_df = swing_summary
+                    else:
+                        team_df = throw_summary
 
-            st.markdown("<br>", unsafe_allow_html=True)
+                    team_df.fillna(0, inplace=True)
 
-            c_col1, c_col2 = st.columns(2, gap="large")
+                    rename_dict = {}
+                    if 'Swing Count' in team_df.columns: rename_dict['Swing Count'] = 'Total Swings'
+                    if 'Sum Swing Max Player Load' in team_df.columns: rename_dict['Sum Swing Max Player Load'] = 'Swing Player Load'
+                    if 'Swing Max Rotation Band 3 Count' in team_df.columns: rename_dict['Swing Max Rotation Band 3 Count'] = 'Band 3 Swings'
+                    if 'Total Throw Count' in team_df.columns: rename_dict['Total Throw Count'] = 'Total Throws'
+                    if 'Total Throw Player Load' in team_df.columns: rename_dict['Total Throw Player Load'] = 'Throw Player Load'
+                    if 'Total Throw Count - Player Load 3' in team_df.columns: rename_dict['Total Throw Count - Player Load 3'] = 'Load 3 Throws'
+                    if 'Total Throw Count - Rotation Band 3' in team_df.columns: rename_dict['Total Throw Count - Rotation Band 3'] = 'Band 3 Throws'
 
-            with c_col1:
-                st.markdown('<div class="sub-header-title">Throwing Load Summary</div>', unsafe_allow_html=True)
-                if not p_throw.empty:
-                    tot_throws = p_throw['Total Throw Count'].sum() if 'Total Throw Count' in p_throw.columns else 0
-                    tot_throw_pl = p_throw['Total Throw Player Load'].sum() if 'Total Throw Player Load' in p_throw.columns else 0
+                    team_df.rename(columns=rename_dict, inplace=True)
 
-                    kpi1, kpi2 = st.columns(2)
-                    with kpi1:
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    tot_swings = int(team_df['Total Swings'].sum()) if 'Total Swings' in team_df.columns else 0
+                    tot_throws = int(team_df['Total Throws'].sum()) if 'Total Throws' in team_df.columns else 0
+                    active_players = len(team_df)
+                    avg_swings = round(tot_swings / active_players, 1) if active_players > 0 else 0
+
+                    with col1:
                         st.markdown(f"""
                             <div class="catapult-card">
-                                <h5>Total Throws</h5>
-                                <h3>{int(tot_throws):,}</h3>
-                                <p>Selected Window</p>
+                                <h5>Active Athletes</h5>
+                                <h3>{active_players}</h3>
+                                <p>Logged Data</p>
                             </div>
                         """, unsafe_allow_html=True)
-                    with kpi2:
+                    with col2:
                         st.markdown(f"""
                             <div class="catapult-card">
-                                <h5>Throw Player Load</h5>
-                                <h3>{tot_throw_pl:.1f}</h3>
-                                <p>Selected Window</p>
+                                <h5>Team Total Swings</h5>
+                                <h3>{tot_swings:,}</h3>
+                                <p>Accumulated Volume</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with col3:
+                        st.markdown(f"""
+                            <div class="catapult-card">
+                                <h5>Team Total Throws</h5>
+                                <h3>{tot_throws:,}</h3>
+                                <p>Accumulated Volume</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with col4:
+                        st.markdown(f"""
+                            <div class="catapult-card">
+                                <h5>Avg Swings / Player</h5>
+                                <h3>{avg_swings}</h3>
+                                <p>Team Mean</p>
                             </div>
                         """, unsafe_allow_html=True)
 
-                    fig_throw = go.Figure()
-                    if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        # Changed marker_color to #EC4899 (Pink)
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
-                        fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown('<div class="sub-header-title">Athlete Workload Summary Table</div>', unsafe_allow_html=True)
+
+                    numeric_cols = team_df.select_dtypes(include=[np.number]).columns
+                    team_df[numeric_cols] = team_df[numeric_cols].round(1)
+
+                    sort_col = 'Total Swings' if 'Total Swings' in team_df.columns else team_df.columns[1]
+                    team_df.sort_values(by=sort_col, ascending=False, inplace=True)
+
+                    def render_styled_team_table(df):
+                        if df.empty:
+                            return "<p style='text-align:center; color:#6C757D;'>No data available.</p>"
+            
+                        html = """
+                        <style>
+                            .styled-team-container { border: 1px solid #E2E8F0; border-radius: 10px; overflow-x: auto; margin-top: 10px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+                            .styled-team-table { width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; }
+                            .styled-team-table th { background-color: #F1F5F9; color: #1E293B; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 10px; border-bottom: 2px solid #CBD5E1; text-align: center !important; }
+                            .styled-team-table td { padding: 10px 12px; border-bottom: 1px solid #E2E8F0; font-size: 13px; color: #334155; text-align: center !important; }
+                            .styled-team-table tbody tr:nth-child(even) { background-color: #F8FAFC; }
+                            .styled-team-table tbody tr:hover { background-color: #EDF2F7; }
+                            .col-swing { background-color: rgba(255, 130, 0, 0.03); }
+                            .col-throw { background-color: rgba(47, 128, 237, 0.03); }
+                        </style>
+                        <div class="styled-team-container">
+                            <table class="styled-team-table">
+                                <thead>
+                                    <tr>
+                        """
+            
+                        for col in df.columns:
+                            html += f'<th>{col}</th>'
+                        html += '</tr></thead><tbody>'
+            
+                        for _, row in df.iterrows():
+                            html += '<tr>'
+                            for col_name, val in row.items():
+                                cell_class = ""
+                                if "Swing" in col_name:
+                                    cell_class = 'class="col-swing"'
+                                elif "Throw" in col_name:
+                                    cell_class = 'class="col-throw"'
+                    
+                                formatted_val = f"{val:,}" if isinstance(val, (int, np.integer)) else f"{val}"
+                                html += f'<td {cell_class}>{formatted_val}</td>'
+                            html += '</tr>'
+            
+                        html += '</tbody></table></div>'
+                        return html
+
+                    st.markdown(render_styled_team_table(team_df), unsafe_allow_html=True)
+
+                    csv = team_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="Download Team Summary CSV",
+                        data=csv,
+                        file_name=f"catapult_team_summary_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
+                        mime='text/csv'
+                    )
+
+            # =========================================================================
+            # PLAYER CARDS (DAILY THROW BREAKDOWN)
+            # =========================================================================
+            with tab_player_cards:
+                st.markdown('<div class="section-header">Player Throwing Cards</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                team_throw_cards = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
+
+                if team_throw_cards.empty:
+                    st.info("No throw data available for the selected date range.")
+                else:
+                    players_with_throws = sorted(team_throw_cards['Player Name'].dropna().unique())
+                    cols = st.columns(3, gap="medium")
+
+                    for idx, player in enumerate(players_with_throws):
+                        player_data = team_throw_cards[team_throw_cards['Player Name'] == player].sort_values('Date')
+                        if player_data.empty:
+                            continue
+                            
+                        t_count_col = find_col(player_data, ['Total Throw Count'])
+                        t_pl3_col = find_col(player_data, ['Total Throw Count - Player Load 3'])
+                        t_rb3_col = find_col(player_data, ['Total Throw Count - Rotation Band 3'])
                         
-                    fig_throw.update_layout(
-                        barmode='stack',
-                        title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Throw Count",
-                        height=290,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-                    )
-                    st.plotly_chart(fig_throw, use_container_width=True)
+                        sum_tot = player_data[t_count_col].sum() if t_count_col else 0
+                        sum_pl3 = player_data[t_pl3_col].sum() if t_pl3_col else 0
+                        sum_rb3 = player_data[t_rb3_col].sum() if t_rb3_col else 0
+                        
+                        p_key = str(player).strip().lower()
+                        photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
 
-                    with st.expander("View Throw Log"):
-                        t_log = p_throw.copy()
-                        if 'Date' in t_log.columns:
-                            t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
-            
-                        name_col = next((c for c in t_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
-                        activity_col = next((c for c in t_log.columns if 'activity' in c.lower()), None)
-            
-                        front_cols = [c for c in [name_col, activity_col, 'Date'] if c in t_log.columns]
-                        remaining_cols = [c for c in t_log.columns if c not in front_cols]
-                        t_log = t_log[front_cols + remaining_cols]
-            
-                        st.dataframe(t_log, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No Throw data recorded for this date range.")
+                        rows_html = ""
+                        for _, row in player_data.iterrows():
+                            date_str = row['Date'].strftime('%b %d') if pd.notna(row['Date']) else "N/A"
+                            tot = f"{row[t_count_col]:.0f}" if t_count_col and pd.notna(row[t_count_col]) else "0"
+                            pl3 = f"{row[t_pl3_col]:.0f}" if t_pl3_col and pd.notna(row[t_pl3_col]) else "0"
+                            rb3 = f"{row[t_rb3_col]:.0f}" if t_rb3_col and pd.notna(row[t_rb3_col]) else "0"
+                            
+                            rows_html += f"<tr style='border-bottom: 1px solid #F1F5F9; transition: background-color 0.15s ease;'><td style='padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;'>{date_str}</td><td style='padding: 10px 4px; color: #4895DB; font-weight: 800;'>{tot}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{pl3}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{rb3}</td></tr>"
 
-            with c_col2:
-                st.markdown('<div class="sub-header-title">Batting Swing Summary</div>', unsafe_allow_html=True)
-                if not p_swing.empty:
-                    tot_swings = p_swing['Swing Count'].sum() if 'Swing Count' in p_swing.columns else 0
-                    tot_swing_pl = p_swing['Sum Swing Max Player Load'].sum() if 'Sum Swing Max Player Load' in p_swing.columns else 0
+                        footer_html = f"<tfoot style='position: sticky; bottom: 0; background: #F8FAFC; border-top: 2px solid #E2E8F0; z-index: 1;'><tr><td style='padding: 12px 4px; text-align: left; font-weight: 800; color: #1D1D1F; font-size: 11px; text-transform: uppercase;'>Total</td><td style='padding: 12px 4px; color: #4895DB; font-weight: 800;'>{sum_tot:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_pl3:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_rb3:,.0f}</td></tr></tfoot>"
+                        card_html = f"<div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #FF8200; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Throwing Profile</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Date</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html}</tbody>{footer_html}</table></div></div>"
+                        
+                        with cols[idx % 3]:
+                            st.markdown(card_html, unsafe_allow_html=True)
 
-                    kpi3, kpi4 = st.columns(2)
-                    with kpi3:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Total Swings</h5>
-                                <h3>{int(tot_swings):,}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with kpi4:
-                        st.markdown(f"""
-                            <div class="catapult-card">
-                                <h5>Swing Max Player Load</h5>
-                                <h3>{tot_swing_pl:.1f}</h3>
-                                <p>Selected Window</p>
-                            </div>
-                        """, unsafe_allow_html=True)
 
-                    fig_swing = go.Figure()
-                    if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
-                        fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
+            # =========================================================================
+            # REPORT PAGE (SWINGS VS THROWS)
+            # =========================================================================
+            with tab_report:
+                st.markdown('<div class="section-header">Activity Volume Report</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-                    fig_swing.update_layout(
-                        barmode='stack',
-                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=13, color='#1D1D1F')),
-                        xaxis_title="",
-                        yaxis_title="Swing Count",
-                        height=290,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
-                    )
-                    st.plotly_chart(fig_swing, use_container_width=True)
-
-                    with st.expander("View Swing Log"):
-                        s_log = p_swing.copy()
-                        if 'Date' in s_log.columns:
-                            s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
-            
-                        name_col = next((c for c in s_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
-                        activity_col = next((c for c in s_log.columns if 'activity' in c.lower()), None)
-            
-                        front_cols = [c for c in [name_col, activity_col, 'Date'] if c in s_log.columns]
-                        remaining_cols = [c for c in s_log.columns if c not in front_cols]
-                        s_log = s_log[front_cols + remaining_cols]
-            
-                        st.dataframe(s_log, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No Swing data recorded for this date range.")
-
-        # =========================================================================
-        # TAB 3: TEAM SUMMARY (CATAPULT AGGREGATED ROSTER VIEW)
-        # =========================================================================
-        with tab_team_summary:
-            st.markdown('<div class="section-header">Catapult Team Summary Overview</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            team_swing = filter_season(swing_df).copy() if not swing_df.empty else pd.DataFrame()
-            team_throw = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
-
-            if team_swing.empty and team_throw.empty:
-                st.warning("No Catapult swing or throw data found for any athlete within the selected date range.")
-            else:
-                swing_summary = pd.DataFrame()
-                if not team_swing.empty:
-                    s_count_col = find_col(team_swing, ['Swing Count'])
-                    s_load_col = find_col(team_swing, ['Sum Swing Max Player Load'])
-                    s_b3_col = find_col(team_swing, ['Swing Max Rotation Band 3 Count'])
-
-                    s_agg = {}
-                    if s_count_col: s_agg[s_count_col] = 'sum'
-                    if s_load_col: s_agg[s_load_col] = 'sum'
-                    if s_b3_col: s_agg[s_b3_col] = 'sum'
-
-                    if s_agg:
-                        swing_summary = team_swing.groupby('Player Name', as_index=False).agg(s_agg)
-
-                throw_summary = pd.DataFrame()
-                if not team_throw.empty:
-                    t_count_col = find_col(team_throw, ['Total Throw Count'])
-                    t_load_col = find_col(team_throw, ['Total Throw Player Load'])
-                    t_l3_col = find_col(team_throw, ['Total Throw Count - Player Load 3'])
-                    t_b3_col = find_col(team_throw, ['Total Throw Count - Rotation Band 3'])
-
-                    t_agg = {}
-                    if t_count_col: t_agg[t_count_col] = 'sum'
-                    if t_load_col: t_agg[t_load_col] = 'sum'
-                    if t_l3_col: t_agg[t_l3_col] = 'sum'
-                    if t_b3_col: t_agg[t_b3_col] = 'sum'
-
-                    if t_agg:
-                        throw_summary = team_throw.groupby('Player Name', as_index=False).agg(t_agg)
-
-                if not swing_summary.empty and not throw_summary.empty:
-                    team_df = pd.merge(swing_summary, throw_summary, on='Player Name', how='outer')
-                elif not swing_summary.empty:
-                    team_df = swing_summary
-                else:
-                    team_df = throw_summary
-
-                team_df.fillna(0, inplace=True)
-
-                rename_dict = {}
-                if 'Swing Count' in team_df.columns: rename_dict['Swing Count'] = 'Total Swings'
-                if 'Sum Swing Max Player Load' in team_df.columns: rename_dict['Sum Swing Max Player Load'] = 'Swing Player Load'
-                if 'Swing Max Rotation Band 3 Count' in team_df.columns: rename_dict['Swing Max Rotation Band 3 Count'] = 'Band 3 Swings'
-                if 'Total Throw Count' in team_df.columns: rename_dict['Total Throw Count'] = 'Total Throws'
-                if 'Total Throw Player Load' in team_df.columns: rename_dict['Total Throw Player Load'] = 'Throw Player Load'
-                if 'Total Throw Count - Player Load 3' in team_df.columns: rename_dict['Total Throw Count - Player Load 3'] = 'Load 3 Throws'
-                if 'Total Throw Count - Rotation Band 3' in team_df.columns: rename_dict['Total Throw Count - Rotation Band 3'] = 'Band 3 Throws'
-
-                team_df.rename(columns=rename_dict, inplace=True)
-
-                col1, col2, col3, col4 = st.columns(4)
-                
-                tot_swings = int(team_df['Total Swings'].sum()) if 'Total Swings' in team_df.columns else 0
-                tot_throws = int(team_df['Total Throws'].sum()) if 'Total Throws' in team_df.columns else 0
-                active_players = len(team_df)
-                avg_swings = round(tot_swings / active_players, 1) if active_players > 0 else 0
-
-                with col1:
-                    st.markdown(f"""
-                        <div class="catapult-card">
-                            <h5>Active Athletes</h5>
-                            <h3>{active_players}</h3>
-                            <p>Logged Data</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with col2:
-                    st.markdown(f"""
-                        <div class="catapult-card">
-                            <h5>Team Total Swings</h5>
-                            <h3>{tot_swings:,}</h3>
-                            <p>Accumulated Volume</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with col3:
-                    st.markdown(f"""
-                        <div class="catapult-card">
-                            <h5>Team Total Throws</h5>
-                            <h3>{tot_throws:,}</h3>
-                            <p>Accumulated Volume</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with col4:
-                    st.markdown(f"""
-                        <div class="catapult-card">
-                            <h5>Avg Swings / Player</h5>
-                            <h3>{avg_swings}</h3>
-                            <p>Team Mean</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-
+                report_type = st.radio("Select Metric to View:", ["Swings", "Throws"], horizontal=True)
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<div class="sub-header-title">Athlete Workload Summary Table</div>', unsafe_allow_html=True)
 
-                numeric_cols = team_df.select_dtypes(include=[np.number]).columns
-                team_df[numeric_cols] = team_df[numeric_cols].round(1)
+                if report_type == "Throws":
+                    with st.expander("Throwing Metric Descriptions", expanded=False):
+                        t_l1, t_l2, t_l3 = st.columns(3)
+                        with t_l1:
+                            st.markdown("""
+                                <div class="legend-card">
+                                    <div class="legend-title">Player Load 1</div>
+                                    <div class="legend-desc">Light, low-effort throws. Examples include short-distance warming up, playing light catch, or casual sub-maximal returns.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">Rotation Band 1</div>
+                                    <div class="legend-desc">Throws made with minimal hip/torso separation or torso whip. These are typically flick throws, touch passes, or flat-footed tossing.</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with t_l2:
+                            st.markdown("""
+                                <div class="legend-card">
+                                    <div class="legend-title">Player Load 2</div>
+                                    <div class="legend-desc">Moderate-effort throws. Examples include standard situational plays, standard infield/outfield drill throws, or medium-distance tracking.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">Rotation Band 2</div>
+                                    <div class="legend-desc">Standard mechanical throws where the body goes through a normal, controlled rotational sequence.</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with t_l3:
+                            st.markdown("""
+                                <div class="legend-card">
+                                    <div class="legend-title">Player Load 3</div>
+                                    <div class="legend-desc">Max-effort, high-stress throws. Examples include high-velocity pitches, max-effort outfield crow-hops, or deep downfield quarterback passes.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">Rotation Band 3</div>
+                                    <div class="legend-desc">Highly explosive throws with aggressive trunk rotation and arm-whip. This tracks when an athlete is really letting the ball fly and using full rotational power.</div>
+                                </div>
+                            """, unsafe_allow_html=True)
 
-                sort_col = 'Total Swings' if 'Total Swings' in team_df.columns else team_df.columns[1]
-                team_df.sort_values(by=sort_col, ascending=False, inplace=True)
+                    if not team_throw.empty:
+                        # Group by Date for whole team
+                        t_band_df = team_throw.groupby('Date', as_index=False).sum(numeric_only=True)
+                        
+                        fig_rep_throw_band = go.Figure()
+                        if 'Total Throw Count - Player Load 1' in t_band_df.columns:
+                            fig_rep_throw_band.add_trace(go.Bar(x=t_band_df['Date'], y=t_band_df['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
+                            fig_rep_throw_band.add_trace(go.Bar(x=t_band_df['Date'], y=t_band_df['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
+                            fig_rep_throw_band.add_trace(go.Bar(x=t_band_df['Date'], y=t_band_df['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
 
-                def render_styled_team_table(df):
-                    if df.empty:
-                        return "<p style='text-align:center; color:#6C757D;'>No data available.</p>"
-    
-                    html = """
-                    <style>
-                        .styled-team-container {
-                            border: 1px solid #E2E8F0;
-                            border-radius: 10px;
-                            overflow-x: auto;
-                            margin-top: 10px;
-                            margin-bottom: 20px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-                        }
-                        .styled-team-table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                            text-align: center;
-                        }
-                        .styled-team-table th {
-                            background-color: #F1F5F9;
-                            color: #1E293B;
-                            font-weight: 700;
-                            font-size: 12px;
-                            text-transform: uppercase;
-                            letter-spacing: 0.5px;
-                            padding: 12px 10px;
-                            border-bottom: 2px solid #CBD5E1;
-                            text-align: center !important;
-                        }
-                        .styled-team-table td {
-                            padding: 10px 12px;
-                            border-bottom: 1px solid #E2E8F0;
-                            font-size: 13px;
-                            color: #334155;
-                            text-align: center !important;
-                        }
-                        .styled-team-table tbody tr:nth-child(even) {
-                            background-color: #F8FAFC;
-                        }
-                        .styled-team-table tbody tr:hover {
-                            background-color: #EDF2F7;
-                        }
-                        .col-swing {
-                            background-color: rgba(255, 130, 0, 0.03);
-                        }
-                        .col-throw {
-                            background-color: rgba(47, 128, 237, 0.03);
-                        }
-                    </style>
-                    <div class="styled-team-container">
-                        <table class="styled-team-table">
+                        fig_rep_throw_band.update_layout(
+                            barmode='stack',
+                            title=dict(text="Team Throw Volume by Load Band", font=dict(size=14, color='#1D1D1F')),
+                            xaxis=dict(title="", tickformat='%b %d, %Y', tickangle=-45),
+                            yaxis_title="Throw Count",
+                            height=350,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
+                        )
+                        st.plotly_chart(fig_rep_throw_band, use_container_width=True)
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+
+                        fig_rep_throw_rot = go.Figure()
+                        if 'Total Throw Count - Rotation Band 1' in t_band_df.columns:
+                            fig_rep_throw_rot.add_trace(go.Bar(x=t_band_df['Date'], y=t_band_df['Total Throw Count - Rotation Band 1'], name='Rot Band 1', marker_color='#EC4899'))
+                            fig_rep_throw_rot.add_trace(go.Bar(x=t_band_df['Date'], y=t_band_df['Total Throw Count - Rotation Band 2'], name='Rot Band 2', marker_color='#3B82F6'))
+                            fig_rep_throw_rot.add_trace(go.Bar(x=t_band_df['Date'], y=t_band_df['Total Throw Count - Rotation Band 3'], name='Rot Band 3', marker_color='#10B981'))
+
+                        fig_rep_throw_rot.update_layout(
+                            barmode='stack',
+                            title=dict(text="Team Throw Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
+                            xaxis=dict(title="", tickformat='%b %d, %Y', tickangle=-45),
+                            yaxis_title="Throw Count",
+                            height=350,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
+                        )
+                        st.plotly_chart(fig_rep_throw_rot, use_container_width=True)
+
+                else:  # Swings selected
+                    with st.expander("Batting Swing Metric Descriptions", expanded=False):
+                        s_l1, s_l2, s_l3 = st.columns(3)
+                        with s_l1:
+                            st.markdown("""
+                                <div class="legend-card">
+                                    <div class="legend-title">Rotation Band 1</div>
+                                    <div class="legend-desc">The total number of low-intensity/slower swings (e.g., check swings, warm-up swings).</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">PL Band 1</div>
+                                    <div class="legend-desc">Swings with a low peak physical load/impact.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">Forward % (Median)</div>
+                                    <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with s_l2:
+                            st.markdown("""
+                                <div class="legend-card">
+                                    <div class="legend-title">Rotation Band 2</div>
+                                    <div class="legend-desc">The total number of medium-intensity/moderate speed swings.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">PL Band 2</div>
+                                    <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">Lateral % (Median)</div>
+                                    <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with s_l3:
+                            st.markdown("""
+                                <div class="legend-card">
+                                    <div class="legend-title">Rotation Band 3</div>
+                                    <div class="legend-desc">The total number of high-intensity/maximum speed swings.</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">PL Band 3</div>
+                                    <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
+                                </div>
+                                <div class="legend-card">
+                                    <div class="legend-title">Vertical % (Median)</div>
+                                    <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                    if not team_swing.empty:
+                        s_band_df = team_swing.groupby('Date', as_index=False).sum(numeric_only=True)
+                        fig_rep_swing_band = go.Figure()
+                        if 'Swing Max Rotation Band 1 Count' in s_band_df.columns:
+                            fig_rep_swing_band.add_trace(go.Bar(x=s_band_df['Date'], y=s_band_df['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
+                            fig_rep_swing_band.add_trace(go.Bar(x=s_band_df['Date'], y=s_band_df['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
+                            fig_rep_swing_band.add_trace(go.Bar(x=s_band_df['Date'], y=s_band_df['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
+
+                        fig_rep_swing_band.update_layout(
+                            barmode='stack',
+                            title=dict(text="Team Swing Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
+                            xaxis=dict(title="", tickformat='%b %d, %Y', tickangle=-45),
+                            yaxis_title="Swing Count",
+                            height=350,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
+                        )
+                        st.plotly_chart(fig_rep_swing_band, use_container_width=True)
+
+            # =========================================================================
+            # TEAM TESTS (CMJ & ASH TRENDS)
+            # =========================================================================
+            with tab_team_tests:
+                st.markdown('<div class="section-header">Team Assessment Trends</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                cmj_dates = cmj_df['Date'].dropna().dt.date.unique().tolist() if not cmj_df.empty and 'Date' in cmj_df.columns else []
+                ash_dates = ash_df['Date'].dropna().dt.date.unique().tolist() if not ash_df.empty and 'Date' in ash_df.columns else []
+                all_test_dates = sorted(list(set(cmj_dates + ash_dates)))
+
+                if not all_test_dates:
+                    st.info("No CMJ or ASH testing dates found in the dataset.")
+                else:
+                    default_curr_idx = len(all_test_dates) - 1
+                    default_prev_idx = len(all_test_dates) - 2 if len(all_test_dates) > 1 else default_curr_idx
+
+                    t_col1, t_col2, _ = st.columns([1, 1, 2])
+                    with t_col1:
+                        curr_date_sel = st.selectbox("Current Test Date:", all_test_dates, index=default_curr_idx, format_func=lambda x: x.strftime('%b %d, %Y'))
+                    with t_col2:
+                        prev_date_sel = st.selectbox("Previous Test Date:", all_test_dates, index=default_prev_idx, format_func=lambda x: x.strftime('%b %d, %Y'))
+                        
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    def get_test_trends_by_date(df, val_col, prev_date, curr_date, player_col='Player Name', date_col='Date'):
+                        if df.empty or not val_col:
+                            return pd.DataFrame()
+                        
+                        trends = []
+                        temp = df.dropna(subset=[val_col]).copy()
+                        temp['TempDate'] = temp[date_col].dt.date
+                        
+                        for player, grp in temp.groupby(player_col):
+                            prev_record = grp[grp['TempDate'] == prev_date]
+                            curr_record = grp[grp['TempDate'] == curr_date]
+                            
+                            prev_v = prev_record[val_col].mean() if not prev_record.empty else np.nan
+                            curr_v = curr_record[val_col].mean() if not curr_record.empty else np.nan
+                            
+                            if pd.isna(prev_v) and pd.isna(curr_v):
+                                continue
+                                
+                            trends.append({player_col: player, 'Prev': prev_v, 'Curr': curr_v})
+                            
+                        return pd.DataFrame(trends).set_index(player_col)
+
+                    cmj_trends = get_test_trends_by_date(cmj_df, cmj_h_col, prev_date_sel, curr_date_sel)
+                    ash_l_trends = get_test_trends_by_date(ash_df, ash_l_col, prev_date_sel, curr_date_sel)
+                    ash_r_trends = get_test_trends_by_date(ash_df, ash_r_col, prev_date_sel, curr_date_sel)
+
+                    team_test_df = pd.DataFrame(index=all_athletes)
+                    team_test_df.index.name = 'Player Name'
+
+                    if not cmj_trends.empty:
+                        team_test_df = team_test_df.join(cmj_trends.rename(columns={'Prev': 'Prev CMJ', 'Curr': 'Curr CMJ'}))
+                    if not ash_l_trends.empty:
+                        team_test_df = team_test_df.join(ash_l_trends.rename(columns={'Prev': 'Prev ASH (L)', 'Curr': 'Curr ASH (L)'}))
+                    if not ash_r_trends.empty:
+                        team_test_df = team_test_df.join(ash_r_trends.rename(columns={'Prev': 'Prev ASH (R)', 'Curr': 'Curr ASH (R)'}))
+
+                    team_test_df = team_test_df.dropna(how='all').reset_index()
+
+                    def format_trend(prev_val, curr_val):
+                        if pd.isna(curr_val):
+                            return "-"
+                        if pd.isna(prev_val):
+                            return f"{curr_val:.1f}"
+                        diff = curr_val - prev_val
+                        
+                        if diff > 0:
+                            return f"{curr_val:.1f} <span style='color:#10B981; font-weight:bold;'>&uarr;</span>"
+                        elif diff < 0:
+                            return f"{curr_val:.1f} <span style='color:#EF4444; font-weight:bold;'>&darr;</span>"
+                        else:
+                            return f"{curr_val:.1f} <span style='color:#6C757D; font-weight:bold;'>-</span>"
+
+                    if team_test_df.empty:
+                        st.info("No CMJ or ASH testing data available for the selected dates.")
+                    else:
+                        html_table = """
+                        <style>
+                            .trend-table { width: 100%; border-collapse: collapse; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+                            .trend-table th { background-color: #F8FAFC; color: #475569; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #CBD5E1; text-align: center !important;}
+                            .trend-table td { padding: 10px 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #E2E8F0; text-align: center !important;}
+                            .trend-table tbody tr:nth-child(even) { background-color: #F8FAFC; }
+                            .trend-table tbody tr:hover { background-color: #EDF2F7; }
+                            .col-cmj { background-color: rgba(47, 128, 237, 0.04); }
+                            .col-ash { background-color: rgba(255, 130, 0, 0.04); }
+                        </style>
+                        <div class="styled-team-container">
+                        <table class="trend-table">
                             <thead>
                                 <tr>
-                    """
-    
-                    for col in df.columns:
-                        html += f'<th>{col}</th>'
-                    html += '</tr></thead><tbody>'
-    
-                    for _, row in df.iterrows():
-                        html += '<tr>'
-                        for col_name, val in row.items():
-                            cell_class = ""
-                            if "Swing" in col_name:
-                                cell_class = 'class="col-swing"'
-                            elif "Throw" in col_name:
-                                cell_class = 'class="col-throw"'
-                
-                            formatted_val = f"{val:,}" if isinstance(val, (int, np.integer)) else f"{val}"
-                            html += f'<td {cell_class}>{formatted_val}</td>'
-                        html += '</tr>'
-        
-                    html += '</tbody></table></div>'
-                    return html
+                                    <th style="text-align: left !important;">Player Name</th>
+                                    <th class="col-cmj">Prev CMJ (cm)</th>
+                                    <th class="col-cmj">Current CMJ (cm)</th>
+                                    <th class="col-ash">Prev ASH L (N)</th>
+                                    <th class="col-ash">Current ASH L (N)</th>
+                                    <th class="col-ash">Prev ASH R (N)</th>
+                                    <th class="col-ash">Current ASH R (N)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                        """
+                        for _, row in team_test_df.iterrows():
+                            p_name = row['Player Name']
+                            p_cmj = f"{row['Prev CMJ']:.1f}" if pd.notna(row.get('Prev CMJ')) else "-"
+                            c_cmj = format_trend(row.get('Prev CMJ'), row.get('Curr CMJ'))
+                            p_ash_l = f"{row['Prev ASH (L)']:.1f}" if pd.notna(row.get('Prev ASH (L)')) else "-"
+                            c_ash_l = format_trend(row.get('Prev ASH (L)'), row.get('Curr ASH (L)'))
+                            p_ash_r = f"{row['Prev ASH (R)']:.1f}" if pd.notna(row.get('Prev ASH (R)')) else "-"
+                            c_ash_r = format_trend(row.get('Prev ASH (R)'), row.get('Curr ASH (R)'))
 
-                st.markdown(render_styled_team_table(team_df), unsafe_allow_html=True)
+                            html_table += "<tr>"
+                            html_table += f"<td style='font-weight:600; text-align:left !important; color:#1D1D1F;'>{p_name}</td>"
+                            html_table += f"<td class='col-cmj'>{p_cmj}</td>"
+                            html_table += f"<td class='col-cmj'>{c_cmj}</td>"
+                            html_table += f"<td class='col-ash'>{p_ash_l}</td>"
+                            html_table += f"<td class='col-ash'>{c_ash_l}</td>"
+                            html_table += f"<td class='col-ash'>{p_ash_r}</td>"
+                            html_table += f"<td class='col-ash'>{c_ash_r}</td>"
+                            html_table += "</tr>"
 
-                csv = team_df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Download Team Summary CSV",
-                    data=csv,
-                    file_name=f"catapult_team_summary_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
-                    mime='text/csv'
-                )
-        # =========================================================================
-        # TAB 4: REPORT PAGE (SWINGS VS THROWS)
-        # =========================================================================
-        with tab_report:
-            st.markdown('<div class="section-header">Activity Volume Report</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                        html_table += "</tbody></table></div>"
+                        st.markdown(html_table, unsafe_allow_html=True)
 
-            # Selector for Swings or Throws
-            report_type = st.radio("Select Metric to View:", ["Swings", "Throws"], horizontal=True)
-            st.markdown("<br>", unsafe_allow_html=True)
 
-            if report_type == "Throws":
-                with st.expander("Throwing Metric Descriptions", expanded=False):
+        # --- INDIVIDUAL ATHLETE VIEW ---
+        elif view_mode == "👤 Individual Athlete":
+            tab_catapult, tab_testing = st.tabs(["CATAPULT PROFILE", "TESTING ASSESSMENTS"])
+
+            # =========================================================================
+            # CATAPULT PROFILE (SWING & THROW ANALYTICS)
+            # =========================================================================
+            with tab_catapult:
+                st.markdown('<div class="section-header">Catapult Swing & Throw Analytics</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                with st.expander("Metric Descriptions", expanded=False):
+                    st.markdown("#### **Throwing Metrics Legend**")
                     t_l1, t_l2, t_l3 = st.columns(3)
                     with t_l1:
                         st.markdown("""
@@ -1134,102 +1166,8 @@ if check_password():
                             </div>
                         """, unsafe_allow_html=True)
 
-                if not p_throw.empty:
-                    # 1. Band Graph for Throws (Player Load)
-                    fig_rep_throw_band = go.Figure()
-                    if 'Total Throw Count - Player Load 1' in p_throw.columns:
-                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
-                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
-                        fig_rep_throw_band.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
-
-                    fig_rep_throw_band.update_layout(
-                        barmode='stack',
-                        title=dict(text="Throw Volume by Load Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis=dict(
-                            title="",
-                            tickmode='array',
-                            tickvals=p_throw['Date'],
-                            tickformat='%b %d, %Y',
-                            tickangle=-45
-                        ),
-                        yaxis_title="Throw Count",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
-                    )
-                    st.plotly_chart(fig_rep_throw_band, use_container_width=True)
-
                     st.markdown("<br>", unsafe_allow_html=True)
-
-                    # 2. Band Graph for Throws (Rotation)
-                    fig_rep_throw_rot = go.Figure()
-                    if 'Total Throw Count - Rotation Band 1' in p_throw.columns:
-                        fig_rep_throw_rot.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Rotation Band 1'], name='Rot Band 1', marker_color='#EC4899'))
-                        fig_rep_throw_rot.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Rotation Band 2'], name='Rot Band 2', marker_color='#3B82F6'))
-                        fig_rep_throw_rot.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Rotation Band 3'], name='Rot Band 3', marker_color='#10B981'))
-
-                    fig_rep_throw_rot.update_layout(
-                        barmode='stack',
-                        title=dict(text="Throw Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis=dict(
-                            title="",
-                            tickmode='array',
-                            tickvals=p_throw['Date'],
-                            tickformat='%b %d, %Y',
-                            tickangle=-45
-                        ),
-                        yaxis_title="Throw Count",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
-                    )
-                    st.plotly_chart(fig_rep_throw_rot, use_container_width=True)
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    # 3. Line Graph for Total Throws Over Time
-                    fig_rep_throw_line = go.Figure()
-                    if 'Total Throw Count' in p_throw.columns:
-                        hover_template = '<b>Date:</b> %{x|%b %d, %Y}<br><b>Total Throws:</b> %{y}'
-                        custom_data = None
-                        
-                        if 'Activity' in p_throw.columns:
-                            hover_template += '<br><b>Activity:</b> %{customdata}'
-                            custom_data = p_throw['Activity']
-
-                        fig_rep_throw_line.add_trace(go.Scatter(
-                            x=p_throw['Date'], 
-                            y=p_throw['Total Throw Count'], 
-                            mode='lines+markers',  # Added markers to explicitly show the points
-                            name='Total Throws',
-                            line=dict(width=4, color='#FF8200'),
-                            marker=dict(size=8),
-                            customdata=custom_data,
-                            hovertemplate=hover_template + '<extra></extra>'
-                        ))
-
-                    fig_rep_throw_line.update_layout(
-                        title=dict(text="Total Throws Over Time", font=dict(size=14, color='#1D1D1F')),
-                        xaxis=dict(
-                            title="",
-                            tickmode='array',
-                            tickvals=p_throw['Date'],
-                            tickformat='%b %d, %Y',
-                            tickangle=-45
-                        ),
-                        yaxis_title="Total Throws",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        showlegend=False,
-                        hovermode="x unified"
-                    )
-                    st.plotly_chart(fig_rep_throw_line, use_container_width=True)
-
-                else:
-                    st.info("No Throw data available for the selected athlete in this date range.")
-
-            else:  # If Swings selected
-                with st.expander("Batting Swing Metric Descriptions", expanded=False):
+                    st.markdown("#### **Batting Swing Metrics Legend**")
                     s_l1, s_l2, s_l3 = st.columns(3)
                     with s_l1:
                         st.markdown("""
@@ -1240,10 +1178,6 @@ if check_password():
                             <div class="legend-card">
                                 <div class="legend-title">PL Band 1</div>
                                 <div class="legend-desc">Swings with a low peak physical load/impact.</div>
-                            </div>
-                            <div class="legend-card">
-                                <div class="legend-title">Forward % (Median)</div>
-                                <div class="legend-desc">What percentage of the peak swing load was directed strictly in the forward linear plane.</div>
                             </div>
                         """, unsafe_allow_html=True)
                     with s_l2:
@@ -1256,10 +1190,6 @@ if check_password():
                                 <div class="legend-title">PL Band 2</div>
                                 <div class="legend-desc">Swings with a medium peak physical load/impact.</div>
                             </div>
-                            <div class="legend-card">
-                                <div class="legend-title">Lateral % (Median)</div>
-                                <div class="legend-desc">The median percentage of peak swing force that was generated along the lateral (side-to-side) plane.</div>
-                            </div>
                         """, unsafe_allow_html=True)
                     with s_l3:
                         st.markdown("""
@@ -1271,285 +1201,174 @@ if check_password():
                                 <div class="legend-title">PL Band 3</div>
                                 <div class="legend-desc">Swings with a high peak physical load/impact (fully aggressive cuts).</div>
                             </div>
-                            <div class="legend-card">
-                                <div class="legend-title">Vertical % (Median)</div>
-                                <div class="legend-desc">The median percentage of peak swing force that was generated along the vertical (up-and-down) plane.</div>
-                            </div>
                         """, unsafe_allow_html=True)
 
-                if not p_swing.empty:
-                    # 1. Band Graph for Swings
-                    fig_rep_swing_band = go.Figure()
-                    if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
-                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
-                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
-                        fig_rep_swing_band.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
-
-                    fig_rep_swing_band.update_layout(
-                        barmode='stack',
-                        title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=14, color='#1D1D1F')),
-                        xaxis=dict(
-                            title="",
-                            tickmode='array',
-                            tickvals=p_swing['Date'],
-                            tickformat='%b %d, %Y',
-                            tickangle=-45
-                        ),
-                        yaxis_title="Swing Count",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))
-                    )
-                    st.plotly_chart(fig_rep_swing_band, use_container_width=True)
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    # 2. Line Graph for Total Swings Over Time
-                    fig_rep_swing_line = go.Figure()
-                    if 'Swing Count' in p_swing.columns:
-                        hover_template = '<b>Date:</b> %{x|%b %d, %Y}<br><b>Total Swings:</b> %{y}'
-                        custom_data = None
-                        
-                        if 'Activity' in p_swing.columns:
-                            hover_template += '<br><b>Activity:</b> %{customdata}'
-                            custom_data = p_swing['Activity']
-
-                        fig_rep_swing_line.add_trace(go.Scatter(
-                            x=p_swing['Date'], 
-                            y=p_swing['Swing Count'], 
-                            mode='lines+markers',  # Added markers to explicitly show the points
-                            name='Total Swings',
-                            line=dict(width=4, color='#4895DB'),
-                            marker=dict(size=8),
-                            customdata=custom_data,
-                            hovertemplate=hover_template + '<extra></extra>'
-                        ))
-
-                    fig_rep_swing_line.update_layout(
-                        title=dict(text="Total Swings Over Time", font=dict(size=14, color='#1D1D1F')),
-                        xaxis=dict(
-                            title="",
-                            tickmode='array',
-                            tickvals=p_swing['Date'],
-                            tickformat='%b %d, %Y',
-                            tickangle=-45
-                        ),
-                        yaxis_title="Total Swings",
-                        height=350,
-                        margin=dict(l=10, r=10, t=35, b=10),
-                        showlegend=False,
-                        hovermode="x unified"
-                    )
-                    st.plotly_chart(fig_rep_swing_line, use_container_width=True)
-
-                else:
-                    st.info("No Swing data available for the selected athlete in this date range.")
-
-        # =========================================================================
-        # TAB 5: TEAM TESTS (CMJ & ASH TRENDS)
-        # =========================================================================
-        with tab_team_tests:
-            st.markdown('<div class="section-header">Team Assessment Trends</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            # Extract all unique dates from CMJ and ASH datasets
-            cmj_dates = cmj_df['Date'].dropna().dt.date.unique().tolist() if not cmj_df.empty and 'Date' in cmj_df.columns else []
-            ash_dates = ash_df['Date'].dropna().dt.date.unique().tolist() if not ash_df.empty and 'Date' in ash_df.columns else []
-            all_test_dates = sorted(list(set(cmj_dates + ash_dates)))
-
-            if not all_test_dates:
-                st.info("No CMJ or ASH testing dates found in the dataset.")
-            else:
-                default_curr_idx = len(all_test_dates) - 1
-                default_prev_idx = len(all_test_dates) - 2 if len(all_test_dates) > 1 else default_curr_idx
-
-                # Date selectors
-                t_col1, t_col2, _ = st.columns([1, 1, 2])
-                with t_col1:
-                    curr_date_sel = st.selectbox(
-                        "Current Test Date:", 
-                        all_test_dates, 
-                        index=default_curr_idx, 
-                        format_func=lambda x: x.strftime('%b %d, %Y')
-                    )
-                with t_col2:
-                    prev_date_sel = st.selectbox(
-                        "Previous Test Date:", 
-                        all_test_dates, 
-                        index=default_prev_idx, 
-                        format_func=lambda x: x.strftime('%b %d, %Y')
-                    )
-                    
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # Helper function to find tests exactly on the selected dates
-                def get_test_trends_by_date(df, val_col, prev_date, curr_date, player_col='Player Name', date_col='Date'):
-                    if df.empty or not val_col:
-                        return pd.DataFrame()
-                    
-                    trends = []
-                    temp = df.dropna(subset=[val_col]).copy()
-                    temp['TempDate'] = temp[date_col].dt.date
-                    
-                    for player, grp in temp.groupby(player_col):
-                        prev_record = grp[grp['TempDate'] == prev_date]
-                        curr_record = grp[grp['TempDate'] == curr_date]
-                        
-                        # If multiple tests exist on the same day, average them safely
-                        prev_v = prev_record[val_col].mean() if not prev_record.empty else np.nan
-                        curr_v = curr_record[val_col].mean() if not curr_record.empty else np.nan
-                        
-                        if pd.isna(prev_v) and pd.isna(curr_v):
-                            continue
+                c_col1, c_col2 = st.columns(2, gap="large")
+
+                with c_col1:
+                    st.markdown('<div class="sub-header-title">Throwing Load Summary</div>', unsafe_allow_html=True)
+                    if not p_throw.empty:
+                        tot_throws = p_throw['Total Throw Count'].sum() if 'Total Throw Count' in p_throw.columns else 0
+                        tot_throw_pl = p_throw['Total Throw Player Load'].sum() if 'Total Throw Player Load' in p_throw.columns else 0
+
+                        kpi1, kpi2 = st.columns(2)
+                        with kpi1:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Total Throws</h5>
+                                    <h3>{int(tot_throws):,}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with kpi2:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Throw Player Load</h5>
+                                    <h3>{tot_throw_pl:.1f}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                        fig_throw = go.Figure()
+                        if 'Total Throw Count - Player Load 1' in p_throw.columns:
+                            fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 1'], name='PL Band 1 (Low)', marker_color='#EC4899'))
+                            fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 2'], name='PL Band 2 (Med)', marker_color='#3B82F6'))
+                            fig_throw.add_trace(go.Bar(x=p_throw['Date'], y=p_throw['Total Throw Count - Player Load 3'], name='PL Band 3 (High)', marker_color='#10B981'))
                             
-                        trends.append({player_col: player, 'Prev': prev_v, 'Curr': curr_v})
-                        
-                    return pd.DataFrame(trends).set_index(player_col)
+                        fig_throw.update_layout(
+                            barmode='stack',
+                            title=dict(text="Throw Volume by Load Band", font=dict(size=13, color='#1D1D1F')),
+                            xaxis_title="",
+                            yaxis_title="Throw Count",
+                            height=290,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
+                        )
+                        st.plotly_chart(fig_throw, use_container_width=True)
 
-                # Calculate trends based on selected dates
-                cmj_trends = get_test_trends_by_date(cmj_df, cmj_h_col, prev_date_sel, curr_date_sel)
-                ash_l_trends = get_test_trends_by_date(ash_df, ash_l_col, prev_date_sel, curr_date_sel)
-                ash_r_trends = get_test_trends_by_date(ash_df, ash_r_col, prev_date_sel, curr_date_sel)
-
-                # Merge trends into a single summary dataframe
-                team_test_df = pd.DataFrame(index=all_athletes)
-                team_test_df.index.name = 'Player Name'
-
-                if not cmj_trends.empty:
-                    team_test_df = team_test_df.join(cmj_trends.rename(columns={'Prev': 'Prev CMJ', 'Curr': 'Curr CMJ'}))
-                if not ash_l_trends.empty:
-                    team_test_df = team_test_df.join(ash_l_trends.rename(columns={'Prev': 'Prev ASH (L)', 'Curr': 'Curr ASH (L)'}))
-                if not ash_r_trends.empty:
-                    team_test_df = team_test_df.join(ash_r_trends.rename(columns={'Prev': 'Prev ASH (R)', 'Curr': 'Curr ASH (R)'}))
-
-                team_test_df = team_test_df.dropna(how='all').reset_index()
-
-                # Helper to generate the directional HTML arrow based on test diffs
-                def format_trend(prev_val, curr_val):
-                    if pd.isna(curr_val):
-                        return "-"
-                    if pd.isna(prev_val):
-                        return f"{curr_val:.1f}"
-                    diff = curr_val - prev_val
-                    
-                    if diff > 0:
-                        return f"{curr_val:.1f} <span style='color:#10B981; font-weight:bold;'>&uarr;</span>"
-                    elif diff < 0:
-                        return f"{curr_val:.1f} <span style='color:#EF4444; font-weight:bold;'>&darr;</span>"
-                    else:
-                        return f"{curr_val:.1f} <span style='color:#6C757D; font-weight:bold;'>-</span>"
-
-                if team_test_df.empty:
-                    st.info("No CMJ or ASH testing data available for the selected dates.")
-                else:
-                    # Custom HTML table rendering mimicking the existing CSS theme
-                    html_table = """
-                    <style>
-                        .trend-table { width: 100%; border-collapse: collapse; text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-                        .trend-table th { background-color: #F8FAFC; color: #475569; padding: 12px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #CBD5E1; text-align: center !important;}
-                        .trend-table td { padding: 10px 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #E2E8F0; text-align: center !important;}
-                        .trend-table tbody tr:nth-child(even) { background-color: #F8FAFC; }
-                        .trend-table tbody tr:hover { background-color: #EDF2F7; }
-                        .col-cmj { background-color: rgba(47, 128, 237, 0.04); }
-                        .col-ash { background-color: rgba(255, 130, 0, 0.04); }
-                    </style>
-                    <div class="styled-team-container">
-                    <table class="trend-table">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left !important;">Player Name</th>
-                                <th class="col-cmj">Prev CMJ (cm)</th>
-                                <th class="col-cmj">Current CMJ (cm)</th>
-                                <th class="col-ash">Prev ASH L (N)</th>
-                                <th class="col-ash">Current ASH L (N)</th>
-                                <th class="col-ash">Prev ASH R (N)</th>
-                                <th class="col-ash">Current ASH R (N)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                    """
-                    for _, row in team_test_df.iterrows():
-                        p_name = row['Player Name']
-                        
-                        p_cmj = f"{row['Prev CMJ']:.1f}" if pd.notna(row.get('Prev CMJ')) else "-"
-                        c_cmj = format_trend(row.get('Prev CMJ'), row.get('Curr CMJ'))
-
-                        p_ash_l = f"{row['Prev ASH (L)']:.1f}" if pd.notna(row.get('Prev ASH (L)')) else "-"
-                        c_ash_l = format_trend(row.get('Prev ASH (L)'), row.get('Curr ASH (L)'))
-
-                        p_ash_r = f"{row['Prev ASH (R)']:.1f}" if pd.notna(row.get('Prev ASH (R)')) else "-"
-                        c_ash_r = format_trend(row.get('Prev ASH (R)'), row.get('Curr ASH (R)'))
-
-                        # Building HTML strings cleanly to avoid Markdown formatting issues
-                        html_table += "<tr>"
-                        html_table += f"<td style='font-weight:600; text-align:left !important; color:#1D1D1F;'>{p_name}</td>"
-                        html_table += f"<td class='col-cmj'>{p_cmj}</td>"
-                        html_table += f"<td class='col-cmj'>{c_cmj}</td>"
-                        html_table += f"<td class='col-ash'>{p_ash_l}</td>"
-                        html_table += f"<td class='col-ash'>{c_ash_l}</td>"
-                        html_table += f"<td class='col-ash'>{p_ash_r}</td>"
-                        html_table += f"<td class='col-ash'>{c_ash_r}</td>"
-                        html_table += "</tr>"
-
-                    html_table += "</tbody></table></div>"
-                    
-                    st.markdown(html_table, unsafe_allow_html=True)
-
-        
-        # =========================================================================
-        # TAB 6: PLAYER CARDS (DAILY THROW BREAKDOWN)
-        # =========================================================================
-        with tab_player_cards:
-            st.markdown('<div class="section-header">Player Throwing Cards</div>', unsafe_allow_html=True)
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-            # Pull the filtered team throwing data
-            team_throw_cards = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
-
-            if team_throw_cards.empty:
-                st.info("No throw data available for the selected date range.")
-            else:
-                # Get a unique list of all players who have throw data in this range
-                players_with_throws = sorted(team_throw_cards['Player Name'].dropna().unique())
+                        with st.expander("View Throw Log"):
+                            t_log = p_throw.copy()
+                            if 'Date' in t_log.columns:
+                                t_log['Date'] = t_log['Date'].dt.strftime('%b %d, %Y')
                 
-                # Create a 3-column grid layout for the cards
-                cols = st.columns(3, gap="medium")
+                            name_col = next((c for c in t_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
+                            activity_col = next((c for c in t_log.columns if 'activity' in c.lower()), None)
+                
+                            front_cols = [c for c in [name_col, activity_col, 'Date'] if c in t_log.columns]
+                            remaining_cols = [c for c in t_log.columns if c not in front_cols]
+                            t_log = t_log[front_cols + remaining_cols]
+                
+                            st.dataframe(t_log, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No Throw data recorded for this date range.")
 
-                for idx, player in enumerate(players_with_throws):
-                    player_data = team_throw_cards[team_throw_cards['Player Name'] == player].sort_values('Date')
-                    if player_data.empty:
-                        continue
-                        
-                    # Safely locate the specific metrics
-                    t_count_col = find_col(player_data, ['Total Throw Count'])
-                    t_pl3_col = find_col(player_data, ['Total Throw Count - Player Load 3'])
-                    t_rb3_col = find_col(player_data, ['Total Throw Count - Rotation Band 3'])
-                    
-                    # Calculate totals for the footer
-                    sum_tot = player_data[t_count_col].sum() if t_count_col else 0
-                    sum_pl3 = player_data[t_pl3_col].sum() if t_pl3_col else 0
-                    sum_rb3 = player_data[t_rb3_col].sum() if t_rb3_col else 0
-                    
-                    # Fetch photo URL from the photo_dict you built during data loading
-                    p_key = str(player).strip().lower()
-                    photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
+                with c_col2:
+                    st.markdown('<div class="sub-header-title">Batting Swing Summary</div>', unsafe_allow_html=True)
+                    if not p_swing.empty:
+                        tot_swings = p_swing['Swing Count'].sum() if 'Swing Count' in p_swing.columns else 0
+                        tot_swing_pl = p_swing['Sum Swing Max Player Load'].sum() if 'Sum Swing Max Player Load' in p_swing.columns else 0
 
-                    # Build the HTML for the table rows dynamically without line breaks
-                    rows_html = ""
-                    for _, row in player_data.iterrows():
-                        date_str = row['Date'].strftime('%b %d') if pd.notna(row['Date']) else "N/A"
-                        tot = f"{row[t_count_col]:.0f}" if t_count_col and pd.notna(row[t_count_col]) else "0"
-                        pl3 = f"{row[t_pl3_col]:.0f}" if t_pl3_col and pd.notna(row[t_pl3_col]) else "0"
-                        rb3 = f"{row[t_rb3_col]:.0f}" if t_rb3_col and pd.notna(row[t_rb3_col]) else "0"
-                        
-                        rows_html += f"<tr style='border-bottom: 1px solid #F1F5F9; transition: background-color 0.15s ease;'><td style='padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;'>{date_str}</td><td style='padding: 10px 4px; color: #4895DB; font-weight: 800;'>{tot}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{pl3}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{rb3}</td></tr>"
+                        kpi3, kpi4 = st.columns(2)
+                        with kpi3:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Total Swings</h5>
+                                    <h3>{int(tot_swings):,}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with kpi4:
+                            st.markdown(f"""
+                                <div class="catapult-card">
+                                    <h5>Swing Max Player Load</h5>
+                                    <h3>{tot_swing_pl:.1f}</h3>
+                                    <p>Selected Window</p>
+                                </div>
+                            """, unsafe_allow_html=True)
 
-                    # Build the footer HTML for the totals
-                    footer_html = f"<tfoot style='position: sticky; bottom: 0; background: #F8FAFC; border-top: 2px solid #E2E8F0; z-index: 1;'><tr><td style='padding: 12px 4px; text-align: left; font-weight: 800; color: #1D1D1F; font-size: 11px; text-transform: uppercase;'>Total</td><td style='padding: 12px 4px; color: #4895DB; font-weight: 800;'>{sum_tot:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_pl3:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_rb3:,.0f}</td></tr></tfoot>"
+                        fig_swing = go.Figure()
+                        if 'Swing Max Rotation Band 1 Count' in p_swing.columns:
+                            fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 1 Count'], name='Band 1', marker_color='#F59E0B'))
+                            fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 2 Count'], name='Band 2', marker_color='#EF4444'))
+                            fig_swing.add_trace(go.Bar(x=p_swing['Date'], y=p_swing['Swing Max Rotation Band 3 Count'], name='Band 3', marker_color='#8B5CF6'))
 
-                    # Build the full card HTML wrapper without any newlines or indentation
-                    card_html = f"<div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #FF8200; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Throwing Profile</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Date</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html}</tbody>{footer_html}</table></div></div>"
-                    
-                    # Render the built card into the correct grid column
-                    with cols[idx % 3]:
-                        st.markdown(card_html, unsafe_allow_html=True)
+                        fig_swing.update_layout(
+                            barmode='stack',
+                            title=dict(text="Swing Volume by Rotation Velocity Band", font=dict(size=13, color='#1D1D1F')),
+                            xaxis_title="",
+                            yaxis_title="Swing Count",
+                            height=290,
+                            margin=dict(l=10, r=10, t=35, b=10),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10))
+                        )
+                        st.plotly_chart(fig_swing, use_container_width=True)
+
+                        with st.expander("View Swing Log"):
+                            s_log = p_swing.copy()
+                            if 'Date' in s_log.columns:
+                                s_log['Date'] = s_log['Date'].dt.strftime('%b %d, %Y')
+                
+                            name_col = next((c for c in s_log.columns if 'name' in c.lower() and 'activity' not in c.lower()), None)
+                            activity_col = next((c for c in s_log.columns if 'activity' in c.lower()), None)
+                
+                            front_cols = [c for c in [name_col, activity_col, 'Date'] if c in s_log.columns]
+                            remaining_cols = [c for c in s_log.columns if c not in front_cols]
+                            s_log = s_log[front_cols + remaining_cols]
+                
+                            st.dataframe(s_log, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No Swing data recorded for this date range.")
+
+            # =========================================================================
+            # TESTING
+            # =========================================================================
+            with tab_testing:
+                st.markdown('<div class="section-header">Latest Assessment Summary</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                render_assessment_cards()
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-header">Testing History Tables</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                if not p_ash.empty:
+                    st.markdown('<div class="sub-header-title">ASH Isometric Shoulder Test History</div>', unsafe_allow_html=True)
+                    ash_cols = [c for c in ['Date', ash_l_col, ash_r_col] if c and c in p_ash.columns]
+                    ash_tbl = p_ash[ash_cols].copy()
+                    if 'Date' in ash_tbl.columns:
+                        ash_tbl['Date'] = ash_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(ash_tbl), unsafe_allow_html=True)
+
+                if not p_cmj.empty:
+                    st.markdown('<div class="sub-header-title">Countermovement Jump History</div>', unsafe_allow_html=True)
+                    cmj_cols = [c for c in ['Date', cmj_h_col, cmj_rsi_col] if c and c in p_cmj.columns]
+                    cmj_tbl = p_cmj[cmj_cols].copy()
+                    if 'Date' in cmj_tbl.columns:
+                        cmj_tbl['Date'] = cmj_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(cmj_tbl), unsafe_allow_html=True)
+
+                if not p_er.empty:
+                    st.markdown('<div class="sub-header-title">External Rotation (ER) ROM History</div>', unsafe_allow_html=True)
+                    er_cols = [c for c in ['Date', er_l_col, er_r_col] if c and c in p_er.columns]
+                    er_tbl = p_er[er_cols].copy()
+                    if 'Date' in er_tbl.columns:
+                        er_tbl['Date'] = er_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(er_tbl), unsafe_allow_html=True)
+
+                if not p_grip.empty:
+                    st.markdown('<div class="sub-header-title">Grip Strength History</div>', unsafe_allow_html=True)
+                    grip_cols = [c for c in ['Date', grip_l_col, grip_r_col] if c and c in p_grip.columns]
+                    grip_tbl = p_grip[grip_cols].copy()
+                    if 'Date' in grip_tbl.columns:
+                        grip_tbl['Date'] = grip_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(grip_tbl), unsafe_allow_html=True)
+
+                if not p_sprint.empty:
+                    st.markdown('<div class="sub-header-title">20m Sprint Performance History</div>', unsafe_allow_html=True)
+                    sprint_cols = [c for c in ['Date', sprint_time_col] if c and c in p_sprint.columns]
+                    sprint_tbl = p_sprint[sprint_cols].copy()
+                    if 'Date' in sprint_tbl.columns:
+                        sprint_tbl['Date'] = sprint_tbl['Date'].dt.strftime('%b %d, %Y')
+                    st.markdown(render_custom_table(sprint_tbl), unsafe_allow_html=True)
