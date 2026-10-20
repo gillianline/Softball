@@ -801,6 +801,15 @@ if check_password():
                     st.info("No throw data available for the selected date range.")
                 else:
                     players_with_throws = sorted(team_throw_cards['Player Name'].dropna().unique())
+                    
+                    # Calculate team-wide threshold for "Significant Volume" (Top 25% of throwers)
+                    t_count_col_global = find_col(team_throw_cards, ['Total Throw Count'])
+                    if t_count_col_global:
+                        player_totals = team_throw_cards.groupby('Player Name')[t_count_col_global].sum()
+                        significant_threshold = player_totals.quantile(0.75) if len(player_totals) > 3 else 0
+                    else:
+                        significant_threshold = float('inf')
+                    
                     cols = st.columns(3, gap="medium")
 
                     for idx, player in enumerate(players_with_throws):
@@ -816,30 +825,48 @@ if check_password():
                         sum_pl3 = player_data[t_pl3_col].sum() if t_pl3_col else 0
                         sum_rb3 = player_data[t_rb3_col].sum() if t_rb3_col else 0
                         
+                        # Identify the maximum single-day throw count for this player
+                        max_day_throws = player_data[t_count_col].max() if t_count_col else 0
+                        
+                        # Determine if player has a significant total relative to the team
+                        is_high_volume = (sum_tot >= significant_threshold) and (sum_tot > 0)
+                        vol_badge = "<span style='background:#EF4444; color:white; font-size:9px; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight:800; letter-spacing:0.5px;'>HIGH VOLUME</span>" if is_high_volume else ""
+                        
                         p_key = str(player).strip().lower()
                         photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
 
-                        # Locate the Activity column
                         act_col = find_col(player_data, ['Activity', 'Session Name'])
 
                         rows_html = ""
                         for _, row in player_data.iterrows():
-                            # Attempt to use Activity name, fallback to Date if blank/missing
+                            # Activity formatting
                             if act_col and pd.notna(row[act_col]) and str(row[act_col]).strip() and str(row[act_col]).strip().lower() != 'nan':
                                 activity_str = str(row[act_col]).strip()
                             else:
                                 activity_str = row['Date'].strftime('%b %d') if pd.notna(row['Date']) else "N/A"
                                 
-                            tot = f"{row[t_count_col]:.0f}" if t_count_col and pd.notna(row[t_count_col]) else "0"
+                            # Data Extraction
+                            raw_tot = row[t_count_col] if t_count_col and pd.notna(row[t_count_col]) else 0
+                            tot = f"{raw_tot:.0f}"
                             pl3 = f"{row[t_pl3_col]:.0f}" if t_pl3_col and pd.notna(row[t_pl3_col]) else "0"
                             rb3 = f"{row[t_rb3_col]:.0f}" if t_rb3_col and pd.notna(row[t_rb3_col]) else "0"
                             
-                            rows_html += f"<tr style='border-bottom: 1px solid #F1F5F9; transition: background-color 0.15s ease;'><td style='padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;'>{activity_str}</td><td style='padding: 10px 4px; color: #4895DB; font-weight: 800;'>{tot}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{pl3}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{rb3}</td></tr>"
+                            # Highlight the row if it's the highest day (and greater than 0)
+                            if raw_tot == max_day_throws and max_day_throws > 0:
+                                bg_color = "rgba(255, 130, 0, 0.08)"
+                                icon = " <span style='font-size: 9px; color: #FF8200; font-weight: 800; letter-spacing: 0.5px;'>MAX</span>"
+                            else:
+                                bg_color = "transparent"
+                                icon = ""
+                            
+                            rows_html += f"<tr style='border-bottom: 1px solid #F1F5F9; background-color: {bg_color}; transition: background-color 0.15s ease;'><td style='padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;'>{activity_str}</td><td style='padding: 10px 4px; color: #4895DB; font-weight: 800;'>{tot}{icon}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{pl3}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{rb3}</td></tr>"
 
                         footer_html = f"<tfoot style='position: sticky; bottom: 0; background: #F8FAFC; border-top: 2px solid #E2E8F0; z-index: 1;'><tr><td style='padding: 12px 4px; text-align: left; font-weight: 800; color: #1D1D1F; font-size: 11px; text-transform: uppercase;'>Total</td><td style='padding: 12px 4px; color: #4895DB; font-weight: 800;'>{sum_tot:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_pl3:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_rb3:,.0f}</td></tr></tfoot>"
                         
-                        # Updated card_html table header from "Date" to "Activity"
-                        card_html = f"<div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #FF8200; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 70px; height: 70px; box-sizing: border-box; padding: 6px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Throwing Profile</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Activity</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html}</tbody>{footer_html}</table></div></div>"
+                        # Change top border color if high volume
+                        card_border = "#EF4444" if is_high_volume else "#FF8200"
+                        
+                        card_html = f"<div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid {card_border}; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 70px; height: 70px; box-sizing: border-box; padding: 6px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Throwing Profile{vol_badge}</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Activity</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html}</tbody>{footer_html}</table></div></div>"
                         
                         with cols[idx % 3]:
                             st.markdown(card_html, unsafe_allow_html=True)
