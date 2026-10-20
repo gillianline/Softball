@@ -599,8 +599,7 @@ if check_password():
                 st.info(f"No testing assessment entries found for {selected} within the selected date window ({start_dt.strftime('%b %d, %Y')} – {end_dt.strftime('%b %d, %Y')}).")
 
         # --- 6. NAVIGATION TABS ---
-        # ADDED "TEAM TESTS" TAB HERE
-        tab_testing, tab_catapult, tab_team_summary, tab_report, tab_team_tests = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT", "TEAM TESTS"])
+        tab_testing, tab_catapult, tab_team_summary, tab_report, tab_team_tests, tab_player_cards = st.tabs(["TESTING", "CATAPULT PROFILE", "TEAM SUMMARY", "REPORT", "TEAM TESTS", "PLAYER CARDS"])
 
         # =========================================================================
         # TAB 1: TESTING
@@ -1493,5 +1492,86 @@ if check_password():
                         html_table += "</tr>"
 
                     html_table += "</tbody></table></div>"
+                    
+                    st.markdown(html_table, unsafe_allow_html=True)
+            # =========================================================================
+        # TAB 6: PLAYER CARDS (DAILY THROW BREAKDOWN)
+        # =========================================================================
+        with tab_player_cards:
+            st.markdown('<div class="section-header">Player Throwing Cards</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+            # Pull the filtered team throwing data
+            team_throw_cards = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
+
+            if team_throw_cards.empty:
+                st.info("No throw data available for the selected date range.")
+            else:
+                # Get a unique list of all players who have throw data in this range
+                players_with_throws = sorted(team_throw_cards['Player Name'].dropna().unique())
+
+                for player in players_with_throws:
+                    # Filter data down to just this player, sorted chronologically
+                    player_data = team_throw_cards[team_throw_cards['Player Name'] == player].sort_values('Date')
+                    
+                    if player_data.empty:
+                        continue
+
+                    # Safely locate the specific metrics you requested
+                    t_count_col = find_col(player_data, ['Total Throw Count'])
+                    t_pl3_col = find_col(player_data, ['Total Throw Count - Player Load 3'])
+                    t_rb3_col = find_col(player_data, ['Total Throw Count - Rotation Band 3'])
+
+                    # Generate an orange-accented header for the player
+                    st.markdown(f"""
+                        <div style="background-color: #F8F9FA; padding: 10px 15px; border-left: 5px solid #FF8200; border-radius: 5px; margin-top: 20px; margin-bottom: 5px;">
+                            <h3 style="margin:0; color:#1D1D1F; font-size:16px; text-transform: uppercase;">{player}</h3>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    # Build the display columns map
+                    display_cols = ['Date']
+                    rename_map = {'Date': 'Date'}
+                    
+                    if t_count_col:
+                        display_cols.append(t_count_col)
+                        rename_map[t_count_col] = 'Total Throws'
+                    if t_pl3_col:
+                        display_cols.append(t_pl3_col)
+                        rename_map[t_pl3_col] = 'Band 3 PL Throws'
+                    if t_rb3_col:
+                        display_cols.append(t_rb3_col)
+                        rename_map[t_rb3_col] = 'Rotation Band 3'
+
+                    # Prep the DataFrame for the HTML table
+                    p_disp = player_data[display_cols].copy()
+                    p_disp['Date'] = p_disp['Date'].dt.strftime('%b %d, %Y')
+                    p_disp = p_disp.rename(columns=rename_map)
+
+                    # Reusing the existing styled-team-table CSS for a unified look
+                    html_table = f'''
+                    <div class="styled-team-container" style="margin-bottom: 30px; box-shadow: none;">
+                        <table class="styled-team-table">
+                            <thead>
+                                <tr>
+                    '''
+                    
+                    for col in p_disp.columns:
+                        html_table += f'<th>{col}</th>'
+                    html_table += '</tr></thead><tbody>'
+
+                    for _, row in p_disp.iterrows():
+                        html_table += '<tr>'
+                        for i, val in enumerate(row):
+                            if i == 0: 
+                                # Bold the date column
+                                html_table += f'<td style="font-weight: 600; color: #1D1D1F;">{val}</td>'
+                            else:
+                                # Apply the light blue "col-throw" background to the metrics
+                                formatted_val = f"{val:,.0f}" if isinstance(val, (int, float)) and not pd.isna(val) else "0"
+                                html_table += f'<td class="col-throw">{formatted_val}</td>'
+                        html_table += '</tr>'
+
+                    html_table += '</tbody></table></div>'
                     
                     st.markdown(html_table, unsafe_allow_html=True)
