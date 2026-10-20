@@ -622,7 +622,7 @@ if check_password():
 
         # --- 6. CONDITIONAL NAVIGATION TAB RENDERING ---
         
-        if view_mode == "🛡️ Team Overview":
+        if view_mode == "Team Overview":
             tab_team_summary, tab_player_cards, tab_report, tab_team_tests = st.tabs(["TEAM SUMMARY", "PLAYER THROW CARDS", "VOLUME REPORT", "TEAM TESTS"])
 
             # =========================================================================
@@ -1119,7 +1119,7 @@ if check_password():
 
 
         # --- INDIVIDUAL ATHLETE VIEW ---
-        elif view_mode == "👤 Individual Athlete":
+        elif view_mode == "Individual Athlete":
             tab_catapult, tab_testing = st.tabs(["CATAPULT PROFILE", "TESTING ASSESSMENTS"])
 
             # =========================================================================
