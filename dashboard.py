@@ -213,40 +213,39 @@ if check_password():
 
         /* --- PRINT OPTIMIZATION --- */
         @media print {
-            /* 1. New utility class to aggressively hide elements */
-            .no-print { display: none !important; }
-            iframe { display: none !important; } /* Hides the print button component */
+            /* 1. Hide the entire top control panel, filters, view toggle, and button component */
+            div[data-testid="stHorizontalBlock"]:has(button), 
+            div[data-testid="stHorizontalBlock"]:has(.stSelectbox),
+            div[data-testid="stRadio"],
+            iframe { 
+                display: none !important; 
+            }
 
-            /* 2. Hide Streamlit Chrome & Navigation */
+            /* 2. Hide Streamlit Chrome, Header, Navigation & Footers */
             [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], 
             .stApp > header, footer, #MainMenu {
                 display: none !important;
             }
-            
-            /* 3. Hide Interactive Widgets (Dropdowns, Buttons, Date Pickers, Radio Buttons) */
-            button, [data-testid="stSelectbox"], [data-testid="stDateInput"], .stRadio {
-                display: none !important;
-            }
 
-            /* 4. Hide the Tab Selector Row */
+            /* 3. Hide the Tab Selector Row entirely */
             [data-testid="stTabs"] [data-baseweb="tab-list"] {
                 display: none !important;
             }
 
-            /* 5. Force browsers to print your background colors */
+            /* 4. Force browsers to print your custom background colors and borders */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            /* 6. Prevent elements from breaking cleanly across page breaks */
+            /* 5. Prevent individual player cards from breaking awkwardly across page breaks */
             .catapult-card, .assessment-card, .legend-card, .js-plotly-plot, .styled-team-container {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 margin-bottom: 20px !important;
             }
 
-            /* 7. Remove app padding to push the cards to the very top of the paper */
+            /* 6. Strip away padding so content starts directly at the top of the paper */
             .main .block-container {
                 max-width: 100% !important;
                 padding-top: 0 !important;
