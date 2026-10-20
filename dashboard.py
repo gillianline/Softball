@@ -213,40 +213,46 @@ if check_password():
 
         /* --- PRINT OPTIMIZATION --- */
         @media print {
-            /* 1. Hide Streamlit Chrome & Navigation */
+            /* 1. New utility class to aggressively hide elements */
+            .no-print { display: none !important; }
+            iframe { display: none !important; } /* Hides the print button component */
+
+            /* 2. Hide Streamlit Chrome & Navigation */
             [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], 
             .stApp > header, footer, #MainMenu {
                 display: none !important;
             }
             
-            /* 2. Hide Interactive Widgets (Dropdowns, Buttons, Date Pickers, Radio Buttons) */
+            /* 3. Hide Interactive Widgets (Dropdowns, Buttons, Date Pickers, Radio Buttons) */
             button, [data-testid="stSelectbox"], [data-testid="stDateInput"], .stRadio {
                 display: none !important;
             }
 
-            /* 3. Hide the Tab Selector Row */
+            /* 4. Hide the Tab Selector Row */
             [data-testid="stTabs"] [data-baseweb="tab-list"] {
                 display: none !important;
             }
 
-            /* 4. Force browsers to print your background colors (badges, colored borders) */
+            /* 5. Force browsers to print your background colors */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            /* 5. Prevent elements from breaking cleanly across page breaks */
+            /* 6. Prevent elements from breaking cleanly across page breaks */
             .catapult-card, .assessment-card, .legend-card, .js-plotly-plot, .styled-team-container {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 margin-bottom: 20px !important;
             }
 
-            /* 6. Remove app padding to maximize paper space */
+            /* 7. Remove app padding to push the cards to the very top of the paper */
             .main .block-container {
                 max-width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
+                padding-top: 0 !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                margin-top: 0 !important;
             }
         }
         </style>
@@ -401,7 +407,7 @@ if check_password():
             horizontal=True,
             label_visibility="collapsed"
         )
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br class='no-print'>", unsafe_allow_html=True)
 
         # --- GLOBAL FILTERS ---
         f_col1, f_col2, f_col3, f_col4, f_col5, f_col6 = st.columns([1.2, 1, 1, 1, 0.5, 0.6])
@@ -412,7 +418,7 @@ if check_password():
             else:
                 selected = None
                 st.markdown("""
-                    <div style='padding: 8px 12px; background-color: rgba(255, 130, 0, 0.1); border-left: 4px solid #FF8200; border-radius: 4px; color: #1D1D1F; font-weight: 700; font-size: 14px;'>
+                    <div class='no-print' style='padding: 8px 12px; background-color: rgba(255, 130, 0, 0.1); border-left: 4px solid #FF8200; border-radius: 4px; color: #1D1D1F; font-weight: 700; font-size: 14px;'>
                         Viewing Full Team Roster
                     </div>
                 """, unsafe_allow_html=True)
@@ -452,13 +458,13 @@ if check_password():
             end_date_val = st.date_input("End Date", key="global_end_date")
 
         with f_col5:
-            st.write(" ") # Layout offset
+            st.markdown("<div class='no-print' style='height: 28px;'></div>", unsafe_allow_html=True)
             if st.button("Refresh"):
                 st.cache_data.clear()
                 st.rerun()
 
         with f_col6:
-            st.write(" ") # Layout offset
+            st.markdown("<div class='no-print' style='height: 28px;'></div>", unsafe_allow_html=True)
             components.html(
                 """
                 <button onclick="window.parent.print()" style="
