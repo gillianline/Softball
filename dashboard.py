@@ -951,7 +951,6 @@ if check_password():
                                     <p style='margin: 2px 0 0 0; color: #6C757D; font-size: 10.5px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Practice Score</p>
                                 </div>
                             </div>
-                            
                             <div style='padding: 12px; display: flex; justify-content: space-around; background-color: #FAFAFA; border-bottom: 1px solid #E2E8F0;'>
                                 <div style='text-align: center;'>
                                     <div style='font-size: 10px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Total Dist (y)</div>
@@ -962,7 +961,6 @@ if check_password():
                                     <div style='font-size: 17px; color: #FF8200; font-weight: 800;'>{max_v:.1f}</div>
                                 </div>
                             </div>
-                            
                             <div style='padding: 10px 15px 15px 15px;'>
                                 <table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 12.5px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>
                                     <thead>
