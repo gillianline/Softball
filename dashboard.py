@@ -213,39 +213,28 @@ if check_password():
 
         /* --- PRINT OPTIMIZATION --- */
         @media print {
-            /* 1. Hide the entire top control panel, filters, view toggle, and button component */
             div[data-testid="stHorizontalBlock"]:has(button), 
             div[data-testid="stHorizontalBlock"]:has(.stSelectbox),
             div[data-testid="stRadio"],
             iframe { 
                 display: none !important; 
             }
-
-            /* 2. Hide Streamlit Chrome, Header, Navigation & Footers */
             [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], 
             .stApp > header, footer, #MainMenu {
                 display: none !important;
             }
-
-            /* 3. Hide the Tab Selector Row entirely */
             [data-testid="stTabs"] [data-baseweb="tab-list"] {
                 display: none !important;
             }
-
-            /* 4. Force browsers to print your custom background colors and borders */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-
-            /* 5. Prevent individual player cards from breaking awkwardly across page breaks */
             .catapult-card, .assessment-card, .legend-card, .js-plotly-plot, .styled-team-container {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 margin-bottom: 20px !important;
             }
-
-            /* 6. Strip away padding so content starts directly at the top of the paper */
             .main .block-container {
                 max-width: 100% !important;
                 padding-top: 0 !important;
@@ -289,14 +278,16 @@ if check_password():
         roster_df = safe_read_csv("ROSTER_URL")
         swing_df = safe_read_csv("SWING_URL")
         throw_df = safe_read_csv("THROW_URL")
+        practice_df = safe_read_csv("PRACTICE_URL")
 
-        for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, roster_df, swing_df, throw_df]:
+        for df in [ash_df, cmj_df, er_df, grip_df, sprint_df, roster_df, swing_df, throw_df, practice_df]:
             if not df.empty:
                 if 'Name' in df.columns and 'Player Name' not in df.columns:
                     df.rename(columns={'Name': 'Player Name'}, inplace=True)
                 if 'Player Name' in df.columns:
                     df['Player Name'] = df['Player Name'].astype(str).str.strip()
 
+        # Group Swings
         if not swing_df.empty:
             swing_cols = [
                 'Sum Swing Max Player Load', 'Swing Count',
@@ -316,6 +307,7 @@ if check_password():
             
             swing_df = swing_df.groupby(['Player Name', 'Date'], as_index=False).agg(agg_dict)
 
+        # Group Throws
         if not throw_df.empty:
             throw_cols = [
                 'Total Throw Count', 'Total Throw Player Load',
@@ -334,6 +326,21 @@ if check_password():
 
             throw_df = throw_df.groupby(['Player Name', 'Date'], as_index=False).agg(agg_dict_t)
 
+        # Clean Practice Data
+        if not practice_df.empty:
+            pract_cols = [
+                'Total Player Load', 'Total Distance (y)', 'Total Distance 80-100% Velocity (y)',
+                'Total Distance 90-100% Velocity (y)', 'Maximum Velocity (mph)',
+                'IMA Accel High', 'IMA Accel Medium', 'IMA Accel Low',
+                'IMA CoD Left High', 'IMA CoD Left Medium', 'IMA CoD Left Low',
+                'IMA CoD Right High', 'IMA CoD Right Medium', 'IMA CoD Right Low',
+                'IMA Decel High', 'IMA Decel Medium', 'IMA Decel Low'
+            ]
+            for col in pract_cols:
+                if col in practice_df.columns:
+                    practice_df[col] = clean_num_series(practice_df[col])
+
+        # Map Photos
         photo_dict = {}
         if not roster_df.empty:
             photo_col_candidates = [c for c in roster_df.columns if any(k in c.lower() for k in ['photo', 'picture', 'headshot', 'image', 'url'])]
@@ -345,6 +352,7 @@ if check_password():
                     if val and val.lower() != 'nan':
                         photo_dict[str(r[name_col]).strip().lower()] = val
 
+        # Clean Assessments
         for df, col_keywords in [
             (ash_df, ['force', 'asym', 'rfd']),
             (cmj_df, ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']),
@@ -357,9 +365,9 @@ if check_password():
                     if any(k in col.lower() for k in col_keywords):
                         df[col] = clean_num_series(df[col])
 
-        return ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, photo_dict
+        return ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, practice_df, photo_dict
 
-    ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, photo_dict = load_all_data()
+    ash_df, cmj_df, er_df, grip_df, sprint_df, swing_df, throw_df, practice_df, photo_dict = load_all_data()
 
     def find_col(df, options):
         if df.empty:
@@ -381,7 +389,8 @@ if check_password():
         list(grip_df['Player Name'].dropna().unique() if 'Player Name' in grip_df.columns else []) +
         list(sprint_df['Player Name'].dropna().unique() if 'Player Name' in sprint_df.columns else []) +
         list(swing_df['Player Name'].dropna().unique() if 'Player Name' in swing_df.columns else []) +
-        list(throw_df['Player Name'].dropna().unique() if 'Player Name' in throw_df.columns else [])
+        list(throw_df['Player Name'].dropna().unique() if 'Player Name' in throw_df.columns else []) +
+        list(practice_df['Player Name'].dropna().unique() if 'Player Name' in practice_df.columns else [])
     )))
 
     if all_athletes:
@@ -511,6 +520,7 @@ if check_password():
             raw_sprint = sprint_df[sprint_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in sprint_df.columns else pd.DataFrame()
             raw_swing = swing_df[swing_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in swing_df.columns else pd.DataFrame()
             raw_throw = throw_df[throw_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in throw_df.columns else pd.DataFrame()
+            raw_practice = practice_df[practice_df['Player Name'] == selected].sort_values('Date') if 'Player Name' in practice_df.columns else pd.DataFrame()
 
             p_ash = filter_season(raw_ash).copy()
             p_cmj = filter_season(raw_cmj).copy()
@@ -519,6 +529,7 @@ if check_password():
             p_sprint = filter_season(raw_sprint).copy()
             p_swing = filter_season(raw_swing).copy()
             p_throw = filter_season(raw_throw).copy()
+            p_practice = filter_season(raw_practice).copy()
 
         def render_custom_table(df):
             if df.empty:
@@ -1198,7 +1209,7 @@ if check_password():
 
         # --- INDIVIDUAL ATHLETE VIEW ---
         elif view_mode == "Individual Athlete":
-            tab_catapult, tab_testing = st.tabs(["CATAPULT PROFILE", "TESTING ASSESSMENTS"])
+            tab_catapult, tab_practice, tab_testing = st.tabs(["CATAPULT PROFILE", "PRACTICE SCORE CARD", "TESTING ASSESSMENTS"])
 
             # =========================================================================
             # CATAPULT PROFILE (SWING & THROW ANALYTICS)
@@ -1398,6 +1409,126 @@ if check_password():
                             st.dataframe(s_log, use_container_width=True, hide_index=True)
                     else:
                         st.info("No Swing data recorded for this date range.")
+
+
+            # =========================================================================
+            # PRACTICE SCORE CARD (NEW INTEGRATION)
+            # =========================================================================
+            with tab_practice:
+                st.markdown('<div class="section-header">Practice Score Card</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                if p_practice.empty and p_swing.empty and p_throw.empty:
+                    st.info("No practice data available for the selected date range.")
+                else:
+                    # Totals
+                    total_swings = p_swing['Swing Count'].sum() if not p_swing.empty and 'Swing Count' in p_swing.columns else 0
+                    total_throws = p_throw['Total Throw Count'].sum() if not p_throw.empty and 'Total Throw Count' in p_throw.columns else 0
+                    total_distance = p_practice['Total Distance (y)'].sum() if not p_practice.empty and 'Total Distance (y)' in p_practice.columns else 0
+
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.markdown(f"""
+                            <div class="catapult-card">
+                                <h5>Total Swings</h5>
+                                <h3>{int(total_swings):,}</h3>
+                                <p>Selected Window</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with c2:
+                        st.markdown(f"""
+                            <div class="catapult-card">
+                                <h5>Total Throws</h5>
+                                <h3>{int(total_throws):,}</h3>
+                                <p>Selected Window</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with c3:
+                        st.markdown(f"""
+                            <div class="catapult-card">
+                                <h5>Total Distance (y)</h5>
+                                <h3>{int(total_distance):,}</h3>
+                                <p>Selected Window</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown('<div class="sub-header-title">IMA Movement Breakdown</div>', unsafe_allow_html=True)
+
+                    # Extract IMA Sums safely
+                    def get_pract_sum(col_name):
+                        return int(p_practice[col_name].sum()) if not p_practice.empty and col_name in p_practice.columns else 0
+
+                    ima_a_h, ima_a_m, ima_a_l = get_pract_sum('IMA Accel High'), get_pract_sum('IMA Accel Medium'), get_pract_sum('IMA Accel Low')
+                    ima_d_h, ima_d_m, ima_d_l = get_pract_sum('IMA Decel High'), get_pract_sum('IMA Decel Medium'), get_pract_sum('IMA Decel Low')
+                    ima_cl_h, ima_cl_m, ima_cl_l = get_pract_sum('IMA CoD Left High'), get_pract_sum('IMA CoD Left Medium'), get_pract_sum('IMA CoD Left Low')
+                    ima_cr_h, ima_cr_m, ima_cr_l = get_pract_sum('IMA CoD Right High'), get_pract_sum('IMA CoD Right Medium'), get_pract_sum('IMA CoD Right Low')
+
+                    i1, i2, i3, i4 = st.columns(4)
+                    with i1:
+                        st.markdown(f"""
+                            <div class="assessment-card border-blue" style="height: 100%;">
+                                <div class="card-title">IMA Accel (A)</div>
+                                <hr style="margin:8px 0; border:none; border-top: 1px solid #EAEAEA;" />
+                                <div class="card-metrics" style="line-height: 1.8;">
+                                    <strong>High:</strong> {ima_a_h} <br>
+                                    <strong>Medium:</strong> {ima_a_m} <br>
+                                    <strong>Low:</strong> {ima_a_l}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with i2:
+                        st.markdown(f"""
+                            <div class="assessment-card border-blue" style="height: 100%;">
+                                <div class="card-title">IMA Decel (D)</div>
+                                <hr style="margin:8px 0; border:none; border-top: 1px solid #EAEAEA;" />
+                                <div class="card-metrics" style="line-height: 1.8;">
+                                    <strong>High:</strong> {ima_d_h} <br>
+                                    <strong>Medium:</strong> {ima_d_m} <br>
+                                    <strong>Low:</strong> {ima_d_l}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with i3:
+                        st.markdown(f"""
+                            <div class="assessment-card border-orange" style="height: 100%;">
+                                <div class="card-title">IMA CoD Left</div>
+                                <hr style="margin:8px 0; border:none; border-top: 1px solid #EAEAEA;" />
+                                <div class="card-metrics" style="line-height: 1.8;">
+                                    <strong>High:</strong> {ima_cl_h} <br>
+                                    <strong>Medium:</strong> {ima_cl_m} <br>
+                                    <strong>Low:</strong> {ima_cl_l}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with i4:
+                        st.markdown(f"""
+                            <div class="assessment-card border-orange" style="height: 100%;">
+                                <div class="card-title">IMA CoD Right</div>
+                                <hr style="margin:8px 0; border:none; border-top: 1px solid #EAEAEA;" />
+                                <div class="card-metrics" style="line-height: 1.8;">
+                                    <strong>High:</strong> {ima_cr_h} <br>
+                                    <strong>Medium:</strong> {ima_cr_m} <br>
+                                    <strong>Low:</strong> {ima_cr_l}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    with st.expander("View Daily Practice Log"):
+                        if not p_practice.empty:
+                            pract_log = p_practice.copy()
+                            if 'Date' in pract_log.columns:
+                                pract_log['Date'] = pract_log['Date'].dt.strftime('%b %d, %Y')
+                            
+                            # Shift Name and Date to front if present
+                            front = [c for c in ['Player Name', 'Date'] if c in pract_log.columns]
+                            back = [c for c in pract_log.columns if c not in front]
+                            st.dataframe(pract_log[front + back], use_container_width=True, hide_index=True)
+                        else:
+                            st.info("No detailed practice entries for this window.")
+
 
             # =========================================================================
             # TESTING
