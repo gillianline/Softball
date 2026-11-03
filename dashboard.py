@@ -915,95 +915,143 @@ if check_password():
                 st.markdown('<div class="section-header">Player Practice Score Cards</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
                 
+                # Get the filtered data based on global dates
                 team_practice = filter_season(practice_df).copy() if not practice_df.empty else pd.DataFrame()
+                team_s = filter_season(swing_df).copy() if not swing_df.empty else pd.DataFrame()
+                team_t = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
 
                 if team_practice.empty:
                     st.info("No practice data available for the selected date range.")
                 else:
-                    players_with_practice = sorted(team_practice['Player Name'].dropna().unique())
-                    p_cols = st.columns(3, gap="medium")
+                    # 1. Create a session dropdown based on Date and Activity
+                    if 'Activity' not in team_practice.columns:
+                        team_practice['Activity'] = "Practice"
+                        
+                    temp_dates = team_practice.dropna(subset=['Date']).copy()
+                    temp_dates['Session_Label'] = temp_dates['Date'].dt.strftime('%b %d, %Y') + " | " + temp_dates['Activity'].astype(str)
                     
-                    for idx, player in enumerate(players_with_practice):
-                        p_data = team_practice[team_practice['Player Name'] == player]
+                    # Get unique sessions and sort newest first
+                    unique_sessions = temp_dates[['Date', 'Activity', 'Session_Label']].drop_duplicates().sort_values('Date', ascending=False)
+                    
+                    if unique_sessions.empty:
+                        st.warning("No valid dates found in practice data.")
+                    else:
+                        selected_session_label = st.selectbox("Select Practice Session:", unique_sessions['Session_Label'].tolist())
                         
-                        # Total Aggregations
-                        tot_dist = p_data['Total Distance (y)'].sum() if 'Total Distance (y)' in p_data.columns else 0
-                        max_v = p_data['Maximum Velocity (mph)'].max() if 'Maximum Velocity (mph)' in p_data.columns else 0
-                        if pd.isna(max_v): max_v = 0
+                        # Filter to the specific day chosen
+                        sel_date = unique_sessions[unique_sessions['Session_Label'] == selected_session_label].iloc[0]['Date']
                         
-                        def s(col):
-                            return int(p_data[col].sum()) if col in p_data.columns else 0
+                        day_practice = team_practice[team_practice['Date'] == sel_date]
+                        day_swing = team_s[team_s['Date'] == sel_date] if not team_s.empty else pd.DataFrame()
+                        day_throw = team_t[team_t['Date'] == sel_date] if not team_t.empty else pd.DataFrame()
+                        
+                        players_with_practice = sorted(day_practice['Player Name'].dropna().unique())
+                        
+                        if not players_with_practice:
+                            st.info("No player data for this specific session.")
+                        else:
+                            p_cols = st.columns(3, gap="medium")
                             
-                        ah, am, al = s('IMA Accel High'), s('IMA Accel Medium'), s('IMA Accel Low')
-                        dh, dm, dl = s('IMA Decel High'), s('IMA Decel Medium'), s('IMA Decel Low')
-                        clh, clm, cll = s('IMA CoD Left High'), s('IMA CoD Left Medium'), s('IMA CoD Left Low')
-                        crh, crm, crl = s('IMA CoD Right High'), s('IMA CoD Right Medium'), s('IMA CoD Right Low')
-
-                        p_key = str(player).strip().lower()
-                        photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
-                        
-                        pract_card_html = f"""
-                        <div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #2F80ED; overflow: hidden; margin-bottom: 20px; height: auto;'>
-                            <div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'>
-                                <img src='{photo_url}' style='width: 60px; height: 60px; box-sizing: border-box; padding: 4px; border-radius: 50%; object-fit: cover; border: 2px solid #2F80ED; margin-right: 15px; background: white;'>
-                                <div>
-                                    <h3 style='margin: 0; color: #1D1D1F; font-size: 18px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3>
-                                    <p style='margin: 2px 0 0 0; color: #6C757D; font-size: 10.5px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Practice Score</p>
+                            for idx, player in enumerate(players_with_practice):
+                                p_data = day_practice[day_practice['Player Name'] == player]
+                                s_data = day_swing[day_swing['Player Name'] == player] if not day_swing.empty else pd.DataFrame()
+                                t_data = day_throw[day_throw['Player Name'] == player] if not day_throw.empty else pd.DataFrame()
+                                
+                                # Distance & Catapult PL
+                                dist = p_data['Total Distance (y)'].sum() if 'Total Distance (y)' in p_data.columns else 0
+                                cat_pl = p_data['Total Player Load'].sum() if 'Total Player Load' in p_data.columns else 0
+                                
+                                # Swings & Throws
+                                swings = s_data['Swing Count'].sum() if 'Swing Count' in s_data.columns else 0
+                                throws = t_data['Total Throw Count'].sum() if 'Total Throw Count' in t_data.columns else 0
+                                
+                                # Swing/Throw Player Load
+                                swing_pl = s_data['Sum Swing Max Player Load'].sum() if 'Sum Swing Max Player Load' in s_data.columns else 0
+                                throw_pl = t_data['Total Throw Player Load'].sum() if 'Total Throw Player Load' in t_data.columns else 0
+                                
+                                # IMAs Combined (High + Med + Low)
+                                def s_ima(cols):
+                                    valid_cols = [c for c in cols if c in p_data.columns]
+                                    return p_data[valid_cols].sum().sum() if valid_cols else 0
+                                
+                                ima_a = s_ima(['IMA Accel High', 'IMA Accel Medium', 'IMA Accel Low'])
+                                ima_d = s_ima(['IMA Decel High', 'IMA Decel Medium', 'IMA Decel Low'])
+                                ima_cl = s_ima(['IMA CoD Left High', 'IMA CoD Left Medium', 'IMA CoD Left Low'])
+                                ima_cr = s_ima(['IMA CoD Right High', 'IMA CoD Right Medium', 'IMA CoD Right Low'])
+                                
+                                # CALCULATE COMBINED PRACTICE SCORE
+                                practice_score = dist + cat_pl + swings + throws + swing_pl + throw_pl + ima_a + ima_d + ima_cl + ima_cr
+                                
+                                p_key = str(player).strip().lower()
+                                photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
+                                
+                                pract_card_html = f"""
+                                <div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #10B981; overflow: hidden; margin-bottom: 20px; height: auto;'>
+                                    <div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0;'>
+                                        <div style='display: flex; align-items: center;'>
+                                            <img src='{photo_url}' style='width: 55px; height: 55px; box-sizing: border-box; padding: 3px; border-radius: 50%; object-fit: cover; border: 2px solid #10B981; margin-right: 12px; background: white;'>
+                                            <div>
+                                                <h3 style='margin: 0; color: #1D1D1F; font-size: 16px; font-weight: 800; letter-spacing: -0.2px;'>{player}</h3>
+                                                <p style='margin: 2px 0 0 0; color: #6C757D; font-size: 10px; text-transform: uppercase; font-weight: 700;'>Practice Score</p>
+                                            </div>
+                                        </div>
+                                        <div style='text-align: right;'>
+                                            <div style='font-size: 24px; color: #10B981; font-weight: 900; letter-spacing: -0.5px;'>{practice_score:,.0f}</div>
+                                        </div>
+                                    </div>
+                                    <div style='padding: 10px 12px; display: flex; justify-content: space-between; background-color: #FAFAFA; border-bottom: 1px solid #E2E8F0;'>
+                                        <div style='text-align: center; width: 33%;'>
+                                            <div style='font-size: 9.5px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Dist (y)</div>
+                                            <div style='font-size: 15px; color: #1D1D1F; font-weight: 800;'>{dist:,.0f}</div>
+                                        </div>
+                                        <div style='text-align: center; width: 33%; border-left: 1px solid #E2E8F0; border-right: 1px solid #E2E8F0;'>
+                                            <div style='font-size: 9.5px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Swings</div>
+                                            <div style='font-size: 15px; color: #1D1D1F; font-weight: 800;'>{swings:,.0f}</div>
+                                        </div>
+                                        <div style='text-align: center; width: 33%;'>
+                                            <div style='font-size: 9.5px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Throws</div>
+                                            <div style='font-size: 15px; color: #1D1D1F; font-weight: 800;'>{throws:,.0f}</div>
+                                        </div>
+                                    </div>
+                                    <div style='padding: 10px 12px; display: flex; justify-content: space-between; background-color: #FFFFFF; border-bottom: 1px solid #E2E8F0;'>
+                                        <div style='text-align: center; width: 33%;'>
+                                            <div style='font-size: 9.5px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Cat PL</div>
+                                            <div style='font-size: 14px; color: #2F80ED; font-weight: 800;'>{cat_pl:,.1f}</div>
+                                        </div>
+                                        <div style='text-align: center; width: 33%; border-left: 1px solid #E2E8F0; border-right: 1px solid #E2E8F0;'>
+                                            <div style='font-size: 9.5px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Swing PL</div>
+                                            <div style='font-size: 14px; color: #FF8200; font-weight: 800;'>{swing_pl:,.1f}</div>
+                                        </div>
+                                        <div style='text-align: center; width: 33%;'>
+                                            <div style='font-size: 9.5px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Throw PL</div>
+                                            <div style='font-size: 14px; color: #EF4444; font-weight: 800;'>{throw_pl:,.1f}</div>
+                                        </div>
+                                    </div>
+                                    <div style='padding: 10px 15px;'>
+                                        <div style='font-size: 10px; color: #475569; text-transform: uppercase; font-weight: 800; margin-bottom: 6px; text-align: center;'>Combined IMA Breakdown</div>
+                                        <div style='display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;'>
+                                            <div style='background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; width: 45%; text-align: center;'>
+                                                <span style='font-size: 9.5px; color: #6C757D; font-weight: 700; display: block;'>Accel (A)</span>
+                                                <span style='font-size: 13px; color: #1D1D1F; font-weight: 800;'>{ima_a:,.0f}</span>
+                                            </div>
+                                            <div style='background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; width: 45%; text-align: center;'>
+                                                <span style='font-size: 9.5px; color: #6C757D; font-weight: 700; display: block;'>Decel (D)</span>
+                                                <span style='font-size: 13px; color: #1D1D1F; font-weight: 800;'>{ima_d:,.0f}</span>
+                                            </div>
+                                            <div style='background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; width: 45%; text-align: center;'>
+                                                <span style='font-size: 9.5px; color: #6C757D; font-weight: 700; display: block;'>CoD Left</span>
+                                                <span style='font-size: 13px; color: #1D1D1F; font-weight: 800;'>{ima_cl:,.0f}</span>
+                                            </div>
+                                            <div style='background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 8px; width: 45%; text-align: center;'>
+                                                <span style='font-size: 9.5px; color: #6C757D; font-weight: 700; display: block;'>CoD Right</span>
+                                                <span style='font-size: 13px; color: #1D1D1F; font-weight: 800;'>{ima_cr:,.0f}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div style='padding: 12px; display: flex; justify-content: space-around; background-color: #FAFAFA; border-bottom: 1px solid #E2E8F0;'>
-                                <div style='text-align: center;'>
-                                    <div style='font-size: 10px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Total Dist (y)</div>
-                                    <div style='font-size: 17px; color: #2F80ED; font-weight: 800;'>{tot_dist:,.0f}</div>
-                                </div>
-                                <div style='text-align: center;'>
-                                    <div style='font-size: 10px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Max Vel (mph)</div>
-                                    <div style='font-size: 17px; color: #FF8200; font-weight: 800;'>{max_v:.1f}</div>
-                                </div>
-                            </div>
-                            <div style='padding: 10px 15px 15px 15px;'>
-                                <table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 12.5px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>
-                                    <thead>
-                                        <tr style='color: #475569; font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #E2E8F0;'>
-                                            <th style='padding: 6px 4px; text-align: left;'>IMA Move</th>
-                                            <th style='padding: 6px 4px; color: #EF4444;'>High</th>
-                                            <th style='padding: 6px 4px; color: #F59E0B;'>Med</th>
-                                            <th style='padding: 6px 4px; color: #10B981;'>Low</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr style='border-bottom: 1px solid #F1F5F9;'>
-                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>Accel (A)</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{ah}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{am}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{al}</td>
-                                        </tr>
-                                        <tr style='border-bottom: 1px solid #F1F5F9;'>
-                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>Decel (D)</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{dh}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{dm}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{dl}</td>
-                                        </tr>
-                                        <tr style='border-bottom: 1px solid #F1F5F9;'>
-                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>CoD Left</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{clh}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{clm}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{cll}</td>
-                                        </tr>
-                                        <tr>
-                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>CoD Right</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{crh}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{crm}</td>
-                                            <td style='padding: 8px 4px; font-weight: 600;'>{crl}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        """
-                        with p_cols[idx % 3]:
-                            st.markdown(pract_card_html, unsafe_allow_html=True)
-
+                                """
+                                with p_cols[idx % 3]:
+                                    st.markdown(pract_card_html, unsafe_allow_html=True)
 
             # =========================================================================
             # REPORT PAGE (SWINGS VS THROWS)
