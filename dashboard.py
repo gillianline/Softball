@@ -661,7 +661,7 @@ if check_password():
         # --- 6. CONDITIONAL NAVIGATION TAB RENDERING ---
         
         if view_mode == "Team Overview":
-            tab_team_summary, tab_player_cards, tab_report, tab_team_tests = st.tabs(["TEAM SUMMARY", "PLAYER THROW CARDS", "VOLUME REPORT", "TEAM TESTS"])
+            tab_team_summary, tab_player_cards, tab_practice_cards, tab_report, tab_team_tests = st.tabs(["TEAM SUMMARY", "PLAYER THROW CARDS", "PRACTICE CARDS", "VOLUME REPORT", "TEAM TESTS"])
 
             # =========================================================================
             # TEAM SUMMARY (CATAPULT AGGREGATED ROSTER VIEW)
@@ -826,8 +826,9 @@ if check_password():
                         mime='text/csv'
                     )
 
+
             # =========================================================================
-            # TAB 6: PLAYER CARDS (DAILY THROW BREAKDOWN)
+            # PLAYER CARDS (DAILY THROW BREAKDOWN)
             # =========================================================================
             with tab_player_cards:
                 st.markdown('<div class="section-header">Player Throwing Cards</div>', unsafe_allow_html=True)
@@ -840,7 +841,6 @@ if check_password():
                 else:
                     players_with_throws = sorted(team_throw_cards['Player Name'].dropna().unique())
                     
-                    # Calculate team-wide threshold for "Significant Volume" (Top 25% of throwers)
                     t_count_col_global = find_col(team_throw_cards, ['Total Throw Count'])
                     if t_count_col_global:
                         player_totals = team_throw_cards.groupby('Player Name')[t_count_col_global].sum()
@@ -902,27 +902,105 @@ if check_password():
                         with cols[idx % 3]:
                             st.markdown(card_html, unsafe_allow_html=True)
 
-                # --- TEAM THROWING SUMMARY TABLE AT THE BOTTOM ---
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<div class="section-header">Team Throwing Summary Roster</div>', unsafe_allow_html=True)
+
+            # =========================================================================
+            # PRACTICE CARDS (TEAM-WIDE VIEW)
+            # =========================================================================
+            with tab_practice_cards:
+                st.markdown('<div class="section-header">Player Practice Score Cards</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+                
+                team_practice = filter_season(practice_df).copy() if not practice_df.empty else pd.DataFrame()
 
-                summary_rows = []
-                for player in players_with_throws:
-                    p_data = team_throw_cards[team_throw_cards['Player Name'] == player]
-                    t_cnt = p_data[t_count_col_global].sum() if t_count_col_global else 0
-                    t_pl3 = p_data['Total Throw Count - Player Load 3'].sum() if 'Total Throw Count - Player Load 3' in p_data.columns else 0
-                    t_rb3 = p_data['Total Throw Count - Rotation Band 3'].sum() if 'Total Throw Count - Rotation Band 3' in p_data.columns else 0
+                if team_practice.empty:
+                    st.info("No practice data available for the selected date range.")
+                else:
+                    players_with_practice = sorted(team_practice['Player Name'].dropna().unique())
+                    p_cols = st.columns(3, gap="medium")
                     
-                    summary_rows.append({
-                        'Player Name': player,
-                        'Total Throws': int(t_cnt),
-                        'Band 3 Player Load': int(t_pl3),
-                        'Band 3 Rotation': int(t_rb3)
-                    })
+                    for idx, player in enumerate(players_with_practice):
+                        p_data = team_practice[team_practice['Player Name'] == player]
+                        
+                        # Total Aggregations
+                        tot_dist = p_data['Total Distance (y)'].sum() if 'Total Distance (y)' in p_data.columns else 0
+                        max_v = p_data['Maximum Velocity (mph)'].max() if 'Maximum Velocity (mph)' in p_data.columns else 0
+                        if pd.isna(max_v): max_v = 0
+                        
+                        def s(col):
+                            return int(p_data[col].sum()) if col in p_data.columns else 0
+                            
+                        ah, am, al = s('IMA Accel High'), s('IMA Accel Medium'), s('IMA Accel Low')
+                        dh, dm, dl = s('IMA Decel High'), s('IMA Decel Medium'), s('IMA Decel Low')
+                        clh, clm, cll = s('IMA CoD Left High'), s('IMA CoD Left Medium'), s('IMA CoD Left Low')
+                        crh, crm, crl = s('IMA CoD Right High'), s('IMA CoD Right Medium'), s('IMA CoD Right Low')
 
-                summary_df = pd.DataFrame(summary_rows).sort_values(by='Total Throws', ascending=False)
-                st.markdown(render_styled_team_table(summary_df), unsafe_allow_html=True)
+                        p_key = str(player).strip().lower()
+                        photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
+                        
+                        pract_card_html = f"""
+                        <div style='background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid #2F80ED; overflow: hidden; margin-bottom: 20px; height: auto;'>
+                            <div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'>
+                                <img src='{photo_url}' style='width: 60px; height: 60px; box-sizing: border-box; padding: 4px; border-radius: 50%; object-fit: cover; border: 2px solid #2F80ED; margin-right: 15px; background: white;'>
+                                <div>
+                                    <h3 style='margin: 0; color: #1D1D1F; font-size: 18px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3>
+                                    <p style='margin: 2px 0 0 0; color: #6C757D; font-size: 10.5px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Practice Score</p>
+                                </div>
+                            </div>
+                            
+                            <div style='padding: 12px; display: flex; justify-content: space-around; background-color: #FAFAFA; border-bottom: 1px solid #E2E8F0;'>
+                                <div style='text-align: center;'>
+                                    <div style='font-size: 10px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Total Dist (y)</div>
+                                    <div style='font-size: 17px; color: #2F80ED; font-weight: 800;'>{tot_dist:,.0f}</div>
+                                </div>
+                                <div style='text-align: center;'>
+                                    <div style='font-size: 10px; color: #6C757D; text-transform: uppercase; font-weight: 700;'>Max Vel (mph)</div>
+                                    <div style='font-size: 17px; color: #FF8200; font-weight: 800;'>{max_v:.1f}</div>
+                                </div>
+                            </div>
+                            
+                            <div style='padding: 10px 15px 15px 15px;'>
+                                <table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 12.5px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>
+                                    <thead>
+                                        <tr style='color: #475569; font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #E2E8F0;'>
+                                            <th style='padding: 6px 4px; text-align: left;'>IMA Move</th>
+                                            <th style='padding: 6px 4px; color: #EF4444;'>High</th>
+                                            <th style='padding: 6px 4px; color: #F59E0B;'>Med</th>
+                                            <th style='padding: 6px 4px; color: #10B981;'>Low</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr style='border-bottom: 1px solid #F1F5F9;'>
+                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>Accel (A)</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{ah}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{am}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{al}</td>
+                                        </tr>
+                                        <tr style='border-bottom: 1px solid #F1F5F9;'>
+                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>Decel (D)</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{dh}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{dm}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{dl}</td>
+                                        </tr>
+                                        <tr style='border-bottom: 1px solid #F1F5F9;'>
+                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>CoD Left</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{clh}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{clm}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{cll}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style='padding: 8px 4px; text-align: left; font-weight: 700; color: #1D1D1F;'>CoD Right</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{crh}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{crm}</td>
+                                            <td style='padding: 8px 4px; font-weight: 600;'>{crl}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        """
+                        with p_cols[idx % 3]:
+                            st.markdown(pract_card_html, unsafe_allow_html=True)
+
 
             # =========================================================================
             # REPORT PAGE (SWINGS VS THROWS)
@@ -1412,7 +1490,7 @@ if check_password():
 
 
             # =========================================================================
-            # PRACTICE SCORE CARD (NEW INTEGRATION)
+            # PRACTICE SCORE CARD (INDIVIDUAL DRILLDOWN)
             # =========================================================================
             with tab_practice:
                 st.markdown('<div class="section-header">Practice Score Card</div>', unsafe_allow_html=True)
@@ -1421,7 +1499,6 @@ if check_password():
                 if p_practice.empty and p_swing.empty and p_throw.empty:
                     st.info("No practice data available for the selected date range.")
                 else:
-                    # Totals
                     total_swings = p_swing['Swing Count'].sum() if not p_swing.empty and 'Swing Count' in p_swing.columns else 0
                     total_throws = p_throw['Total Throw Count'].sum() if not p_throw.empty and 'Total Throw Count' in p_throw.columns else 0
                     total_distance = p_practice['Total Distance (y)'].sum() if not p_practice.empty and 'Total Distance (y)' in p_practice.columns else 0
@@ -1455,7 +1532,6 @@ if check_password():
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.markdown('<div class="sub-header-title">IMA Movement Breakdown</div>', unsafe_allow_html=True)
 
-                    # Extract IMA Sums safely
                     def get_pract_sum(col_name):
                         return int(p_practice[col_name].sum()) if not p_practice.empty and col_name in p_practice.columns else 0
 
@@ -1522,7 +1598,6 @@ if check_password():
                             if 'Date' in pract_log.columns:
                                 pract_log['Date'] = pract_log['Date'].dt.strftime('%b %d, %Y')
                             
-                            # Shift Name and Date to front if present
                             front = [c for c in ['Player Name', 'Date'] if c in pract_log.columns]
                             back = [c for c in pract_log.columns if c not in front]
                             st.dataframe(pract_log[front + back], use_container_width=True, hide_index=True)
