@@ -1000,66 +1000,18 @@ if check_password():
                                     grade = min(100, int(round((m['today'] / m['max']) * 100))) if m['today'] > 0 else 0
                                     total_grade += grade
                                     bg_color = "#FFFFFF" if i % 2 == 0 else "#FAFAFA"
-                                    
-                                    # Format floats for PL/Distance, Ints for counts
                                     val_str = f"{m['today']:.1f}" if "PL" in m['name'] or "Distance" in m['name'] else f"{int(m['today'])}"
                                     max_str = f"{m['max']:.1f}" if "PL" in m['name'] or "Distance" in m['name'] else f"{int(m['max'])}"
                                     
-                                    rows_html += f"""
-                                    <tr style='background-color: {bg_color}; border-bottom: 1px solid #F1F5F9;'>
-                                        <td style='padding: 8px 12px; text-align: left; font-size: 13px; color: #1D1D1F;'>{m['name']}</td>
-                                        <td style='padding: 8px 12px; font-weight: 800; font-size: 13px; background-color: rgba(255, 130, 0, 0.15);'>{val_str}</td>
-                                        <td style='padding: 8px 12px; color: #475569; font-size: 13px;'>{max_str}</td>
-                                        <td style='padding: 8px 12px; font-weight: 700; color: #1D1D1F; font-size: 13px;'>{grade}</td>
-                                    </tr>
-                                    """
+                                    rows_html += f"<tr style='background-color: {bg_color}; border-bottom: 1px solid #F1F5F9;'><td style='padding: 8px 12px; text-align: left; font-size: 13px; color: #1D1D1F;'>{m['name']}</td><td style='padding: 8px 12px; font-weight: 800; font-size: 13px; background-color: rgba(255, 130, 0, 0.15);'>{val_str}</td><td style='padding: 8px 12px; color: #475569; font-size: 13px;'>{max_str}</td><td style='padding: 8px 12px; font-weight: 700; color: #1D1D1F; font-size: 13px;'>{grade}</td></tr>"
                                 
                                 session_score = int(round(total_grade / len(metrics)))
                                 
                                 p_key = str(player).strip().lower()
                                 photo_url = photo_dict.get(p_key, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
                                 
-                                pract_card_html = f"""
-                                <div style='background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #EAEAEA; overflow: hidden; margin-bottom: 20px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>
-                                    
-                                    <div style='background: #F8FAFC; padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'>
-                                        <img src='{photo_url}' style='width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #2F80ED; margin-right: 12px; background: white;'>
-                                        <h3 style='margin: 0; color: #1D1D1F; font-size: 16px; font-weight: 800;'>{player}</h3>
-                                    </div>
-                                    
-                                    <div style='display: flex; flex-direction: row; align-items: stretch;'>
-                                        
-                                        <!-- Table Section (70%) -->
-                                        <div style='flex: 7; border-right: 1px solid #E2E8F0;'>
-                                            <table style='width: 100%; border-collapse: collapse; text-align: center;'>
-                                                <thead>
-                                                    <tr style='background-color: #4895DB; color: white;'>
-                                                        <th style='padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase;'>Metric</th>
-                                                        <th style='padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;'>Today Total</th>
-                                                        <th style='padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;'>30D Max</th>
-                                                        <th style='padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;'>Grade</th>
-                                                    </tr>
-                                                    <tr style='height: 3px; background-color: #FF8200;'><td colspan='4' style='padding:0;'></td></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {rows_html}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        
-                                        <!-- Score Section (30%) -->
-                                        <div style='flex: 3; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; background-color: #FFFFFF;'>
-                                            <div style='background-color: #2D5A27; color: white; border-radius: 12px; width: 100px; height: 75px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
-                                                <span style='font-size: 38px; font-weight: 900; line-height: 1;'>{session_score}</span>
-                                            </div>
-                                            <div style='margin-top: 12px; font-size: 12px; font-weight: 900; color: #6C757D; text-transform: uppercase; letter-spacing: 0.5px;'>
-                                                Session Score
-                                            </div>
-                                        </div>
-                                        
-                                    </div>
-                                </div>
-                                """
+                                pract_card_html = f"<div style='background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #EAEAEA; overflow: hidden; margin-bottom: 20px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><div style='background: #F8FAFC; padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url}' style='width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #2F80ED; margin-right: 12px; background: white;'><h3 style='margin: 0; color: #1D1D1F; font-size: 16px; font-weight: 800;'>{player}</h3></div><div style='display: flex; flex-direction: row; align-items: stretch;'><div style='flex: 7; border-right: 1px solid #E2E8F0;'><table style='width: 100%; border-collapse: collapse; text-align: center;'><thead><tr style='background-color: #4895DB; color: white;'><th style='padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase;'>Metric</th><th style='padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;'>Today Total</th><th style='padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;'>30D Max</th><th style='padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;'>Grade</th></tr><tr style='height: 3px; background-color: #FF8200;'><td colspan='4' style='padding:0;'></td></tr></thead><tbody>{rows_html}</tbody></table></div><div style='flex: 3; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; background-color: #FFFFFF;'><div style='background-color: #2D5A27; color: white; border-radius: 12px; width: 100px; height: 75px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'><span style='font-size: 38px; font-weight: 900; line-height: 1;'>{session_score}</span></div><div style='margin-top: 12px; font-size: 12px; font-weight: 900; color: #6C757D; text-transform: uppercase; letter-spacing: 0.5px;'>Session Score</div></div></div></div>"
+                                
                                 with p_cols[idx % 2]:
                                     st.markdown(pract_card_html, unsafe_allow_html=True)
 
