@@ -965,21 +965,38 @@ if check_password():
                                 hist_s = swing_df[(swing_df['Player Name'] == player) & (swing_df['Date'] <= sel_date) & (swing_df['Date'] >= date_30_days_ago)] if not swing_df.empty else pd.DataFrame()
                                 hist_t = throw_df[(throw_df['Player Name'] == player) & (throw_df['Date'] <= sel_date) & (throw_df['Date'] >= date_30_days_ago)] if not throw_df.empty else pd.DataFrame()
                                 
-                                # Helper to get 30D Max for a daily sum
+                                # Helper to get 30D Max for a single dataset
                                 def get_30d_max(df, cols):
-                                    if df.empty: return 1 # Avoid division by zero
+                                    if df.empty: return 1 
                                     valid_cols = [c for c in cols if c in df.columns]
                                     if not valid_cols: return 1
                                     daily_totals = df.groupby('Date')[valid_cols].sum().sum(axis=1)
                                     max_val = daily_totals.max()
                                     return max_val if max_val > 0 else 1
 
+                                # Helper to extract daily series for combined max calculations
+                                def get_daily_series(df, cols):
+                                    if df.empty: return pd.Series(dtype=float)
+                                    valid_cols = [c for c in cols if c in df.columns]
+                                    if not valid_cols: return pd.Series(dtype=float)
+                                    return df.groupby('Date')[valid_cols].sum().sum(axis=1)
+
                                 def get_today_sum(df, cols):
                                     valid_cols = [c for c in cols if c in df.columns]
                                     return df[valid_cols].sum().sum() if valid_cols else 0
 
-                                # Calculate Today & 30D Max
+                                # 1. Calculate Combined Player Load (Today & 30D Max)
+                                today_pl = get_today_sum(p_data, ['Total Player Load']) + get_today_sum(s_data, ['Sum Swing Max Player Load']) + get_today_sum(t_data, ['Total Throw Player Load'])
+                                
+                                p_series = get_daily_series(hist_p, ['Total Player Load'])
+                                s_series = get_daily_series(hist_s, ['Sum Swing Max Player Load'])
+                                t_series = get_daily_series(hist_t, ['Total Throw Player Load'])
+                                combined_pl_series = pd.concat([p_series, s_series, t_series], axis=1).sum(axis=1)
+                                max_pl = combined_pl_series.max() if not combined_pl_series.empty and combined_pl_series.max() > 0 else 1
+
+                                # 2. Set Up the Final Metrics List
                                 metrics = [
+                                    {"name": "Player Load", "today": today_pl, "max": max_pl},
                                     {"name": "Total Throws", "today": get_today_sum(t_data, ['Total Throw Count']), "max": get_30d_max(hist_t, ['Total Throw Count'])},
                                     {"name": "Total Swings", "today": get_today_sum(s_data, ['Swing Count']), "max": get_30d_max(hist_s, ['Swing Count'])},
                                     {"name": "Distance (y)", "today": get_today_sum(p_data, ['Total Distance (y)']), "max": get_30d_max(hist_p, ['Total Distance (y)'])},
@@ -987,9 +1004,6 @@ if check_password():
                                     {"name": "IMA Decel", "today": get_today_sum(p_data, ['IMA Decel High', 'IMA Decel Medium', 'IMA Decel Low']), "max": get_30d_max(hist_p, ['IMA Decel High', 'IMA Decel Medium', 'IMA Decel Low'])},
                                     {"name": "IMA CoD L", "today": get_today_sum(p_data, ['IMA CoD Left High', 'IMA CoD Left Medium', 'IMA CoD Left Low']), "max": get_30d_max(hist_p, ['IMA CoD Left High', 'IMA CoD Left Medium', 'IMA CoD Left Low'])},
                                     {"name": "IMA CoD R", "today": get_today_sum(p_data, ['IMA CoD Right High', 'IMA CoD Right Medium', 'IMA CoD Right Low']), "max": get_30d_max(hist_p, ['IMA CoD Right High', 'IMA CoD Right Medium', 'IMA CoD Right Low'])},
-                                    {"name": "Total PL", "today": get_today_sum(p_data, ['Total Player Load']), "max": get_30d_max(hist_p, ['Total Player Load'])},
-                                    {"name": "Swing PL", "today": get_today_sum(s_data, ['Sum Swing Max Player Load']), "max": get_30d_max(hist_s, ['Sum Swing Max Player Load'])},
-                                    {"name": "Throw PL", "today": get_today_sum(t_data, ['Total Throw Player Load']), "max": get_30d_max(hist_t, ['Total Throw Player Load'])},
                                 ]
 
                                 # Generate HTML Rows and Final Score
@@ -1000,8 +1014,8 @@ if check_password():
                                     grade = min(100, int(round((m['today'] / m['max']) * 100))) if m['today'] > 0 else 0
                                     total_grade += grade
                                     bg_color = "#FFFFFF" if i % 2 == 0 else "#FAFAFA"
-                                    val_str = f"{m['today']:.1f}" if "PL" in m['name'] or "Distance" in m['name'] else f"{int(m['today'])}"
-                                    max_str = f"{m['max']:.1f}" if "PL" in m['name'] or "Distance" in m['name'] else f"{int(m['max'])}"
+                                    val_str = f"{m['today']:.1f}" if "PL" in m['name'] or "Distance" in m['name'] or "Player Load" in m['name'] else f"{int(m['today'])}"
+                                    max_str = f"{m['max']:.1f}" if "PL" in m['name'] or "Distance" in m['name'] or "Player Load" in m['name'] else f"{int(m['max'])}"
                                     
                                     rows_html += f"<tr style='background-color: {bg_color}; border-bottom: 1px solid #F1F5F9;'><td style='padding: 8px 12px; text-align: left; font-size: 13px; color: #1D1D1F;'>{m['name']}</td><td style='padding: 8px 12px; font-weight: 800; font-size: 13px; background-color: rgba(255, 130, 0, 0.15);'>{val_str}</td><td style='padding: 8px 12px; color: #475569; font-size: 13px;'>{max_str}</td><td style='padding: 8px 12px; font-weight: 700; color: #1D1D1F; font-size: 13px;'>{grade}</td></tr>"
                                 
@@ -1014,7 +1028,6 @@ if check_password():
                                 
                                 with p_cols[idx % 2]:
                                     st.markdown(pract_card_html, unsafe_allow_html=True)
-
             # =========================================================================
             # REPORT PAGE (SWINGS VS THROWS)
             # =========================================================================
