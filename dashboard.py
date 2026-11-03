@@ -264,7 +264,12 @@ if check_password():
                     df = pd.read_csv(st.secrets[secret_key])
                     df.columns = df.columns.str.strip()
                     if 'Date' in df.columns:
-                        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                        # 1. Force to string, strip hidden spaces, and drop any timestamps
+                        df['Date'] = df['Date'].astype(str).str.strip().str.split(' ').str[0]
+                        # 2. Explicitly tell Pandas to read it as MM/DD/YYYY
+                        parsed_dates = pd.to_datetime(df['Date'], format='%m/%d/%Y', errors='coerce')
+                        # 3. Fallback to generic parsing if there are other formats mixed in
+                        df['Date'] = parsed_dates.fillna(pd.to_datetime(df['Date'], errors='coerce'))
                     return df
                 except Exception:
                     return pd.DataFrame()
