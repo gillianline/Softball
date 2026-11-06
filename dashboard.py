@@ -842,7 +842,7 @@ if check_password():
             # =========================================================================
             # PLAYER CARDS (DAILY THROW BREAKDOWN)
             # =========================================================================
-            with tab_player_cards:
+            with tab_throw_cards:
                 st.markdown('<div class="section-header">Player Throwing Cards</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
