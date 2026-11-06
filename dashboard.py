@@ -666,7 +666,14 @@ if check_password():
         # --- 6. CONDITIONAL NAVIGATION TAB RENDERING ---
         
         if view_mode == "Team Overview":
-            tab_team_summary, tab_player_cards, tab_practice_cards, tab_report, tab_team_tests = st.tabs(["TEAM SUMMARY", "PLAYER THROW CARDS", "PRACTICE CARDS", "VOLUME REPORT", "TEAM TESTS"])
+            tab_team_summary, tab_throw_cards, tab_swing_cards, tab_practice_cards, tab_report, tab_team_tests = st.tabs([
+                "TEAM SUMMARY", 
+                "PLAYER THROW CARDS", 
+                "PLAYER SWING CARDS", 
+                "PRACTICE CARDS", 
+                "VOLUME REPORT", 
+                "TEAM TESTS"
+            ])
 
             # =========================================================================
             # TEAM SUMMARY (CATAPULT AGGREGATED ROSTER VIEW)
@@ -907,6 +914,81 @@ if check_password():
                         with cols[idx % 3]:
                             st.markdown(card_html, unsafe_allow_html=True)
 
+            # =========================================================================
+            # PLAYER SWING CARDS (DAILY SWING BREAKDOWN)
+            # =========================================================================
+            with tab_swing_cards:
+                st.markdown('<div class="section-header">Player Swing Cards</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                team_swing_cards = filter_season(swing_df).copy() if not swing_df.empty else pd.DataFrame()
+
+                if team_swing_cards.empty:
+                    st.info("No swing data available for the selected date range.")
+                else:
+                    players_with_swings = sorted(team_swing_cards['Player Name'].dropna().unique())
+                    
+                    s_count_col_global = find_col(team_swing_cards, ['Swing Count'])
+                    if s_count_col_global:
+                        player_totals_s = team_swing_cards.groupby('Player Name')[s_count_col_global].sum()
+                        significant_threshold_s = player_totals_s.quantile(0.75) if len(player_totals_s) > 3 else 0
+                    else:
+                        significant_threshold_s = float('inf')
+                    
+                    s_cols = st.columns(3, gap="medium")
+
+                    for idx, player in enumerate(players_with_swings):
+                        player_data_s = team_swing_cards[team_swing_cards['Player Name'] == player].sort_values('Date')
+                        if player_data_s.empty:
+                            continue
+                            
+                        s_count_col = find_col(player_data_s, ['Swing Count'])
+                        s_pl3_col = find_col(player_data_s, ['Swing Max PL Band 3 Count'])
+                        s_rb3_col = find_col(player_data_s, ['Swing Max Rotation Band 3 Count'])
+                        
+                        sum_tot_s = player_data_s[s_count_col].sum() if s_count_col else 0
+                        sum_pl3_s = player_data_s[s_pl3_col].sum() if s_pl3_col else 0
+                        sum_rb3_s = player_data_s[s_rb3_col].sum() if s_rb3_col else 0
+                        
+                        max_day_swings = player_data_s[s_count_col].max() if s_count_col else 0
+                        is_high_volume_s = (sum_tot_s >= significant_threshold_s) and (sum_tot_s > 0)
+                        vol_badge_s = "<span style='background:#EF4444; color:white; font-size:9px; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight:800; letter-spacing:0.5px;'>HIGH VOLUME</span>" if is_high_volume_s else ""
+                        
+                        p_key_s = str(player).strip().lower()
+                        photo_url_s = photo_dict.get(p_key_s, "https://via.placeholder.com/150/EAEAEA/6C757D?text=No+Photo")
+
+                        act_col_s = find_col(player_data_s, ['Activity', 'Session Name'])
+
+                        rows_html_s = ""
+                        for _, row in player_data_s.iterrows():
+                            if act_col_s and pd.notna(row[act_col_s]) and str(row[act_col_s]).strip() and str(row[act_col_s]).strip().lower() != 'nan':
+                                activity_str_s = str(row[act_col_s]).strip()
+                            else:
+                                activity_str_s = row['Date'].strftime('%b %d') if pd.notna(row['Date']) else "N/A"
+                                
+                            raw_tot_s = row[s_count_col] if s_count_col and pd.notna(row[s_count_col]) else 0
+                            tot_s = f"{raw_tot_s:.0f}"
+                            pl3_s = f"{row[s_pl3_col]:.0f}" if s_pl3_col and pd.notna(row[s_pl3_col]) else "0"
+                            rb3_s = f"{row[s_rb3_col]:.0f}" if s_rb3_col and pd.notna(row[s_rb3_col]) else "0"
+                            
+                            if raw_tot_s == max_day_swings and max_day_swings > 0:
+                                bg_color_s = "rgba(47, 128, 237, 0.08)"
+                                icon_s = " <span style='font-size: 9px; color: #2F80ED; font-weight: 800; letter-spacing: 0.5px;'>MAX</span>"
+                            else:
+                                bg_color_s = "transparent"
+                                icon_s = ""
+                            
+                            rows_html_s += f"<tr style='border-bottom: 1px solid #F1F5F9; background-color: {bg_color_s}; transition: background-color 0.15s ease;'><td style='padding: 10px 4px; text-align: left; font-weight: 600; color: #1D1D1F;'>{activity_str_s}</td><td style='padding: 10px 4px; color: #4895DB; font-weight: 800;'>{tot_s}{icon_s}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{pl3_s}</td><td style='padding: 10px 4px; color: #FF8200; font-weight: 600;'>{rb3_s}</td></tr>"
+
+                        footer_html_s = f"<tfoot style='position: sticky; bottom: 0; background: #F8FAFC; border-top: 2px solid #E2E8F0; z-index: 1;'><tr><td style='padding: 12px 4px; text-align: left; font-weight: 800; color: #1D1D1F; font-size: 11px; text-transform: uppercase;'>Total</td><td style='padding: 12px 4px; color: #4895DB; font-weight: 800;'>{sum_tot_s:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_pl3_s:,.0f}</td><td style='padding: 12px 4px; color: #FF8200; font-weight: 800;'>{sum_rb3_s:,.0f}</td></tr></tfoot>"
+                        
+                        card_border_s = "#EF4444" if is_high_volume_s else "#2F80ED"
+                        
+                        card_html_s = f"<div style='page-break-inside: avoid; break-inside: avoid; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #EAEAEA; border-top: 6px solid {card_border_s}; overflow: hidden; margin-bottom: 20px; height: 420px; display: flex; flex-direction: column;'><div style='background: linear-gradient(to right, #F8FAFC, #FFFFFF); padding: 18px 15px; display: flex; align-items: center; border-bottom: 1px solid #E2E8F0;'><img src='{photo_url_s}' style='width: 70px; height: 70px; box-sizing: border-box; padding: 6px; border-radius: 50%; object-fit: cover; border: 3px solid #4895DB; margin-right: 15px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div><h3 style='margin: 0; color: #1D1D1F; font-size: 19px; font-weight: 800; letter-spacing: -0.3px;'>{player}</h3><p style='margin: 3px 0 0 0; color: #6C757D; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;'>Swing Profile{vol_badge_s}</p></div></div><div style='padding: 0px 15px 0px 15px; flex-grow: 1; overflow-y: auto;'><table style='width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'><thead style='position: sticky; top: 0; background: white; z-index: 1;'><tr style='color: #475569; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;'><th style='padding: 12px 4px; text-align: left; background: white; border-bottom: 2px solid #E2E8F0;'>Activity</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Total</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 PL</th><th style='padding: 12px 4px; background: white; border-bottom: 2px solid #E2E8F0;'>Band 3 Rot</th></tr></thead><tbody>{rows_html_s}</tbody>{footer_html_s}</table></div></div>"
+                        
+                        with s_cols[idx % 3]:
+                            st.markdown(card_html_s, unsafe_allow_html=True)
+                            
 
             # =========================================================================
             # PRACTICE CARDS (TEAM-WIDE VIEW)
