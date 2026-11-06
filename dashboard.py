@@ -226,6 +226,24 @@ if check_password():
             [data-testid="stTabs"] [data-baseweb="tab-list"] {
                 display: none !important;
             }
+
+            /* FIX: Force Streamlit Tabs and internal containers to expand completely */
+            .stApp, .main, .block-container, 
+            div[data-testid="stTabs"] > div, 
+            div[data-testid="stTabs"] [data-baseweb="tab-panel"] {
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+                display: block !important;
+            }
+            
+            /* FIX: Allow Throw/Swing cards to expand their tables instead of scrolling */
+            div[style*="overflow-y: auto"], div[style*="height: 420px"] {
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+            }
+
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
