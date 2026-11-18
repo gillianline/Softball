@@ -227,7 +227,6 @@ if check_password():
                 display: none !important;
             }
 
-            /* FIX: Force Streamlit Tabs and internal containers to expand completely */
             .stApp, .main, .block-container, 
             div[data-testid="stTabs"] > div, 
             div[data-testid="stTabs"] [data-baseweb="tab-panel"] {
@@ -237,7 +236,6 @@ if check_password():
                 display: block !important;
             }
             
-            /* FIX: Allow Throw/Swing cards to expand their tables instead of scrolling */
             div[style*="overflow-y: auto"], div[style*="height: 420px"] {
                 overflow: visible !important;
                 height: auto !important;
@@ -282,11 +280,8 @@ if check_password():
                     df = pd.read_csv(st.secrets[secret_key])
                     df.columns = df.columns.str.strip()
                     if 'Date' in df.columns:
-                        # 1. Force to string, strip hidden spaces, and drop any timestamps
                         df['Date'] = df['Date'].astype(str).str.strip().str.split(' ').str[0]
-                        # 2. Explicitly tell Pandas to read it as MM/DD/YYYY
                         parsed_dates = pd.to_datetime(df['Date'], format='%m/%d/%Y', errors='coerce')
-                        # 3. Fallback to generic parsing if there are other formats mixed in
                         df['Date'] = parsed_dates.fillna(pd.to_datetime(df['Date'], errors='coerce'))
                     return df
                 except Exception:
@@ -381,7 +376,7 @@ if check_password():
             (cmj_df, ['height', 'power', 'rsi', 'velocity', 'force', 'impulse', 'rfd', 'stiffness', 'bw']),
             (er_df, ['rom', 'asymmetry', 'asym', 'max']),
             (grip_df, ['force', 'asymmetry', 'asym']),
-            (sprint_df, ['time', '20m', 'sec', 'speed'])
+            (sprint_df, ['time', '20m', '20y', '20yd', 'sec', 'speed'])
         ]:
             if not df.empty:
                 for col in df.columns:
@@ -404,7 +399,7 @@ if check_password():
                 return match_part[0]
         return None
 
-   # --- 5. SEASON & CALENDAR DATE RANGE SETUP ---
+    # --- 5. SEASON & CALENDAR DATE RANGE SETUP ---
     all_athletes = sorted(list(set(
         list(ash_df['Player Name'].dropna().unique() if 'Player Name' in ash_df.columns else []) +
         list(cmj_df['Player Name'].dropna().unique() if 'Player Name' in cmj_df.columns else []) +
@@ -532,7 +527,7 @@ if check_password():
         er_r_col = find_col(er_df, ['R Max ROM (°)', 'R Max ROM', 'Right Max ROM', 'R ROM'])
         grip_l_col = find_col(grip_df, ['L Max Force (N)', 'L Max Force', 'Left Max Force (N)', 'Force (L)', 'L Grip'])
         grip_r_col = find_col(grip_df, ['R Max Force (N)', 'R Max Force', 'Right Max Force (N)', 'Force (R)', 'R Grip'])
-        sprint_time_col = find_col(sprint_df, ['Time', '20m Time', '20m Sprint', 'Time (s)', '20m (s)', '20m'])
+        sprint_time_col = find_col(sprint_df, ['Time', '20m Time', '20m Sprint', '20yd Time', '20yd Sprint', 'Time (s)', '20m (s)', '20yd (s)', '20m', '20yd'])
 
         # Global Filtered DataFrames per Selected Athlete (Only process if in Individual Mode)
         if selected:
@@ -657,7 +652,7 @@ if check_password():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # 5. 20m Sprint
+            # 5. 20m / 20yd Sprint
             if not p_sprint.empty and sprint_time_col:
                 has_any_data = True
                 last_sprint = p_sprint.iloc[-1]
@@ -667,7 +662,7 @@ if check_password():
                         <div class="card-top">
                             <div class="card-title-wrap">
                                 <span class="badge-num badge-orange">5</span>
-                                <span class="card-title">20m Sprint Performance</span>
+                                <span class="card-title">20 yd Sprint Performance</span>
                             </div>
                             <span class="card-date">{sprint_date}</span>
                         </div>
@@ -684,13 +679,14 @@ if check_password():
         # --- 6. CONDITIONAL NAVIGATION TAB RENDERING ---
         
         if view_mode == "Team Overview":
-            tab_team_summary, tab_throw_cards, tab_swing_cards, tab_practice_cards, tab_report, tab_team_tests = st.tabs([
+            tab_team_summary, tab_throw_cards, tab_swing_cards, tab_practice_cards, tab_report, tab_team_tests, tab_progression_tests = st.tabs([
                 "TEAM SUMMARY", 
                 "PLAYER THROW CARDS", 
                 "PLAYER SWING CARDS", 
                 "PRACTICE CARDS", 
                 "VOLUME REPORT", 
-                "TEAM TESTS"
+                "TEAM TESTS",
+                "PROGRESSION TESTING"
             ])
 
             # =========================================================================
@@ -1015,7 +1011,6 @@ if check_password():
                 st.markdown('<div class="section-header">Player Practice Score Cards</div>', unsafe_allow_html=True)
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
                 
-                # Get the filtered data based on global dates
                 team_practice = filter_season(practice_df).copy() if not practice_df.empty else pd.DataFrame()
                 team_s = filter_season(swing_df).copy() if not swing_df.empty else pd.DataFrame()
                 team_t = filter_season(throw_df).copy() if not throw_df.empty else pd.DataFrame()
@@ -1023,22 +1018,18 @@ if check_password():
                 if team_practice.empty:
                     st.info("No practice data available for the selected date range.")
                 else:
-                    # 1. Create a session dropdown based on Date and Activity
                     if 'Activity' not in team_practice.columns:
                         team_practice['Activity'] = "Practice"
                         
                     temp_dates = team_practice.dropna(subset=['Date']).copy()
                     temp_dates['Session_Label'] = temp_dates['Date'].dt.strftime('%b %d, %Y') + " | " + temp_dates['Activity'].astype(str)
                     
-                    # Get unique sessions and sort newest first
                     unique_sessions = temp_dates[['Date', 'Activity', 'Session_Label']].drop_duplicates().sort_values('Date', ascending=False)
                     
                     if unique_sessions.empty:
                         st.warning("No valid dates found in practice data.")
                     else:
                         selected_session_label = st.selectbox("Select Practice Session:", unique_sessions['Session_Label'].tolist())
-                        
-                        # Filter to the specific day chosen
                         sel_date = unique_sessions[unique_sessions['Session_Label'] == selected_session_label].iloc[0]['Date']
                         
                         day_practice = team_practice[team_practice['Date'] == sel_date]
@@ -1050,22 +1041,19 @@ if check_password():
                         if not players_with_practice:
                             st.info("No player data for this specific session.")
                         else:
-                            p_cols = st.columns(2, gap="large") # Using 2 columns since these cards are wider
+                            p_cols = st.columns(2, gap="large")
                             
                             for idx, player in enumerate(players_with_practice):
-                                # Current Day Data
                                 p_data = day_practice[day_practice['Player Name'] == player]
                                 s_data = day_swing[day_swing['Player Name'] == player] if not day_swing.empty else pd.DataFrame()
                                 t_data = day_throw[day_throw['Player Name'] == player] if not day_throw.empty else pd.DataFrame()
                                 
-                                # 30-Day Historical Data for Max Calculation
                                 date_30_days_ago = sel_date - pd.Timedelta(days=30)
                                 
                                 hist_p = practice_df[(practice_df['Player Name'] == player) & (practice_df['Date'] <= sel_date) & (practice_df['Date'] >= date_30_days_ago)]
                                 hist_s = swing_df[(swing_df['Player Name'] == player) & (swing_df['Date'] <= sel_date) & (swing_df['Date'] >= date_30_days_ago)] if not swing_df.empty else pd.DataFrame()
                                 hist_t = throw_df[(throw_df['Player Name'] == player) & (throw_df['Date'] <= sel_date) & (throw_df['Date'] >= date_30_days_ago)] if not throw_df.empty else pd.DataFrame()
                                 
-                                # Helper to get 30D Max for a single dataset
                                 def get_30d_max(df, cols):
                                     if df.empty: return 1 
                                     valid_cols = [c for c in cols if c in df.columns]
@@ -1074,7 +1062,6 @@ if check_password():
                                     max_val = daily_totals.max()
                                     return max_val if max_val > 0 else 1
 
-                                # Helper to extract daily series for combined max calculations
                                 def get_daily_series(df, cols):
                                     if df.empty: return pd.Series(dtype=float)
                                     valid_cols = [c for c in cols if c in df.columns]
@@ -1085,7 +1072,6 @@ if check_password():
                                     valid_cols = [c for c in cols if c in df.columns]
                                     return df[valid_cols].sum().sum() if valid_cols else 0
 
-                                # 1. Calculate Combined Player Load (Today & 30D Max)
                                 today_pl = get_today_sum(p_data, ['Total Player Load']) + get_today_sum(s_data, ['Sum Swing Max Player Load']) + get_today_sum(t_data, ['Total Throw Player Load'])
                                 
                                 p_series = get_daily_series(hist_p, ['Total Player Load'])
@@ -1094,7 +1080,6 @@ if check_password():
                                 combined_pl_series = pd.concat([p_series, s_series, t_series], axis=1).sum(axis=1)
                                 max_pl = combined_pl_series.max() if not combined_pl_series.empty and combined_pl_series.max() > 0 else 1
 
-                                # 2. Set Up the Final Metrics List
                                 metrics = [
                                     {"name": "Player Load", "today": today_pl, "max": max_pl},
                                     {"name": "Total Throws", "today": get_today_sum(t_data, ['Total Throw Count']), "max": get_30d_max(hist_t, ['Total Throw Count'])},
@@ -1106,7 +1091,6 @@ if check_password():
                                     {"name": "IMA CoD R", "today": get_today_sum(p_data, ['IMA CoD Right High', 'IMA CoD Right Medium', 'IMA CoD Right Low']), "max": get_30d_max(hist_p, ['IMA CoD Right High', 'IMA CoD Right Medium', 'IMA CoD Right Low'])},
                                 ]
 
-                                # Generate HTML Rows and Final Score
                                 rows_html = ""
                                 total_grade = 0
                                 
@@ -1128,6 +1112,7 @@ if check_password():
                                 
                                 with p_cols[idx % 2]:
                                     st.markdown(pract_card_html, unsafe_allow_html=True)
+
             # =========================================================================
             # REPORT PAGE (SWINGS VS THROWS)
             # =========================================================================
@@ -1176,7 +1161,6 @@ if check_password():
                             """, unsafe_allow_html=True)
 
                     if not team_throw.empty:
-                        # Group by Date for whole team
                         t_band_df = team_throw.groupby('Date', as_index=False).sum(numeric_only=True)
                         
                         fig_rep_throw_band = go.Figure()
@@ -1409,6 +1393,222 @@ if check_password():
 
                         html_table += "</tbody></table></div>"
                         st.markdown(html_table, unsafe_allow_html=True)
+
+            # =========================================================================
+            # PROGRESSION TESTING (ER ROM, GRIP, 20YD SPRINT ACROSS ALL DATES)
+            # =========================================================================
+            with tab_progression_tests:
+                st.markdown('<div class="section-header">Progression Testing Matrix (ER ROM, Grip & 20 yd Sprint)</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                season_er = filter_season(er_df).copy() if not er_df.empty else pd.DataFrame()
+                season_grip = filter_season(grip_df).copy() if not grip_df.empty else pd.DataFrame()
+                season_sprint = filter_season(sprint_df).copy() if not sprint_df.empty else pd.DataFrame()
+
+                # Gather all unique testing dates across the three assessments
+                prog_dates_set = set()
+                for df_src in [season_er, season_grip, season_sprint]:
+                    if not df_src.empty and 'Date' in df_src.columns:
+                        prog_dates_set.update(df_src['Date'].dropna().dt.date.unique().tolist())
+
+                sorted_prog_dates = sorted(list(prog_dates_set))
+
+                if not sorted_prog_dates:
+                    st.info("No ER ROM, Grip Strength, or 20 yd Sprint records found for the selected date range.")
+                else:
+                    # Optional roster filter so you can view all athletes or isolate a subset
+                    prog_players_all = sorted(list(set(
+                        list(season_er['Player Name'].dropna().unique() if not season_er.empty and 'Player Name' in season_er.columns else []) +
+                        list(season_grip['Player Name'].dropna().unique() if not season_grip.empty and 'Player Name' in season_grip.columns else []) +
+                        list(season_sprint['Player Name'].dropna().unique() if not season_sprint.empty and 'Player Name' in season_sprint.columns else [])
+                    )))
+
+                    selected_prog_players = st.multiselect(
+                        "Filter Athletes (leave empty to show all tested athletes):",
+                        options=prog_players_all,
+                        default=[],
+                        key="prog_athlete_filter"
+                    )
+                    display_players = selected_prog_players if selected_prog_players else prog_players_all
+
+                    # Helper to build fast lookup dict: {(player, date_obj): val}
+                    def build_metric_lookup(df_src, val_col):
+                        lookup = {}
+                        if df_src.empty or not val_col or val_col not in df_src.columns or 'Date' not in df_src.columns:
+                            return lookup
+                        valid = df_src.dropna(subset=['Player Name', 'Date', val_col]).copy()
+                        valid['TempDate'] = valid['Date'].dt.date
+                        grouped = valid.groupby(['Player Name', 'TempDate'])[val_col].mean()
+                        for (p_name, d_val), metric_val in grouped.items():
+                            lookup[(p_name, d_val)] = metric_val
+                        return lookup
+
+                    er_l_map = build_metric_lookup(season_er, er_l_col)
+                    er_r_map = build_metric_lookup(season_er, er_r_col)
+                    grip_l_map = build_metric_lookup(season_grip, grip_l_col)
+                    grip_r_map = build_metric_lookup(season_grip, grip_r_col)
+                    sprint_map = build_metric_lookup(season_sprint, sprint_time_col)
+
+                    # Build column structure grouped by Date -> only include tests recorded on that date
+                    date_columns_meta = []
+                    for d_obj in sorted_prog_dates:
+                        sub_cols = []
+                        if any(k[1] == d_obj for k in er_l_map) or any(k[1] == d_obj for k in er_r_map):
+                            sub_cols.append(("ER L (°)", er_l_map, "{:.1f}", "col-er"))
+                            sub_cols.append(("ER R (°)", er_r_map, "{:.1f}", "col-er"))
+                        if any(k[1] == d_obj for k in grip_l_map) or any(k[1] == d_obj for k in grip_r_map):
+                            sub_cols.append(("Grip L (N)", grip_l_map, "{:.1f}", "col-grip"))
+                            sub_cols.append(("Grip R (N)", grip_r_map, "{:.1f}", "col-grip"))
+                        if any(k[1] == d_obj for k in sprint_map):
+                            sub_cols.append(("20 yd (s)", sprint_map, "{:.2f}", "col-sprint"))
+
+                        if sub_cols:
+                            date_columns_meta.append({
+                                "date": d_obj,
+                                "label": d_obj.strftime('%b %d, %Y'),
+                                "sub_cols": sub_cols
+                            })
+
+                    # Build HTML table with sticky Athlete Name column and 2-tier Date -> Metric headers
+                    prog_html = """
+                    <style>
+                        .prog-wrapper {
+                            border: 1px solid #E2E8F0;
+                            border-radius: 10px;
+                            overflow-x: auto;
+                            margin-top: 8px;
+                            margin-bottom: 18px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+                        }
+                        .prog-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            text-align: center;
+                            white-space: nowrap;
+                        }
+                        .prog-table th.date-group-header {
+                            background-color: #1E293B;
+                            color: #FFFFFF;
+                            font-size: 12px;
+                            font-weight: 800;
+                            padding: 9px 12px;
+                            border-left: 2px solid #475569;
+                            letter-spacing: 0.4px;
+                            text-align: center !important;
+                        }
+                        .prog-table th.sub-header {
+                            background-color: #F1F5F9;
+                            color: #334155;
+                            font-size: 11px;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            padding: 8px 10px;
+                            border-bottom: 2px solid #CBD5E1;
+                            text-align: center !important;
+                        }
+                        .prog-table th.sticky-col, .prog-table td.sticky-col {
+                            position: sticky;
+                            left: 0;
+                            z-index: 2;
+                            text-align: left !important;
+                            padding-left: 14px;
+                            padding-right: 16px;
+                            border-right: 2px solid #CBD5E1;
+                        }
+                        .prog-table th.sticky-col {
+                            background-color: #0F172A;
+                            color: #FFFFFF;
+                            font-size: 12px;
+                            font-weight: 800;
+                            text-transform: uppercase;
+                        }
+                        .prog-table tbody tr:nth-child(odd) td.sticky-col {
+                            background-color: #FFFFFF;
+                        }
+                        .prog-table tbody tr:nth-child(even) td.sticky-col {
+                            background-color: #F8FAFC;
+                        }
+                        .prog-table tbody tr:hover td.sticky-col {
+                            background-color: #EDF2F7;
+                        }
+                        .prog-table td {
+                            padding: 9px 10px;
+                            font-size: 13px;
+                            color: #1E293B;
+                            border-bottom: 1px solid #E2E8F0;
+                            text-align: center !important;
+                        }
+                        .prog-table tbody tr:nth-child(even) {
+                            background-color: #F8FAFC;
+                        }
+                        .prog-table tbody tr:hover {
+                            background-color: #EDF2F7;
+                        }
+                        .date-start-border {
+                            border-left: 2px solid #CBD5E1 !important;
+                        }
+                        .col-er { background-color: rgba(255, 130, 0, 0.04); }
+                        .col-grip { background-color: rgba(47, 128, 237, 0.04); }
+                        .col-sprint { background-color: rgba(16, 185, 129, 0.05); }
+                    </style>
+                    <div class="prog-wrapper">
+                    <table class="prog-table">
+                        <thead>
+                            <tr>
+                                <th class="sticky-col" rowspan="2">Player Name</th>
+                    """
+
+                    for grp in date_columns_meta:
+                        span = len(grp["sub_cols"])
+                        prog_html += f'<th class="date-group-header" colspan="{span}">{grp["label"]}</th>'
+
+                    prog_html += "</tr><tr>"
+
+                    for grp in date_columns_meta:
+                        for idx_sub, (sub_label, _, _, _) in enumerate(grp["sub_cols"]):
+                            border_cls = " date-start-border" if idx_sub == 0 else ""
+                            prog_html += f'<th class="sub-header{border_cls}">{sub_label}</th>'
+
+                    prog_html += "</tr></thead><tbody>"
+
+                    # Also build flat export DataFrame simultaneously
+                    export_rows = []
+
+                    for p_name in display_players:
+                        prog_html += "<tr>"
+                        prog_html += f'<td class="sticky-col" style="font-weight:700; color:#1D1D1F;">{p_name}</td>'
+                        export_row = {"Player Name": p_name}
+
+                        for grp in date_columns_meta:
+                            d_obj = grp["date"]
+                            for idx_sub, (sub_label, lookup_map, fmt_str, bg_cls) in enumerate(grp["sub_cols"]):
+                                val = lookup_map.get((p_name, d_obj), np.nan)
+                                border_cls = " date-start-border" if idx_sub == 0 else ""
+                                if pd.notna(val):
+                                    disp_val = fmt_str.format(val)
+                                    export_row[f"{grp['label']} - {sub_label}"] = round(float(val), 2)
+                                else:
+                                    disp_val = "-"
+                                    export_row[f"{grp['label']} - {sub_label}"] = ""
+
+                                prog_html += f'<td class="{bg_cls}{border_cls}">{disp_val}</td>'
+
+                        prog_html += "</tr>"
+                        export_rows.append(export_row)
+
+                    prog_html += "</tbody></table></div>"
+                    st.markdown(prog_html, unsafe_allow_html=True)
+
+                    if export_rows:
+                        prog_export_df = pd.DataFrame(export_rows)
+                        prog_csv = prog_export_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="Download Progression Testing CSV",
+                            data=prog_csv,
+                            file_name=f"progression_testing_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
+                            mime='text/csv'
+                        )
 
 
         # --- INDIVIDUAL ATHLETE VIEW ---
@@ -1776,7 +1976,7 @@ if check_password():
                     st.markdown(render_custom_table(grip_tbl), unsafe_allow_html=True)
 
                 if not p_sprint.empty:
-                    st.markdown('<div class="sub-header-title">20m Sprint Performance History</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="sub-header-title">20 yd Sprint Performance History</div>', unsafe_allow_html=True)
                     sprint_cols = [c for c in ['Date', sprint_time_col] if c and c in p_sprint.columns]
                     sprint_tbl = p_sprint[sprint_cols].copy()
                     if 'Date' in sprint_tbl.columns:
