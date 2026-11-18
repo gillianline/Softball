@@ -1395,7 +1395,7 @@ if check_password():
                         st.markdown(html_table, unsafe_allow_html=True)
 
             # =========================================================================
-            # PROGRESSION TESTING (GROUPED BY METRIC ACROSS DATES + TREND ARROWS)
+            # PROGRESSION TESTING (DATE MATRIX + FIRST-TO-LAST NET CHANGE SUMMARY)
             # =========================================================================
             with tab_progression_tests:
                 st.markdown('<div class="section-header">Progression Testing Matrix (ER ROM, Grip & 20 yd Sprint)</div>', unsafe_allow_html=True)
@@ -1423,13 +1423,12 @@ if check_password():
                 grip_r_dates, grip_r_map = get_metric_dates_and_lookup(season_grip, grip_r_col)
                 sprint_dates, sprint_map = get_metric_dates_and_lookup(season_sprint, sprint_time_col)
 
-                # Metric groups ordered so identical tests sit side-by-side across dates
                 metric_groups = [
-                    {"title": "ER ROM Left (°)", "dates": er_l_dates, "lookup": er_l_map, "fmt": "{:.1f}", "cls": "col-er", "lower_better": False},
-                    {"title": "ER ROM Right (°)", "dates": er_r_dates, "lookup": er_r_map, "fmt": "{:.1f}", "cls": "col-er", "lower_better": False},
-                    {"title": "Grip Left (N)", "dates": grip_l_dates, "lookup": grip_l_map, "fmt": "{:.1f}", "cls": "col-grip", "lower_better": False},
-                    {"title": "Grip Right (N)", "dates": grip_r_dates, "lookup": grip_r_map, "fmt": "{:.1f}", "cls": "col-grip", "lower_better": False},
-                    {"title": "20 yd Sprint (s)", "dates": sprint_dates, "lookup": sprint_map, "fmt": "{:.2f}", "cls": "col-sprint", "lower_better": True},
+                    {"title": "ER ROM Left (°)", "unit": "°", "dates": er_l_dates, "lookup": er_l_map, "fmt": "{:.1f}", "cls": "col-er", "lower_better": False},
+                    {"title": "ER ROM Right (°)", "unit": "°", "dates": er_r_dates, "lookup": er_r_map, "fmt": "{:.1f}", "cls": "col-er", "lower_better": False},
+                    {"title": "Grip Left (N)", "unit": " N", "dates": grip_l_dates, "lookup": grip_l_map, "fmt": "{:.1f}", "cls": "col-grip", "lower_better": False},
+                    {"title": "Grip Right (N)", "unit": " N", "dates": grip_r_dates, "lookup": grip_r_map, "fmt": "{:.1f}", "cls": "col-grip", "lower_better": False},
+                    {"title": "20 yd Sprint (s)", "unit": " s", "dates": sprint_dates, "lookup": sprint_map, "fmt": "{:.2f}", "cls": "col-sprint", "lower_better": True},
                 ]
                 metric_groups = [mg for mg in metric_groups if len(mg["dates"]) > 0]
 
@@ -1462,6 +1461,24 @@ if check_password():
                         color = "#10B981" if improved else "#EF4444"
                         return f"{val_str} <span style='color:{color}; font-weight:bold;'>{arrow}</span>"
 
+                    def format_net_delta(first_val, last_val, fmt_str, unit_str, lower_better=False):
+                        if pd.isna(first_val) or pd.isna(last_val):
+                            return "-"
+                        diff = last_val - first_val
+                        if abs(diff) < 1e-6:
+                            return f"<span style='color:#6C757D; font-weight:700;'>0.0{unit_str} -</span>"
+                        improved = (diff < 0) if lower_better else (diff > 0)
+                        arrow = "&uarr;" if diff > 0 else "&darr;"
+                        sign = "+" if diff > 0 else ""
+                        color = "#10B981" if improved else "#EF4444"
+                        bg_pill = "rgba(16, 185, 129, 0.12)" if improved else "rgba(239, 68, 68, 0.12)"
+                        diff_str = fmt_str.format(diff)
+                        return (
+                            f"<span style='background:{bg_pill}; color:{color}; padding:3px 8px; "
+                            f"border-radius:6px; font-weight:800;'>{sign}{diff_str}{unit_str} {arrow}</span>"
+                        )
+
+                    # --- 1. TOP TABLE: FULL DATE-BY-DATE PROGRESSION MATRIX ---
                     prog_html = """
                     <style>
                         .prog-wrapper {
@@ -1593,9 +1610,83 @@ if check_password():
                         prog_export_df = pd.DataFrame(export_rows)
                         prog_csv = prog_export_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="Download Progression Testing CSV",
+                            label="Download Full Progression Matrix CSV",
                             data=prog_csv,
-                            file_name=f"progression_testing_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
+                            file_name=f"progression_matrix_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
+                            mime='text/csv'
+                        )
+
+                    # --- 2. BOTTOM TABLE: FIRST-TO-LAST NET CHANGE SUMMARY ---
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown('<div class="section-header">First-to-Last Net Change Summary</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+                    delta_html = """
+                    <div class="prog-wrapper">
+                    <table class="prog-table">
+                        <thead>
+                            <tr>
+                                <th class="sticky-col" rowspan="2">Player Name</th>
+                    """
+
+                    for mg in metric_groups:
+                        delta_html += f'<th class="metric-group-header" colspan="3">{mg["title"]}</th>'
+
+                    delta_html += "</tr><tr>"
+
+                    for mg in metric_groups:
+                        delta_html += '<th class="sub-header group-start-border">First</th>'
+                        delta_html += '<th class="sub-header">Latest</th>'
+                        delta_html += '<th class="sub-header">Net Change</th>'
+
+                    delta_html += "</tr></thead><tbody>"
+
+                    delta_export_rows = []
+                    for p_name in display_players:
+                        delta_html += "<tr>"
+                        delta_html += f'<td class="sticky-col" style="font-weight:700; color:#1D1D1F;">{p_name}</td>'
+                        delta_export_row = {"Player Name": p_name}
+
+                        for mg in metric_groups:
+                            # Gather all valid chronological values for this player & metric
+                            valid_vals = [
+                                mg["lookup"][(p_name, d_obj)]
+                                for d_obj in mg["dates"]
+                                if (p_name, d_obj) in mg["lookup"] and pd.notna(mg["lookup"][(p_name, d_obj)])
+                            ]
+
+                            first_val = valid_vals[0] if len(valid_vals) >= 1 else np.nan
+                            last_val = valid_vals[-1] if len(valid_vals) >= 2 else np.nan
+
+                            first_disp = mg["fmt"].format(first_val) if pd.notna(first_val) else "-"
+                            last_disp = mg["fmt"].format(last_val) if pd.notna(last_val) else "-"
+                            net_disp = format_net_delta(first_val, last_val, mg["fmt"], mg["unit"], mg["lower_better"])
+
+                            delta_html += f'<td class="{mg["cls"]} group-start-border">{first_disp}</td>'
+                            delta_html += f'<td class="{mg["cls"]}" style="font-weight:700;">{last_disp}</td>'
+                            delta_html += f'<td class="{mg["cls"]}">{net_disp}</td>'
+
+                            delta_export_row[f"{mg['title']} - First"] = round(float(first_val), 2) if pd.notna(first_val) else ""
+                            delta_export_row[f"{mg['title']} - Latest"] = round(float(last_val), 2) if pd.notna(last_val) else ""
+                            delta_export_row[f"{mg['title']} - Net Change"] = (
+                                round(float(last_val - first_val), 2)
+                                if (pd.notna(first_val) and pd.notna(last_val))
+                                else ""
+                            )
+
+                        delta_html += "</tr>"
+                        delta_export_rows.append(delta_export_row)
+
+                    delta_html += "</tbody></table></div>"
+                    st.markdown(delta_html, unsafe_allow_html=True)
+
+                    if delta_export_rows:
+                        delta_export_df = pd.DataFrame(delta_export_rows)
+                        delta_csv = delta_export_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="Download First-to-Last Change Summary CSV",
+                            data=delta_csv,
+                            file_name=f"progression_net_change_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv",
                             mime='text/csv'
                         )
 
